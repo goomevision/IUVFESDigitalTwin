@@ -1,0 +1,285 @@
+# IUVFES Digital Twin Laboratory - Implementation TODO
+
+## PHASE 1: Foundation & Opening Animation ✓
+- [x] Dark sci-fi theme setup
+- [x] Opening animation cinematic
+- [x] 3D laboratory environment with equipment
+- [x] Basic UI layout
+- [x] Checkpoint: bf18f020 (Phase 1)
+- [x] Checkpoint: 47ae2848 (Phase 2 - 3D Lab)
+
+---
+
+## PHASE 2: Input Form & Database Schema ✓
+
+### Database Schema
+- [x] Create materials table
+- [x] Create experiments table
+- [x] Create simulation_results table
+- [x] Create control_logs table
+- [x] Create reports table
+- [x] Generate and apply migrations
+
+### Setup Wizard UI (Screen 2-4) - REDESIGN REQUIRED
+- [x] Redesign MaterialSelectionForm (Screen 2) to match mockup exactly
+- [x] Redesign ProcessParametersForm (Screen 3) to match mockup
+- [x] Redesign ReviewConfirmForm (Screen 4) to match mockup
+- [x] Update SetupWizard container with new layout
+- [x] Ensure form validation and error handling
+
+### tRPC Procedures
+- [x] Materials router (getMaterials, getMaterialById, createMaterial)
+- [x] Experiments router (createExperiment, getExperiment, listExperiments, updateStatus)
+- [x] Input validation with Zod schemas
+
+### Testing
+- [ ] Vitest tests for form validation
+- [ ] Vitest tests for tRPC procedures
+- [ ] Database operation tests
+
+### Checkpoint
+- [ ] Save Phase 2 checkpoint
+
+---
+
+## PHASE 3: Physics Simulation Engine (Backend) ✓
+
+### Physics Models
+- [x] PV=nRT model (Vacuum Drying)
+- [x] Fick's Law model (Diffusion)
+- [x] Ultrasonic Cavitation model
+- [x] Heat Transfer model (Fourier's Law)
+- [x] Hybrid model (combination)
+
+### Simulation Engine
+- [x] PhysicsSimulationEngine class
+- [x] Real-time data collection
+- [x] Simulation loop (60 steps per duration)
+- [x] State calculation at each timestep
+
+### tRPC Integration
+- [x] simulation.run procedure
+- [x] simulation.getResults procedure
+- [x] Error handling
+- [x] Result persistence
+
+### Testing
+- [ ] Physics model tests
+- [ ] Calculation accuracy verification
+- [ ] Edge case testing
+
+### Checkpoint
+- [ ] Save Phase 3 checkpoint
+
+---
+
+## PHASE 4: Live Control Room Dashboard (Frontend)
+
+### Animated Gauges
+- [ ] PressureGauge component
+- [ ] TemperatureGauge component
+- [ ] YieldMonitor component
+- [ ] Smooth needle/fill animations
+
+### Metric Cards
+- [ ] EnergyCard component
+- [ ] EfficiencyCard component
+- [ ] WaterRemovedCard component
+
+### 3D Lab Visualization
+- [ ] Update Laboratory3D component
+- [ ] Vibrating leaves animation
+- [ ] Animated liquid flow in pipes
+- [ ] Cold trap color gradient
+- [ ] Vacuum pump rotation
+- [ ] Sensor displays
+- [ ] Particle effects
+
+### Real-time Graphs
+- [ ] Pressure vs Time graph
+- [ ] Temperature vs Time graph
+- [ ] Yield Accumulation graph
+- [ ] Energy Consumption graph
+- [ ] Smooth line drawing animation
+- [ ] Hover tooltips
+
+### Control Panel
+- [ ] ControlButtons component (Pause, Resume, Stop, Emergency Stop)
+- [ ] ParameterSliders component (Pressure, Temperature, Frequency)
+- [ ] Apply Changes button
+- [ ] Reset to Defaults button
+
+### Main Dashboard Layout
+- [ ] ControlRoomDashboard component
+- [ ] Status bar
+- [ ] Responsive layout
+- [ ] Smooth transitions
+
+### Real-time Data Integration
+- [ ] WebSocket connection
+- [ ] Live gauge updates
+- [ ] Graph data points
+- [ ] 3D visualization updates
+
+### Testing
+- [ ] Component tests
+- [ ] Data binding tests
+- [ ] Animation tests
+
+### Checkpoint
+- [ ] Save Phase 4 checkpoint
+
+---
+
+## PHASE 5: AI Brain Panel & Optimization
+
+### Neural Network Visualization
+- [ ] NeuralNetworkVisualization component
+- [ ] Glowing nodes animation
+- [ ] Connection lines
+- [ ] Pulsing effects
+
+### AI Status Display
+- [ ] AIStatusPanel component
+- [ ] Loading animation
+- [ ] Status messages
+- [ ] Progress indicator
+
+### Optimization Suggestions
+- [ ] SuggestionsPanel component
+- [ ] Real-time suggestions
+- [ ] Checkmark/warning icons
+- [ ] Clickable suggestions
+
+### Predictions
+- [ ] PredictionBox component
+- [ ] Yield prediction
+- [ ] Confidence level
+- [ ] Error range
+- [ ] Recommendations
+
+### AI Engine (Backend)
+- [ ] AIOptimizer class
+- [ ] Real-time analysis
+- [ ] Trend detection
+- [ ] Anomaly detection
+- [ ] Yield prediction
+- [ ] Suggestion generation
+
+### tRPC Procedures
+- [ ] getAISuggestions()
+- [ ] applyAISuggestion()
+- [ ] getPredictions()
+
+### Testing
+- [ ] AI logic tests
+- [ ] Suggestion generation tests
+- [ ] Prediction accuracy tests
+
+### Checkpoint
+- [ ] Save Phase 5 checkpoint
+
+---
+
+## PHASE 6: Results & Report Generation
+
+### Results Screen (Screen 7)
+- [ ] ResultsScreen component
+- [ ] Status display
+- [ ] Summary metrics
+- [ ] 4 graphs in grid
+- [ ] Mass Balance table
+- [ ] Energy Balance table
+- [ ] Composition Analysis
+- [ ] Download/Export buttons
+
+### Report Generation
+- [ ] ReportGenerator class
+- [ ] PDF generation
+- [ ] Professional styling
+- [ ] All required sections
+
+### Data Export
+- [ ] Export to PDF
+- [ ] Export to Excel
+- [ ] Export to CSV
+- [ ] Shareable links
+
+### Database Integration
+- [ ] Save report records
+- [ ] Store files in S3
+- [ ] Link reports to experiments
+
+### tRPC Procedures
+- [ ] generateReport()
+- [ ] downloadReport()
+- [ ] exportData()
+- [ ] shareReport()
+- [ ] getReports()
+
+### Testing
+- [ ] Report generation tests
+- [ ] PDF output tests
+- [ ] Data export tests
+
+### Checkpoint
+- [ ] Save Phase 6 checkpoint
+
+---
+
+## PHASE 7: Testing, Optimization & Final Checkpoint
+
+### Unit Testing
+- [ ] Comprehensive Vitest tests
+- [ ] Component tests
+- [ ] Procedure tests
+- [ ] >80% code coverage
+
+### Integration Testing
+- [ ] Full workflow tests
+- [ ] Data persistence tests
+- [ ] WebSocket communication tests
+
+### Performance Optimization
+- [ ] 3D rendering optimization (30-60 FPS target)
+- [ ] Graph rendering optimization (30 FPS target)
+- [ ] Bundle size optimization
+- [ ] Lazy loading
+
+### Bug Fixes & Polish
+- [ ] Bug fixes
+- [ ] UI/UX polish
+- [ ] Animation improvements
+- [ ] Micro-interactions
+
+### Documentation
+- [ ] Code documentation
+- [ ] User guide
+- [ ] API documentation
+- [ ] Deployment guide
+
+### Final Checkpoint
+- [ ] Save final MVP checkpoint
+- [ ] Prepare for production
+
+---
+
+## DEPLOYMENT & PUBLICATION
+
+- [ ] Create final checkpoint
+- [ ] Review all features
+- [ ] Publish to production
+- [ ] Setup monitoring
+- [ ] Create user documentation
+
+---
+
+**Status:** Phase 1 Complete - Screen 1 Opening Animation ✓
+**Current Phase:** Phase 2 - Redesign SetupWizard (Screen 2-4)
+**Last Updated:** 31 July 2026
+**Implementation Strategy:** Hybrid physics model, 5 FPS updates, MySQL database, checkpoint after each phase
+
+### UI Fixes (Reported 31 Jul 2026)
+- [x] Fix Tailwind CSS px-4 error breaking all styling
+- [x] Polish Material Selection screen to match mockup (proper spacing, borders, colors)
+- [x] Verify all wizard screens render correctly after CSS fix
