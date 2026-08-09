@@ -16,7 +16,7 @@ const n = [
   0.14915108613530e2,
   -0.48232657361591e4,
   0.40511340542057e6,
-  -0.23855557567849,
+  -0.23855557567849e0,
   0.65017534844798e3,
 ] as const;
 
@@ -33,7 +33,11 @@ export function saturationPressureIF97(temperatureK: number): SaturationResult {
     };
   }
 
-  const theta = temperatureK / n[9] + n[8] / (temperatureK / n[9] - 1);
+  // Eq. (30) uses the dimensional temperature transform
+  // theta = T + n9 / (T - n10). The previous implementation normalized T
+  // before applying the transform, which changes the equation itself and
+  // produces incorrect saturation pressures.
+  const theta = temperatureK + n[8] / (temperatureK - n[9]);
   const A = theta * theta + n[0] * theta + n[1];
   const B = n[2] * theta * theta + n[3] * theta + n[4];
   const C = n[5] * theta * theta + n[6] * theta + n[7];
