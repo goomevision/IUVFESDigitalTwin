@@ -1,4 +1,5 @@
 import { deriveCylindricalChamber, type CylindricalChamberGeometry } from './virtualHardwareGeometry';
+import type { DynamicMachineConfig } from './machineDynamics';
 import type { ThermalModelConfig } from './thermalEngineering';
 
 export interface ThermalMaterialProperties {
@@ -61,5 +62,22 @@ export function buildCoupledThermalModel(input: ThermalHardwareInput): CoupledTh
       heatLossKWPerC: estimatedHeatLossCoefficientKWPerC,
     },
     derivedShellMassKg: shellMassKg,
+  };
+}
+
+/**
+ * Explicit adapter from hardware-derived thermal values into MachineDynamics.
+ * The caller can merge this result into DynamicMachineConfig before constructing
+ * the engine; no physical safety claim is implied by the conversion.
+ */
+export function toMachineDynamicsThermalConfig(
+  result: CoupledThermalHardwareResult,
+  base: Pick<DynamicMachineConfig, 'heatingPowerKW' | 'coolingPowerKW'> = {},
+): Pick<DynamicMachineConfig, 'thermalMassKJPerC' | 'effectiveHeatLossKWPerC' | 'heatingPowerKW' | 'coolingPowerKW'> {
+  return {
+    thermalMassKJPerC: result.effectiveThermalMassKJPerC,
+    effectiveHeatLossKWPerC: result.estimatedHeatLossCoefficientKWPerC,
+    heatingPowerKW: base.heatingPowerKW,
+    coolingPowerKW: base.coolingPowerKW,
   };
 }
