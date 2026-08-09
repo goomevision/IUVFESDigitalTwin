@@ -43,15 +43,29 @@ export function validateTimeSeriesComparison(
     };
   }
 
-  const meanPass = meanAbsoluteError <= criteria.maxMeanAbsoluteError;
-  const maxPass = maxAbsoluteError <= criteria.maxAbsoluteError;
+  const meanError = meanAbsoluteError;
+  const maxError = maxAbsoluteError;
+  if (meanError === undefined || maxError === undefined) {
+    return {
+      metric: criteria.metric,
+      status: comparedPoints === 0 ? "INSUFFICIENT_DATA" : "PARTIALLY_VALIDATED",
+      comparedPoints,
+      meanAbsoluteError,
+      maxAbsoluteError,
+      criteria,
+      reasons: ["Error metrics are incomplete."],
+    };
+  }
+
+  const meanPass = meanError <= criteria.maxMeanAbsoluteError;
+  const maxPass = maxError <= criteria.maxAbsoluteError;
   if (meanPass && maxPass) {
     return {
       metric: criteria.metric,
       status: "VALIDATED",
       comparedPoints,
-      meanAbsoluteError,
-      maxAbsoluteError,
+      meanAbsoluteError: meanError,
+      maxAbsoluteError: maxError,
       criteria,
       reasons: ["All configured acceptance criteria passed."],
     };
@@ -62,8 +76,8 @@ export function validateTimeSeriesComparison(
       metric: criteria.metric,
       status: "PARTIALLY_VALIDATED",
       comparedPoints,
-      meanAbsoluteError,
-      maxAbsoluteError,
+      meanAbsoluteError: meanError,
+      maxAbsoluteError: maxError,
       criteria,
       reasons: [
         `Mean error criterion: ${meanPass ? "PASS" : "FAIL"}.`,
@@ -76,8 +90,8 @@ export function validateTimeSeriesComparison(
     metric: criteria.metric,
     status: "NOT_VALIDATED",
     comparedPoints,
-    meanAbsoluteError,
-    maxAbsoluteError,
+    meanAbsoluteError: meanError,
+    maxAbsoluteError: maxError,
     criteria,
     reasons: [
       `Mean error criterion: ${meanPass ? "PASS" : "FAIL"}.`,
