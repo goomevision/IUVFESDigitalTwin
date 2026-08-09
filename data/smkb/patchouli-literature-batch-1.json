@@ -1,0 +1,162 @@
+{
+  "datasetId": "SMKB-PATCHOULI-LITERATURE-BATCH-1",
+  "materialId": "MAT-PATCHOULI-LEAF",
+  "status": "LITERATURE_EVIDENCE",
+  "records": [
+    {
+      "property": "essential_oil_yield",
+      "value": 0.30,
+      "unit": "% v/w fresh weight",
+      "condition": "fresh leaf explants; hydrodistillation",
+      "evidenceGrade": "B",
+      "source": {
+        "title": "Chemical constituents from leaves and cell cultures of Pogostemon cablin and use of precursor feeding to improve patchouli alcohol level",
+        "type": "peer_reviewed_journal",
+        "url": "https://research.manchester.ac.uk/en/publications/chemical-constituents-from-leaves-and-cell-cultures-of-pogostemon/"
+      },
+      "notes": "Literature observation only; not a universal material constant."
+    },
+    {
+      "property": "patchouli_alcohol",
+      "value": 60.30,
+      "unit": "% of essential oil",
+      "condition": "hydrodistilled leaf oil in cited study",
+      "evidenceGrade": "B",
+      "source": {
+        "title": "Chemical constituents from leaves and cell cultures of Pogostemon cablin and use of precursor feeding to improve patchouli alcohol level",
+        "type": "peer_reviewed_journal",
+        "url": "https://research.manchester.ac.uk/en/publications/chemical-constituents-from-leaves-and-cell-cultures-of-pogostemon/"
+      },
+      "notes": "Study-specific composition; must not be used as a fixed universal prior."
+    },
+    {
+      "property": "essential_oil_yield",
+      "value": 5.17,
+      "unit": "%",
+      "condition": "leaves after 4 days drying; Aceh patchouli study",
+      "evidenceGrade": "B",
+      "source": {
+        "title": "Waktu Kering Angin Pada Daun dan Tangkai Terhadap Mutu dan Rendemen Minyak Nilam Aceh (Pogostemon cablin Benth)",
+        "type": "peer_reviewed_journal",
+        "doi": "10.36873/jht.v18i1.9762",
+        "url": "https://e-journal.upr.ac.id/index.php/JHT/article/view/9762"
+      },
+      "notes": "Maximum reported leaf yield in the cited drying-time experiment; not a universal yield."
+    },
+    {
+      "property": "essential_oil_yield",
+      "value": 1.40,
+      "unit": "%",
+      "condition": "leaves without drying (control) in cited Aceh patchouli study",
+      "evidenceGrade": "B",
+      "source": {
+        "title": "Waktu Kering Angin Pada Daun dan Tangkai Terhadap Mutu dan Rendemen Minyak Nilam Aceh (Pogostemon cablin Benth)",
+        "type": "peer_reviewed_journal",
+        "doi": "10.36873/jht.v18i1.9762",
+        "url": "https://e-journal.upr.ac.id/index.php/JHT/article/view/9762"
+      },
+      "notes": "Control value from one experiment."
+    },
+    {
+      "property": "patchouli_alcohol",
+      "value": 31.48,
+      "unit": "% of essential oil",
+      "condition": "leaves after 8 days drying in cited Aceh patchouli study",
+      "evidenceGrade": "B",
+      "source": {
+        "title": "Waktu Kering Angin Pada Daun dan Tangkai Terhadap Mutu dan Rendemen Minyak Nilam Aceh (Pogostemon cablin Benth)",
+        "type": "peer_reviewed_journal",
+        "doi": "10.36873/jht.v18i1.9762",
+        "url": "https://e-journal.upr.ac.id/index.php/JHT/article/view/9762"
+      },
+      "notes": "Study-specific maximum reported for leaves."
+    },
+    {
+      "property": "essential_oil_yield",
+      "value": 2.80,
+      "unit": "%",
+      "condition": "oven drying at 40 C before steam distillation",
+      "evidenceGrade": "B",
+      "source": {
+        "title": "Standardization of Different Drying Methods of Fresh Patchouli (Pogostemon cablin) Leaves for High Essential Oil Yield and Quality",
+        "type": "peer_reviewed_journal",
+        "doi": "10.1080/0972060X.2020.1798289",
+        "url": "https://www.tandfonline.com/doi/abs/10.1080/0972060X.2020.1798289"
+      },
+      "notes": "Reported best volatile-oil yield among the tested oven-temperature conditions."
+    },
+    {
+      "property": "patchouli_alcohol",
+      "value": 36.63,
+      "unit": "% of essential oil",
+      "condition": "direct-sunlight drying treatment in cited study",
+      "evidenceGrade": "B",
+      "source": {
+        "title": "Standardization of Different Drying Methods of Fresh Patchouli (Pogostemon cablin) Leaves for High Essential Oil Yield and Quality",
+        "type": "peer_reviewed_journal",
+        "doi": "10.1080/0972060X.2020.1798289",
+        "url": "https://www.tandfonline.com/doi/abs/10.1080/0972060X.2020.1798289"
+      },
+      "notes": "Composition result from a specific drying treatment; not a universal value."
+    },
+    {
+      "property": "hydrodistillation_yield",
+      "value": 0.52,
+      "unit": "%",
+      "condition": "hydrodistillation in 2025 comparative supercritical-CO2 study",
+      "evidenceGrade": "B",
+      "source": {
+        "title": "Enrichment of patchouli alcohol in extracted patchouli oil from Pogostemon cablin benth leaves using supercritical carbon dioxide",
+        "type": "peer_reviewed_journal",
+        "doi": "10.1016/j.cscee.2024.101046",
+        "url": "https://www.sciencedirect.com/science/article/pii/S2666016424004407"
+      },
+      "notes": "Comparison value under the cited study's conditions."
+    },
+    {
+      "property": "supercritical_co2_extraction_yield",
+      "value": 3.04,
+      "unit": "%",
+      "condition": "supercritical CO2 extraction; 40-80 C, 10-20 MPa, 120 min, 3-5 mL/min tested",
+      "evidenceGrade": "B",
+      "source": {
+        "title": "Enrichment of patchouli alcohol in extracted patchouli oil from Pogostemon cablin benth leaves using supercritical carbon dioxide",
+        "type": "peer_reviewed_journal",
+        "doi": "10.1016/j.cscee.2024.101046",
+        "url": "https://www.sciencedirect.com/science/article/pii/S2666016424004407"
+      },
+      "notes": "Study-specific result; the abstract reports 3.04% maximum extraction yield."
+    },
+    {
+      "property": "gcms_total_identified_fraction",
+      "value": 98.96,
+      "unit": "% of essential oil",
+      "condition": "fresh aerial parts; hydrodistillation; GC-MS",
+      "evidenceGrade": "B",
+      "source": {
+        "title": "Pupicidal and repellent activities of Pogostemon cablin essential oil chemical compounds against medically important human vector mosquitoes",
+        "type": "peer_reviewed_full_text",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4027253/"
+      },
+      "notes": "15 compounds detected; reported total represented 98.96%."
+    },
+    {
+      "property": "patchouli_alcohol",
+      "value": 22.62,
+      "unit": "% of essential oil",
+      "condition": "fresh aerial parts; hydrodistillation; GC-MS",
+      "evidenceGrade": "B",
+      "source": {
+        "title": "Pupicidal and repellent activities of Pogostemon cablin essential oil chemical compounds against medically important human vector mosquitoes",
+        "type": "peer_reviewed_full_text",
+        "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4027253/"
+      },
+      "notes": "One study-specific GC-MS composition."
+    }
+  ],
+  "governance": {
+    "useAsUniversalConstants": false,
+    "defaultValidationStatus": "LITERATURE",
+    "requiredNextStep": "Normalize full experimental metadata and add measured IUVFES samples before calibration."
+  }
+}

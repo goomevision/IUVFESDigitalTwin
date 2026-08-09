@@ -1,0 +1,22 @@
+{
+  "materialId": "PATCHOULI-ALCOHOL-PURE",
+  "name": "Patchouli alcohol (patchoulol)",
+  "cas": "5986-55-0",
+  "basis": "PURE_COMPONENT",
+  "properties": {
+    "molecularWeightGPerMol": 222.3663
+  },
+  "sources": [
+    {
+      "sourceId": "NIST-SRD69",
+      "citation": "NIST Chemistry WebBook, SRD 69 — Patchouli alcohol",
+      "url": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C5986550",
+      "retrievedAt": "2026-08-10",
+      "confidence": "PRIMARY"
+    }
+  ],
+  "warnings": [
+    "Patchouli essential oil is a multicomponent mixture; pure patchouli alcohol data must not be treated as a complete essential-oil property set.",
+    "This seed record contains identity/provenance only; missing thermophysical properties must not be substituted with guessed values."
+  ]
+}

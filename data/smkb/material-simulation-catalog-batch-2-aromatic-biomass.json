@@ -1,0 +1,136 @@
+{
+  "schemaVersion": "1.0.0",
+  "catalogId": "SMKB-AROMATIC-BIOMASS-BATCH-2",
+  "purpose": "Evidence-backed benchmark materials for drying, vacuum-assisted drying, hydrodistillation, steam distillation, microwave-assisted extraction, separation and related IUVFES process simulation. Literature observations are retained with conditions and are not universal constants.",
+  "materials": [
+    {
+      "materialId": "MAT-CITRONELLA-CYMB-NARDUS",
+      "name": "Citronella / Sereh wangi",
+      "scientificName": "Cymbopogon nardus",
+      "category": "AROMATIC_GRASS_BIOMASS",
+      "states": ["FRESH", "AIR_DRY", "DISTILLATION_FEED", "POST_EXTRACTION_RESIDUE"],
+      "evidenceGrade": "B",
+      "validationStatus": "LITERATURE",
+      "processRoutes": ["DRYING", "STEAM_DISTILLATION", "HYDRODISTILLATION", "MICROWAVE_ASSISTED_HYDRODISTILLATION", "OHMIC_HEATED_HYDRODISTILLATION"],
+      "literatureObservations": [
+        {"property": "steam_distillation_duration", "value": 3, "unit": "h", "condition": "fresh aerial material after air drying to 30% of fresh weight", "source": "PMC study on C. nardus essential oil", "sourceUrl": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3696851/"},
+        {"property": "essential_oil_yield", "value": 3.0, "unit": "% w/v", "condition": "dried sample, steam distillation", "source": "PMC study on C. nardus essential oil", "sourceUrl": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3696851/"},
+        {"property": "extraction_kinetics", "model": "second_order", "condition": "comparison of ohmic hydro-distillation, hydro-distillation and steam distillation", "source": "BioResources 2014", "sourceUrl": "https://bioresources.cnr.ncsu.edu/resources/comparison-of-citronella-oil-extraction-methods-from-cymbopogon-nardus-grass-by-ohmic-heated-hydro-distillation-hydro-distillation-and-steam-distillation/"},
+        {"property": "oil_density", "range": [0.866, 0.902], "unit": "g/mL", "condition": "microwave-assisted hydrodistillation study", "source": "Jurnal Kimia Sains dan Aplikasi 2024", "sourceUrl": "https://ejournal.undip.ac.id/index.php/ksa/article/view/59187"}
+      ],
+      "modelingRole": ["DRYING", "VACUUM_DRYING_BENCHMARK", "DISTILLATION", "MASS_TRANSFER", "EXTRACTION_KINETICS", "ENERGY_COMPARISON"],
+      "dataGaps": ["validated_Cp_T_moisture_surface", "thermal_conductivity_surface", "density_vs_moisture", "vacuum_drying_kinetics", "plant_origin_effect"]
+    },
+    {
+      "materialId": "MAT-LAVENDER-L-ANGUSTIFOLIA",
+      "name": "Lavender",
+      "scientificName": "Lavandula angustifolia",
+      "category": "AROMATIC_FLOWER_BIOMASS",
+      "states": ["FRESH", "DRIED", "DISTILLATION_FEED"],
+      "evidenceGrade": "B",
+      "validationStatus": "LITERATURE",
+      "processRoutes": ["DRYING", "STEAM_DISTILLATION", "MICROWAVE_ASSISTED_STEAM_DISTILLATION", "MICROWAVE_ACCELERATED_STEAM_DISTILLATION"],
+      "literatureObservations": [
+        {"property": "microwave_steam_distillation_time", "value": 6, "unit": "min", "condition": "optimized study; steam flow 8 g/min and microwave power 500 W", "source": "Desalination and Water Treatment 2022", "sourceUrl": "https://www.sciencedirect.com/science/article/pii/S1944398624080391"},
+        {"property": "conventional_vs_microwave_extraction_time", "values": [6, 30], "unit": "min", "condition": "optimized microwave-assisted steam distillation vs conventional steam distillation in cited study", "source": "Desalination and Water Treatment 2022", "sourceUrl": "https://www.sciencedirect.com/science/article/pii/S1944398624080391"}
+      ],
+      "modelingRole": ["LOW_TEMPERATURE_DRYING", "DISTILLATION", "EXTRACTION_KINETICS", "ENERGY_OPTIMIZATION"],
+      "dataGaps": ["species_origin_effect", "validated_Cp_T_moisture_surface", "thermal_conductivity_surface", "vacuum_specific_kinetics", "bulk_density_vs_moisture"]
+    },
+    {
+      "materialId": "MAT-CLOVE-S-AROMATICUM",
+      "name": "Clove",
+      "scientificName": "Syzygium aromaticum",
+      "category": "AROMATIC_FLOWER_BUD_BIOMASS",
+      "states": ["FRESH", "DRIED", "DISTILLATION_FEED"],
+      "evidenceGrade": "B",
+      "validationStatus": "LITERATURE",
+      "processRoutes": ["DRYING", "HYDRODISTILLATION", "STEAM_DISTILLATION", "MICROWAVE_ASSISTED_EXTRACTION", "SUPERCRITICAL_FLUID_EXTRACTION"],
+      "literatureObservations": [
+        {"property": "hydrodistillation_duration", "value": 3, "unit": "h", "condition": "500 g clove buds, Clevenger-type hydrodistillation", "source": "Processes 2020", "sourceUrl": "https://www.mdpi.com/2297-8739/7/2/35"},
+        {"property": "major_volatile", "name": "eugenol", "condition": "review of clove essential oil literature", "source": "Molecules 2021 review", "sourceUrl": "https://www.mdpi.com/1420-3049/26/21/6387"}
+      ],
+      "modelingRole": ["DRYING", "DISTILLATION", "VOLATILE_RECOVERY", "SEPARATION"],
+      "dataGaps": ["validated_Cp_T_moisture_surface", "thermal_conductivity_surface", "density_vs_moisture", "vacuum_extraction_kinetics", "particle_size_effect"]
+    },
+    {
+      "materialId": "MAT-NUTMEG-M-FRAGRANS",
+      "name": "Nutmeg / Pala",
+      "scientificName": "Myristica fragrans",
+      "category": "AROMATIC_SPICE_BIOMASS",
+      "states": ["FRESH", "DRIED", "GROUND", "DISTILLATION_FEED"],
+      "evidenceGrade": "B",
+      "validationStatus": "LITERATURE",
+      "processRoutes": ["DRYING", "HYDRODISTILLATION", "MICROWAVE_ASSISTED_AIR_HYDRODISTILLATION", "MICROWAVE_ASSISTED_EXTRACTION"],
+      "literatureObservations": [
+        {"property": "mace_oil_yield", "value": 10.71, "unit": "%", "condition": "microwave air-hydrodistillation; 600 W, feed-to-solvent 0.30 g/mL, 60 mesh, 120 min", "source": "Results in Chemistry 2026", "sourceUrl": "https://www.sciencedirect.com/science/article/pii/S2211715626002936"},
+        {"property": "seed_oil_yield", "value": 6.53, "unit": "%", "condition": "microwave air-hydrodistillation; 600 W, 100 mesh, 0.30 g/mL, 180 min", "source": "Results in Engineering 2026", "sourceUrl": "https://www.sciencedirect.com/science/article/pii/S2590123026001179"}
+      ],
+      "modelingRole": ["DRYING", "PARTICLE_SIZE_STUDY", "EXTRACTION_KINETICS", "ENERGY_OPTIMIZATION"],
+      "dataGaps": ["vacuum_specific_kinetics", "validated_Cp_T_moisture_surface", "thermal_conductivity_surface", "density_vs_moisture"]
+    },
+    {
+      "materialId": "MAT-GINGER-Z-OFFICINALE",
+      "name": "Ginger / Jahe",
+      "scientificName": "Zingiber officinale",
+      "category": "AROMATIC_RHIZOME_BIOMASS",
+      "states": ["FRESH", "DRIED", "SLICED", "GROUND", "DISTILLATION_FEED"],
+      "evidenceGrade": "B",
+      "validationStatus": "LITERATURE",
+      "processRoutes": ["CONVECTIVE_DRYING", "FREEZE_DRYING", "INFRARED_DRYING", "MICROWAVE_DRYING", "PULSED_VACUUM_DRYING", "HYDRODISTILLATION", "MICROWAVE_EXTRACTION"],
+      "literatureObservations": [
+        {"property": "pulsed_vacuum_dried_moisture", "value": 10.07, "unit": "%", "condition": "comparative drying study on ginger slices", "source": "Industrial Crops and Products 2021", "sourceUrl": "https://www.sciencedirect.com/science/article/pii/S092666902100813X"},
+        {"property": "drying_methods_compared", "values": ["relative_humidity_convective", "freeze", "infrared", "microwave", "pulsed_vacuum"], "condition": "same comparative study", "source": "Industrial Crops and Products 2021", "sourceUrl": "https://www.sciencedirect.com/science/article/pii/S092666902100813X"},
+        {"property": "drying_time_effect", "condition": "24, 48 and 72 h at 40 C; hydrodistillation and GC analysis", "source": "Natural Product Research 2025", "sourceUrl": "https://www.sciencedirect.com/org/science/article/abs/pii/S147864192400706X"}
+      ],
+      "modelingRole": ["VACUUM_DRYING", "DRYING_KINETICS", "EXTRACTION", "MOISTURE_TRANSFER", "QUALITY_RETENTION"],
+      "dataGaps": ["validated_Cp_T_moisture_surface", "thermal_conductivity_surface", "density_vs_moisture", "pressure_dependent_vacuum_drying_model"]
+    },
+    {
+      "materialId": "MAT-ROSE-R-DAMASCENA",
+      "name": "Rose",
+      "scientificName": "Rosa damascena",
+      "category": "AROMATIC_FLOWER_BIOMASS",
+      "states": ["FRESH", "WILTED", "DISTILLATION_FEED"],
+      "evidenceGrade": "B",
+      "validationStatus": "LITERATURE",
+      "processRoutes": ["LOW_TEMPERATURE_HANDLING", "WATER_DISTILLATION", "STEAM_DISTILLATION", "SEPARATION"],
+      "literatureObservations": [
+        {"property": "traditional_process", "value": "water_distillation", "condition": "Rosa damascena oil production literature", "source": "Plants 2023", "sourceUrl": "https://www.mdpi.com/2223-7747/12/3/506"}
+      ],
+      "modelingRole": ["FLOWER_HANDLING", "DISTILLATION", "LOW_TEMPERATURE_PROCESSING", "SEPARATION"],
+      "dataGaps": ["validated_Cp_T_moisture_surface", "thermal_conductivity_surface", "flower_wilting_kinetics", "vacuum_process_validation", "yield_vs_harvest_time"]
+    },
+    {
+      "materialId": "MAT-JASMINE-J-SAMBAC",
+      "name": "Jasmine / Melati",
+      "scientificName": "Jasminum sambac",
+      "category": "AROMATIC_FLOWER_BIOMASS",
+      "states": ["FRESH_FLOWER", "HARVESTED", "EXTRACTION_FEED"],
+      "evidenceGrade": "B",
+      "validationStatus": "LITERATURE",
+      "processRoutes": ["LOW_TEMPERATURE_HANDLING", "SOLVENT_EXTRACTION", "SUPERCRITICAL_FLUID_EXTRACTION", "MACERATION", "STEAM_DISTILLATION"],
+      "literatureObservations": [
+        {"property": "commercial_species", "values": ["Jasminum grandiflorum", "Jasminum sambac", "Jasminum nudiflorum"], "condition": "review of jasmine oil production and extraction", "source": "Essential Oils 2023 book chapter", "sourceUrl": "https://www.sciencedirect.com/science/article/abs/pii/B978032391740700013X"},
+        {"property": "harvest_timing", "value": "early morning", "condition": "review states early-morning harvest is used to preserve volatile/aroma characteristics", "source": "Essential Oils 2023 book chapter", "sourceUrl": "https://www.sciencedirect.com/science/article/abs/pii/B978032391740700013X"}
+      ],
+      "modelingRole": ["LOW_TEMPERATURE_EXTRACTION", "SOLVENT_EXTRACTION", "SUPERCRITICAL_EXTRACTION", "VOLATILE_PRESERVATION"],
+      "dataGaps": ["species_specific_Cp_T", "thermal_conductivity_surface", "vacuum_extraction_kinetics", "flower_moisture_kinetics", "validated_vapor_liquid_data"]
+    },
+    {
+      "materialId": "MAT-CINNAMON-CINNAMOMUM-SP",
+      "name": "Cinnamon / Kayu manis",
+      "scientificName": "Cinnamomum spp.",
+      "category": "AROMATIC_BARK_BIOMASS",
+      "states": ["FRESH_BARK", "DRIED_BARK", "GROUND", "EXTRACTION_FEED"],
+      "evidenceGrade": "B",
+      "validationStatus": "LITERATURE",
+      "processRoutes": ["DRYING", "HYDRODISTILLATION", "STEAM_DISTILLATION", "SOLVENT_EXTRACTION", "SUPERCRITICAL_EXTRACTION"],
+      "literatureObservations": [
+        {"property": "process_class", "values": ["hydrodistillation", "steam_distillation", "solvent_extraction", "supercritical_fluid_extraction"], "condition": "aromatic plant extraction benchmark; exact species and conditions must remain source-specific", "source": "IUVFES SMKB candidate class; numeric property not asserted without species-specific evidence", "sourceUrl": "https://www.mdpi.com/1420-3049/26/21/6387"}
+      ],
+      "modelingRole": ["DRYING", "DISTILLATION", "EXTRACTION", "PARTICLE_SIZE_STUDY"],
+      "dataGaps": ["species_specific_identity", "validated_Cp_T_moisture_surface", "thermal_conductivity_surface", "density_vs_moisture", "species_specific_kinetics"]
+    }
+  ]
+}

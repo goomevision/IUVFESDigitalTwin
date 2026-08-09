@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "1.0.0",
+  "catalogId": "SMKB-SIMULATION-MATERIALS-BATCH-1",
+  "purpose": "Initial evidence-backed material catalog for multi-material IUVFES simulation. Values are literature/standard/manufacturer evidence, not universal constants or validation results.",
+  "materials": [
+    {
+      "materialId": "MAT-WATER-H2O",
+      "name": "Water",
+      "scientificName": "H2O",
+      "category": "PROCESS_FLUID",
+      "states": ["LIQUID", "VAPOR"],
+      "evidenceGrade": "A",
+      "validationStatus": "STANDARD",
+      "properties": [
+        {"name": "thermodynamic_properties", "source": "IAPWS-IF97", "sourceUrl": "https://iapws.org/documents/release/IF97-Rev"},
+        {"name": "thermal_conductivity", "source": "IAPWS R15-11", "sourceUrl": "https://iapws.org/documents/release/ThCond"}
+      ],
+      "modelingRole": ["HEATING", "COOLING", "EVAPORATION", "CONDENSATION", "VACUUM"],
+      "dataGaps": ["mixture_properties_for_real_feedstock", "noncondensable_contaminants"]
+    },
+    {
+      "materialId": "MAT-ETHANOL-C2H6O",
+      "name": "Ethanol",
+      "scientificName": "C2H5OH",
+      "cas": "64-17-5",
+      "category": "PROCESS_FLUID",
+      "states": ["LIQUID", "VAPOR"],
+      "evidenceGrade": "A",
+      "validationStatus": "LITERATURE",
+      "properties": [
+        {"name": "liquid_heat_capacity", "referenceTemperatureK": 298.15, "value": 112.4, "unit": "J/mol/K", "source": "NIST Chemistry WebBook SRD 69", "sourceUrl": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C64175&Mask=2"},
+        {"name": "gas_heat_capacity", "referenceTemperatureK": 298.15, "value": 15.59, "unit": "cal/mol/K", "source": "NIST Chemistry WebBook SRD 69", "sourceUrl": "https://webbook.nist.gov/cgi/cbook.cgi?Name=ethanol&Units=CAL&c=&cTC=on&cTG=on"}
+      ],
+      "modelingRole": ["SOLVENT_EXTRACTION", "EVAPORATION", "CONDENSATION", "SEPARATION"],
+      "dataGaps": ["full_temperature_pressure_property_surface", "mixture_vle_parameters"]
+    },
+    {
+      "materialId": "MAT-GLYCERIN-C3H8O3",
+      "name": "Glycerin / Glycerol",
+      "scientificName": "C3H8O3",
+      "cas": "56-81-5",
+      "category": "PROCESS_FLUID",
+      "states": ["LIQUID"],
+      "evidenceGrade": "A",
+      "validationStatus": "LITERATURE",
+      "properties": [
+        {"name": "molecular_weight", "value": 92.0938, "unit": "g/mol", "source": "NIST Chemistry WebBook SRD 69", "sourceUrl": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C56815&Mask=39&Units=CAL"}
+      ],
+      "modelingRole": ["SOLVENT", "HEAT_TRANSFER_FLUID", "MIXTURE_COMPONENT"],
+      "dataGaps": ["temperature_dependent_density", "temperature_dependent_viscosity", "heat_capacity_surface", "thermal_conductivity_surface"]
+    },
+    {
+      "materialId": "MAT-PATCHOULI-LEAF-POGOSTEMON-CABLIN",
+      "name": "Patchouli leaf",
+      "scientificName": "Pogostemon cablin",
+      "category": "BIOMASS_FEEDSTOCK",
+      "states": ["FRESH", "DRIED", "PRE_DISTILLATION", "POST_DISTILLATION_RESIDUE"],
+      "evidenceGrade": "B",
+      "validationStatus": "LITERATURE",
+      "properties": [
+        {"name": "oil_yield", "unit": "%", "conditionDependent": true, "sourceNote": "Multiple published studies report materially different yields depending on drying and extraction method; preserve observations separately rather than averaging.", "sourceUrl": "https://ejournal.unib.ac.id/JIPI/article/view/4772"},
+        {"name": "oil_composition", "conditionDependent": true, "sourceNote": "GC-MS literature data are retained as composition observations, not universal composition constants.", "sourceUrl": "https://ojs3.unpatti.ac.id/index.php/ijcr/article/view/1898"},
+        {"name": "drying_process", "conditionDependent": true, "sourceNote": "Published drying studies provide temperature, time, airflow and moisture/yield observations.", "sourceUrl": "https://etd.repository.ugm.ac.id/penelitian/detail/26208"}
+      ],
+      "modelingRole": ["DRYING", "STEAM_DISTILLATION", "EXTRACTION", "HEATING", "MASS_BALANCE", "ENERGY_BALANCE"],
+      "dataGaps": ["validated_Cp_T_moisture_surface", "validated_thermal_conductivity_surface", "density_vs_moisture", "phase_change_model", "species_specific_kinetics"]
+    },
+    {
+      "materialId": "MAT-COCONUT-SHELL-BIOMASS",
+      "name": "Coconut shell",
+      "scientificName": "Cocos nucifera shell biomass",
+      "category": "BIOMASS_FEEDSTOCK",
+      "states": ["RAW", "DRIED", "THERMALLY_PROCESSED", "ASH"],
+      "evidenceGrade": "B",
+      "validationStatus": "LITERATURE",
+      "properties": [
+        {"name": "thermal_characteristics", "conditionDependent": true, "source": "Yulianto et al. 2023, International Journal of Renewable Energy Development", "sourceUrl": "https://doi.org/10.14710/ijred.2023.48349"}
+      ],
+      "modelingRole": ["DRYING", "COMBUSTION", "THERMAL_PROCESSING", "BIOMASS_CONVERSION"],
+      "dataGaps": ["full_Cp_T_moisture_surface", "thermal_conductivity_surface", "density_vs_moisture", "reaction_kinetics"]
+    },
+    {
+      "materialId": "MAT-SS316L-SANMAC",
+      "name": "Sanmac 316/316L stainless steel",
+      "scientificName": "Austenitic stainless steel 316/316L",
+      "category": "HARDWARE_MATERIAL",
+      "states": ["SOLID"],
+      "evidenceGrade": "C",
+      "validationStatus": "MANUFACTURER_DATA",
+      "properties": [
+        {"name": "density", "value": 8.0, "unit": "g/cm3", "source": "Alleima Sanmac 316/316L datasheet", "sourceUrl": "https://www.alleima.com/en/technical-center/material-datasheets/bar-and-hollow-bar/hollow-bar/sanmac-316316l/"},
+        {"name": "thermal_conductivity", "unit": "W/m/K", "temperaturePointsC": [20,100,200,300,400,500,600], "values": [14,15,17,18,20,21,23], "source": "Alleima Sanmac 316/316L datasheet", "sourceUrl": "https://www.alleima.com/en/technical-center/material-datasheets/bar-and-hollow-bar/hollow-bar/sanmac-316316l/"},
+        {"name": "specific_heat", "unit": "J/kg/K", "temperaturePointsC": [20,100,200,300,400,500,600], "values": [485,500,515,525,540,555,575], "source": "Alleima Sanmac 316/316L datasheet", "sourceUrl": "https://www.alleima.com/en/technical-center/material-datasheets/bar-and-hollow-bar/hollow-bar/sanmac-316316l/"},
+        {"name": "thermal_expansion_mean", "unit": "1e-6/K", "temperatureRangesC": ["30-100","30-200","30-300","30-400","30-500","30-600","30-700"], "values": [16.5,17,17.5,18,18,18.5,18.5], "source": "Alleima Sanmac 316/316L datasheet", "sourceUrl": "https://www.alleima.com/en/technical-center/material-datasheets/bar-and-hollow-bar/hollow-bar/sanmac-316316l/"}
+      ],
+      "modelingRole": ["CHAMBER_WALL", "VESSEL", "HEATER_SUPPORT", "HEAT_TRANSFER", "THERMAL_STRESS"],
+      "dataGaps": ["geometry_specific_allowable_stress", "weld_joint_efficiency", "surface_emissivity_for_actual_finish", "fatigue_model", "corrosion_allowance"]
+    }
+  ]
+}

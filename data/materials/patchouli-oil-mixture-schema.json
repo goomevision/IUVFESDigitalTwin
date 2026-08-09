@@ -1,0 +1,29 @@
+{
+  "materialId": "patchouli-oil-mixture",
+  "materialType": "MULTICOMPONENT_ESSENTIAL_OIL",
+  "botanicalSource": "Pogostemon cablin",
+  "components": [
+    { "name": "patchoulol", "fraction": null },
+    { "name": "alpha-guaiene", "fraction": null },
+    { "name": "alpha-bulnesene", "fraction": null },
+    { "name": "seychellene", "fraction": null },
+    { "name": "alpha-patchoulene", "fraction": null },
+    { "name": "beta-caryophyllene", "fraction": null }
+  ],
+  "compositionPolicy": "REQUIRE_BATCH_OR_LITERATURE_COMPOSITION",
+  "propertyPolicy": "NO_SINGLE_PURE_COMPONENT_PROPERTY_FOR_MIXTURE",
+  "sources": [
+    {
+      "sourceId": "PATCHOULI-COMPOSITION-2011",
+      "reference": "Chemical characterization of the essential oil from patchouli accessions harvested over four seasons",
+      "url": "https://www.sciencedirect.com/science/article/abs/pii/S0926669011000409"
+    },
+    {
+      "sourceId": "PATCHOULI-EXTRACTION-2009",
+      "reference": "Comparison of extraction of patchouli essential oil with supercritical CO2 and by steam distillation",
+      "url": "https://www.sciencedirect.com/science/article/pii/S0896844608003008"
+    }
+  ],
+  "status": "COMPOSITION_REQUIRED_BEFORE_MULTICOMPONENT_SIMULATION",
+  "note": "Literature demonstrates that patchouli oil contains many sesquiterpenes and that composition varies by material/accession/process. The simulator must not substitute pure patchoulol properties for the whole oil mixture."
+}

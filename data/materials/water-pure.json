@@ -1,0 +1,21 @@
+{
+  "materialId": "WATER-PURE",
+  "name": "Water",
+  "cas": "7732-18-5",
+  "basis": "PURE_COMPONENT",
+  "properties": {
+    "molecularWeightGPerMol": 18.0153
+  },
+  "sources": [
+    {
+      "sourceId": "NIST-SRD69",
+      "citation": "NIST Chemistry WebBook, SRD 69",
+      "url": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185",
+      "retrievedAt": "2026-08-10",
+      "confidence": "PRIMARY"
+    }
+  ],
+  "warnings": [
+    "This seed record contains identity/provenance only; missing thermophysical properties must not be substituted with guessed values."
+  ]
+}
