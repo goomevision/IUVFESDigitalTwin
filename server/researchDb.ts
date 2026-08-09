@@ -32,6 +32,12 @@ export async function getResearchExperiment(id: string) {
   return rows[0] ?? null;
 }
 
+export async function getResearchExperimentBySourceExperimentId(experimentId: string) {
+  const db = requireDb(await getDb());
+  const rows = await db.select().from(researchExperiments).where(eq(researchExperiments.experimentId, experimentId)).limit(1);
+  return rows[0] ?? null;
+}
+
 export async function updateResearchExperimentStatus(id: string, status: InsertResearchExperiment["status"]) {
   const db = requireDb(await getDb());
   await db.update(researchExperiments).set({ status, updatedAt: new Date() }).where(eq(researchExperiments.id, id));
