@@ -42,4 +42,16 @@ describe('closed-loop real-time pacing', () => {
     vi.advanceTimersByTime(1000);
     expect(restored.step()).not.toBeNull();
   });
+
+  it('does not create a false transient when state is read at the same simulation timestamp', () => {
+    vi.setSystemTime(new Date('2026-08-09T00:00:00.000Z'));
+    const engine = new ClosedLoopSimulationEngine({ ...config, realTime: true });
+    const first = engine.step();
+    expect(first).not.toBeNull();
+
+    const state = engine.getState();
+    expect(state.stage).not.toBe('FAULT');
+    expect(state.interlocks.pressureTransient).toBe(false);
+    expect(state.interlocks.temperatureTransient).toBe(false);
+  });
 });
