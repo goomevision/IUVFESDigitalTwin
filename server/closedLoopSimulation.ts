@@ -190,7 +190,7 @@ export class ClosedLoopSimulationEngine {
     this.sensors = sensorAfter;
     this.lastStepWallClockMs = now;
 
-    const safety = evaluateSafety(this.sensors, sensorAfter, this.dtSeconds, this.safetyLimits);
+    const safety = evaluateSafety(sensorBefore, sensorAfter, this.dtSeconds, this.safetyLimits);
     const stateAfter = this.state.tick(this.sensors, this.elapsedSeconds);
     const frame: CausalFrame = {
       step: this.stepNumber,
