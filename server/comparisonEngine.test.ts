@@ -34,6 +34,17 @@ describe("compareSimulationToExperiment", () => {
     expect(report.parameters[0].maxAbsoluteError).toBe(30);
   });
 
+  it("treats an empty tolerance object as inconclusive", () => {
+    const report = compareSimulationToExperiment({
+      experimental: [{ parameter: "temperature", timeSeconds: 1, value: 50, qualityFlag: "VALIDATED" }],
+      simulation: [{ timeSeconds: 0, values: { temperature: 50 } }, { timeSeconds: 2, values: { temperature: 50 } }],
+      tolerances: { temperature: {} },
+    });
+
+    expect(report.verdict).toBe("INCONCLUSIVE");
+    expect(report.parameters[0].verdict).toBe("INCONCLUSIVE");
+  });
+
   it("does not assign a scientific verdict without tolerance", () => {
     const report = compareSimulationToExperiment({
       experimental: [{ parameter: "yield", timeSeconds: 1, value: 5, qualityFlag: "VALIDATED" }],
