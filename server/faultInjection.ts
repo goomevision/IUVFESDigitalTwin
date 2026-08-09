@@ -12,6 +12,7 @@ import {
   type ClosedLoopSimulationConfig,
 } from './closedLoopSimulation';
 import type { VirtualHardwareDynamicsConfig } from './machineDynamics';
+import type { FaultPropagationScenario } from './faultPropagation';
 
 export type FaultInjectionType =
   | 'VACUUM_LEAK'
@@ -27,7 +28,7 @@ export interface FaultInjection {
   note?: string;
 }
 
-export interface FaultInjectionScenario {
+export interface FaultInjectionScenario extends FaultPropagationScenario {
   id: string;
   label: string;
   faults: FaultInjection[];
@@ -64,7 +65,6 @@ function clampSeverity(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
 
-/** Apply one fault to a virtual hardware profile without mutating the input. */
 export function applyFaultInjection(
   base: VirtualHardwareDynamicsConfig,
   fault: FaultInjection,
@@ -73,27 +73,13 @@ export function applyFaultInjection(
   const next = { ...base };
 
   switch (fault.type) {
-    case 'VACUUM_LEAK':
-      next.leakRateMbarPerSecond =
-        (next.leakRateMbarPerSecond ?? 0) + 0.5 * severity;
-      break;
-    case 'PUMP_CAPACITY_DEGRADATION':
-      next.pumpCapacityM3h = (next.pumpCapacityM3h ?? 200) * (1 - 0.9 * severity);
-      break;
-    case 'HEATING_POWER_LOSS':
-      next.heatingPowerKW = (next.heatingPowerKW ?? 9) * (1 - 0.9 * severity);
-      break;
-    case 'COOLING_POWER_LOSS':
-      next.coolingPowerKW = (next.coolingPowerKW ?? 3) * (1 - 0.95 * severity);
-      break;
-    case 'THERMAL_MASS_INCREASE':
-      next.thermalMassKJPerC = (next.thermalMassKJPerC ?? 250) * (1 + 2 * severity);
-      break;
-    case 'CHAMBER_VOLUME_INCREASE':
-      next.chamberVolumeL = (next.chamberVolumeL ?? 250) * (1 + 2 * severity);
-      break;
+    case 'VACUUM_LEAK': next.leakRateMbarPerSecond = (next.leakRateMbarPerSecond ?? 0) + 0.5 * severity; break;
+    case 'PUMP_CAPACITY_DEGRADATION': next.pumpCapacityM3h = (next.pumpCapacityM3h ?? 200) * (1 - 0.9 * severity); break;
+    case 'HEATING_POWER_LOSS': next.heatingPowerKW = (next.heatingPowerKW ?? 9) * (1 - 0.9 * severity); break;
+    case 'COOLING_POWER_LOSS': next.coolingPowerKW = (next.coolingPowerKW ?? 3) * (1 - 0.95 * severity); break;
+    case 'THERMAL_MASS_INCREASE': next.thermalMassKJPerC = (next.thermalMassKJPerC ?? 250) * (1 + 2 * severity); break;
+    case 'CHAMBER_VOLUME_INCREASE': next.chamberVolumeL = (next.chamberVolumeL ?? 250) * (1 + 2 * severity); break;
   }
-
   return next;
 }
 
@@ -131,21 +117,20 @@ export function runFaultInjectionScenario(
   baseConfig: ClosedLoopSimulationConfig,
   scenario: FaultInjectionScenario,
 ): FaultInjectionRun {
-  const baseHardware = baseConfig.hardware ?? {};
-  const hardware = buildFaultHardwareProfile(baseHardware, scenario.faults);
+  const hardware = buildFaultHardwareProfile(baseConfig.hardware ?? {}, scenario.faults);
   const engine = new ClosedLoopSimulationEngine({
     ...baseConfig,
     hardware,
+    faultScenario: {
+      id: scenario.id,
+      label: scenario.label,
+      sensorFaults: scenario.sensorFaults,
+      actuatorFaults: scenario.actuatorFaults,
+    },
     realTime: false,
   });
   const result = engine.runToCompletion();
-
-  return {
-    scenario,
-    hardware,
-    metrics: summarize(result),
-    result,
-  };
+  return { scenario, hardware, metrics: summarize(result), result };
 }
 
 export function runFaultInjectionCampaign(
@@ -156,10 +141,8 @@ export function runFaultInjectionCampaign(
     id: 'baseline',
     label: 'Baseline / no injected fault',
     faults: [],
+    sensorFaults: [],
+    actuatorFaults: [],
   });
-
-  return {
-    baseline,
-    scenarios: scenarios.map((scenario) => runFaultInjectionScenario(baseConfig, scenario)),
-  };
+  return { baseline, scenarios: scenarios.map((scenario) => runFaultInjectionScenario(baseConfig, scenario)) };
 }
