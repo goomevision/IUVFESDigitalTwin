@@ -2,6 +2,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
+import * as researchDb from "./researchDb";
 import { ClosedLoopSimulationEngine } from "./closedLoopSimulation";
 import { recordClosedLoopRun } from "./scientificEventJournal";
 import { persistSimulationDataset } from "./scientificDatasetPersistence";
@@ -38,15 +39,18 @@ export const closedLoopRouter = router({
     const result = engine.runToCompletion();
     const isComplete = result.status === "COMPLETE";
     const isFault = result.status === "FAULT";
+    const researchExperiment = await researchDb.getResearchExperimentBySourceExperimentId(input.experimentId);
 
     // The causal journal is persisted before the result is published.
     // A run without its journal is not considered auditable.
     const events = await recordClosedLoopRun(input.experimentId, result);
 
-    // Build a content-addressed scientific dataset manifest. Simulation data
-    // remains RAW until calibrated/validated against laboratory measurements.
+    // Core simulations may exist without a research record. In that case the
+    // nullable dataset foreign key remains NULL rather than pointing at a
+    // core experiment ID that is not present in researchExperiments.
     const dataset = await persistSimulationDataset({
       experimentId: input.experimentId,
+      researchExperimentId: researchExperiment?.id ?? null,
       parameters: {
         materialWeightKg: input.materialWeight,
         waterContentPercent: input.waterContent,
@@ -91,6 +95,7 @@ export const closedLoopRouter = router({
       datasetSha256: dataset.sha256,
       provenanceId: dataset.provenanceId,
       datasetQualityStatus: dataset.qualityStatus,
+      researchExperimentId: dataset.researchExperimentId,
       frames: result.frames,
       finalSensors: result.finalSensors,
     };
