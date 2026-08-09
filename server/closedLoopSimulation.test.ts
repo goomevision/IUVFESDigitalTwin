@@ -65,6 +65,39 @@ describe('closed-loop real-time pacing', () => {
     expect(state.interlocks.temperatureTransient).toBe(false);
   });
 
+  it('records independent causal safety evidence for each dynamics transition', () => {
+    vi.setSystemTime(new Date('2026-08-09T00:00:00.000Z'));
+    const engine = new ClosedLoopSimulationEngine({
+      ...config,
+      realTime: true,
+      safetyLimits: { maxPressureRateMbarPerSecond: 1 },
+    });
+    const frame = engine.step();
+
+    expect(frame).not.toBeNull();
+    expect(frame?.safety.pressureRateMbarPerSecond).not.toBe(0);
+    expect(frame?.safety.pressureRateMbarPerSecond).toBe(
+      (frame!.sensorAfter.pressureMbar - frame!.sensorBefore.pressureMbar) / config.dtSeconds,
+    );
+    expect(frame?.safety.pressureTransient).toBe(true);
+  });
+
+  it('does not execute another dynamics step after a safety fault', () => {
+    vi.setSystemTime(new Date('2026-08-09T00:00:00.000Z'));
+    const engine = new ClosedLoopSimulationEngine({
+      ...config,
+      realTime: true,
+      safetyLimits: { maxPressureMbar: 900 },
+    });
+    const first = engine.step();
+    expect(first).not.toBeNull();
+    expect(engine.getState().stage).toBe('FAULT');
+
+    vi.advanceTimersByTime(5000);
+    expect(engine.step()).toBeNull();
+    expect(engine.getFrames()).toHaveLength(1);
+  });
+
   it('records the state observed after the dynamics step in the causal frame', () => {
     vi.setSystemTime(new Date('2026-08-09T00:00:00.000Z'));
     const engine = new ClosedLoopSimulationEngine({ ...config, realTime: true });
