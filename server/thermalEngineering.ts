@@ -19,6 +19,12 @@ export interface ThermalEngineeringInput {
   coolingEfficiency?: number;
 }
 
+/** Compatibility contract used by hardware-coupling adapters. */
+export type ThermalModelConfig = Pick<
+  ThermalEngineeringInput,
+  'thermalMassKJPerC' | 'effectiveHeatLossKWPerC'
+>;
+
 export interface ThermalStepResult {
   temperatureC: number;
   netHeatKW: number;
