@@ -1,0 +1,24 @@
+{
+  "materialId": "water-pure",
+  "property": "vaporPressure",
+  "correlation": "Antoine",
+  "equation": "log10(P_bar_abs) = A - B/(T_K + C)",
+  "coefficients": {
+    "A": 5.40221,
+    "B": 1838.675,
+    "C": -31.737
+  },
+  "validRange": {
+    "minK": 273,
+    "maxK": 303
+  },
+  "source": {
+    "sourceId": "NIST-WATER-ANTOINE-BRIDGEMAN-ALDRICH-273-303K",
+    "database": "NIST Chemistry WebBook SRD 69",
+    "reference": "Bridgeman and Aldrich, 1964",
+    "url": "https://webbook.nist.gov/cgi/cbook.cgi?ID=C7732185&Type=ANTOINE"
+  },
+  "status": "SOURCE_BACKED",
+  "uncertainty": null,
+  "note": "No uncertainty value is asserted here because the cited NIST correlation entry does not provide a property uncertainty for this coefficient set in the retrieved record."
+}
