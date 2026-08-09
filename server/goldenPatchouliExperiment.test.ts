@@ -26,12 +26,12 @@ describe('golden patchouli experiment', () => {
     }
   });
 
-  it('keeps material mass and latent-energy residuals at the configured tolerance', () => {
+  it('keeps material mass and latent-energy residuals within the configured tolerance', () => {
     const dataset = runGoldenPatchouliExperiment();
     for (const row of dataset.rows) {
-      expect(row.massKg).toBeGreaterThanOrEqual(0);
       expect(Math.abs(row.massKg - 10)).toBeLessThanOrEqual(1e-9);
-      expect(Math.abs(row.latentHeatEnergyKWh - row.latentHeatEnergyKWh)).toBeLessThanOrEqual(1e-12);
+      expect(Math.abs(row.massBalanceResidualKg)).toBeLessThanOrEqual(1e-9);
+      expect(Math.abs(row.energyBalanceResidualKWh)).toBeLessThanOrEqual(1e-9);
     }
   });
 
