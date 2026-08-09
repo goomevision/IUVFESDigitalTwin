@@ -41,10 +41,10 @@ export async function getClosedLoopSession(experimentId: string): Promise<Closed
     SELECT id, experimentId, status, snapshot, frameCount, lastStep
     FROM closedLoopSessions WHERE experimentId = ${experimentId} LIMIT 1
   `);
-  const rows = Array.isArray(result) ? result[0] : [];
-  const row = Array.isArray(rows) ? rows[0] : undefined;
+  const rows = (Array.isArray(result) ? result[0] : []) as Array<Record<string, unknown>>;
+  const row = rows[0];
   if (!row) return null;
-  const snapshotValue = row.snapshot as unknown;
+  const snapshotValue = row.snapshot;
   const snapshot = typeof snapshotValue === "string" ? JSON.parse(snapshotValue) : snapshotValue;
   return {
     id: String(row.id),
