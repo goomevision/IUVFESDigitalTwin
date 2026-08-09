@@ -13,6 +13,7 @@ import { ProcessControlLoop, type ProcessControlSnapshot } from './controlLoop';
 import { MachineDynamicsEngine, type MachineDynamicsSnapshot, type VirtualHardwareDynamicsConfig } from './machineDynamics';
 import { ProcessStateEngine, type MachineSensors, type ProcessState } from './processStateEngine';
 import { evaluateSafety, type SafetyEvaluation, type SafetyLimits } from './safetyKernel';
+import { buildSafetyEventTimeline, type SafetyEvent } from './safetyEventTimeline';
 
 export interface ClosedLoopSimulationConfig {
   targetPressureMbar: number;
@@ -45,6 +46,7 @@ export interface ClosedLoopResult {
   frames: CausalFrame[];
   finalSensors: MachineSensors;
   pausedSteps: number[];
+  safetyEvents: SafetyEvent[];
 }
 
 export interface ClosedLoopSnapshot {
@@ -221,12 +223,14 @@ export class ClosedLoopSimulationEngine {
       frames: [...this.frames],
       finalSensors: { ...this.sensors },
       pausedSteps: [...this.pausedSteps],
+      safetyEvents: buildSafetyEventTimeline(this.frames),
     };
   }
 
   public getFrames(): CausalFrame[] { return [...this.frames]; }
   public getSensors(): MachineSensors { return { ...this.sensors }; }
   public getState(): ProcessState { return this.state.snapshotState(); }
+  public getSafetyEvents(): SafetyEvent[] { return buildSafetyEventTimeline(this.frames); }
 
   public snapshot(): ClosedLoopSnapshot {
     return {
