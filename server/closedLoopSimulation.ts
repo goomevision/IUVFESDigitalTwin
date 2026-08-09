@@ -36,6 +36,16 @@ export interface CausalFrame {
   paused: boolean;
 }
 
+/** Serializable session state used by the persistence layer for replay/audit. */
+export interface ClosedLoopSnapshot {
+  stepNumber: number;
+  elapsedSeconds: number;
+  paused: boolean;
+  sensors: MachineSensors;
+  frames: CausalFrame[];
+  pausedSteps: number[];
+}
+
 export interface ClosedLoopResult {
   status: ProcessState['stage'];
   frames: CausalFrame[];
@@ -97,9 +107,7 @@ export class ClosedLoopSimulationEngine {
   }
 
   public isPaused(): boolean { return this.paused; }
-
   public pause(): void { this.paused = true; }
-
   public resume(): void { this.paused = false; }
 
   public reset(): void {
@@ -121,7 +129,6 @@ export class ClosedLoopSimulationEngine {
     this.control.reset();
   }
 
-  /** Advance exactly one causal timestep. Pause means no state evolution. */
   public step(): CausalFrame | null {
     if (this.paused) {
       this.pausedSteps.push(this.stepNumber);
@@ -176,6 +183,17 @@ export class ClosedLoopSimulationEngine {
       status: finalState.stage,
       frames: [...this.frames],
       finalSensors: { ...this.sensors },
+      pausedSteps: [...this.pausedSteps],
+    };
+  }
+
+  public getSnapshot(): ClosedLoopSnapshot {
+    return {
+      stepNumber: this.stepNumber,
+      elapsedSeconds: this.elapsedSeconds,
+      paused: this.paused,
+      sensors: { ...this.sensors },
+      frames: [...this.frames],
       pausedSteps: [...this.pausedSteps],
     };
   }
