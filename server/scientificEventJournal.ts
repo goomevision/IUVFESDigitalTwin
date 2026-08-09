@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "crypto";
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
-import type { CausalFrame, ClosedLoopResult } from "./closedLoopSimulation";
+import type { ClosedLoopResult } from "./closedLoopSimulation";
 
 export interface ScientificEvent {
   id: string;
@@ -32,10 +32,10 @@ export function canonicalize(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
   const object = value as Record<string, unknown>;
-  return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(object[key])}`).join(",`)}}`;
+  return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(object[key])}`).join(",")}}`;
 }
 
-export function hashEvent(input: Omit<EventJournalInput, "previousHash"> & { previousHash: string | null }): string {
+export function hashEvent(input: EventJournalInput): string {
   const canonical = canonicalize({
     experimentId: input.experimentId,
     sequence: input.sequence,
@@ -88,12 +88,13 @@ export function buildCausalEvents(experimentId: string, result: ClosedLoopResult
     previousHash = event.eventHash;
   }
 
-  const terminal = buildEvent({
+  const lastFrame = result.frames.length > 0 ? result.frames[result.frames.length - 1] : undefined;
+  events.push(buildEvent({
     experimentId,
     sequence: result.frames.length + 1,
     eventType: "RUN_TERMINAL",
     stage: result.status,
-    occurredAt: new Date((result.frames.at(-1)?.timestampSeconds ?? 0) * 1000),
+    occurredAt: new Date((lastFrame?.timestampSeconds ?? 0) * 1000),
     source,
     payload: {
       status: result.status,
@@ -102,8 +103,8 @@ export function buildCausalEvents(experimentId: string, result: ClosedLoopResult
       pausedSteps: result.pausedSteps,
     },
     previousHash,
-  });
-  events.push(terminal);
+  }));
+
   return events;
 }
 
