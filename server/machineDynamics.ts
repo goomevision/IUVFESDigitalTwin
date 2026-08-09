@@ -8,6 +8,7 @@
 
 import type { MachineCommand, MachineSensors } from './processStateEngine';
 import { stepThermalModel } from './thermalEngineering';
+import { stepVacuumDynamics } from './vacuumDynamics';
 import { DEFAULT_VIRTUAL_HARDWARE_PROFILE, resolveVirtualHardwareProfile } from './virtualHardwareProfile';
 
 export interface VirtualHardwareDynamicsConfig {
@@ -18,6 +19,8 @@ export interface VirtualHardwareDynamicsConfig {
   coolingPowerKW?: number;
   leakRateMbarPerSecond?: number;
   effectiveHeatLossKWPerC?: number;
+  vacuumLineConductanceFactor?: number;
+  vacuumVaporMolarMassKgPerMol?: number;
 }
 
 export interface DynamicMachineConfig extends VirtualHardwareDynamicsConfig {
@@ -45,17 +48,27 @@ export class MachineDynamicsEngine {
     this.state = { ...initial };
   }
 
-  public step(target: MachineSensors, commands: MachineCommand, dtSeconds: number, latentHeatLoadKW = 0): MachineSensors {
+  public step(target: MachineSensors, commands: MachineCommand, dtSeconds: number, latentHeatLoadKW = 0, vaporGenerationKgPerS = 0): MachineSensors {
     const dt = Math.max(0.05, dtSeconds);
     const lag = Math.max(0.05, Math.min(1, this.c.actuatorLag));
-    const volumeFactor = this.c.chamberVolumeL > 0 ? DEFAULT_VIRTUAL_HARDWARE_PROFILE.chamberVolumeL / this.c.chamberVolumeL : 0;
-    const pumpFactor = this.c.pumpCapacityM3h / DEFAULT_VIRTUAL_HARDWARE_PROFILE.pumpCapacityM3h;
-    const hardwareVacuumRate = this.c.vacuumRateMbarPerSecond * volumeFactor * pumpFactor;
+    const volumeM3 = Math.max(1e-6, this.c.chamberVolumeL / 1000);
+    const pumpM3PerS = Math.max(0, this.c.pumpCapacityM3h / 3600);
+    const conductance = Math.max(0.01, Math.min(1, this.c.vacuumLineConductanceFactor));
+    const gasTemperatureK = Math.max(1, this.state.temperatureC + 273.15);
+    const vacuum = stepVacuumDynamics({
+      timeStepS: dt,
+      absolutePressureKPa: Math.max(0.1, this.state.pressureMbar / 10),
+      vesselVolumeM3: volumeM3,
+      gasTemperatureK,
+      pumpSpeedM3PerS: pumpM3PerS * conductance,
+      valveOpening: commands.vacuumPump ? 1 : 0,
+      vaporGenerationKgPerS: Math.max(0, vaporGenerationKgPerS),
+      gasMolarMassKgPerMol: this.c.vacuumVaporMolarMassKgPerMol,
+    });
+    const vacuumPressureMbar = Math.max(1, vacuum.absolutePressureKPa * 10);
     const leakRise = Math.max(0, this.c.leakRateMbarPerSecond) * dt;
-    const pressureDemand = commands.vacuumPump
-      ? Math.max(1, this.state.pressureMbar - Math.max(0, hardwareVacuumRate) * dt + leakRise)
-      : this.state.pressureMbar + (this.c.ambientPressureMbar - this.state.pressureMbar) * 0.03 * dt + leakRise;
-    const pressure = this.blend(this.state.pressureMbar, Math.max(1, Math.min(this.c.ambientPressureMbar, pressureDemand)), lag);
+    const pressureWithLeak = Math.min(this.c.ambientPressureMbar, vacuumPressureMbar + leakRise);
+    const pressure = this.blend(this.state.pressureMbar, pressureWithLeak, lag);
 
     const thermal = stepThermalModel({
       initialTemperatureC: this.state.temperatureC,
