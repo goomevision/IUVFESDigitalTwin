@@ -35,6 +35,15 @@ export interface ClosedLoopSnapshot {
   state: ProcessState; dynamics: MachineDynamicsSnapshot; materialInventory: MaterialInventory; control: ProcessControlSnapshot; frames: CausalFrame[]; pausedSteps: number[];
 }
 
+function normalizeFaultScenario(scenario?: FaultPropagationScenario): FaultPropagationScenario {
+  return {
+    id: scenario?.id ?? 'baseline',
+    label: scenario?.label ?? 'Baseline / no sensor or actuator fault',
+    sensorFaults: [...(scenario?.sensorFaults ?? [])],
+    actuatorFaults: [...(scenario?.actuatorFaults ?? [])],
+  };
+}
+
 export class ClosedLoopSimulationEngine {
   private readonly dtSeconds: number; private readonly maxSteps: number; private readonly realTime: boolean;
   private readonly state: ProcessStateEngine; private readonly dynamics: MachineDynamicsEngine; private readonly control: ProcessControlLoop; private readonly material: MaterialProcessEngine;
@@ -45,7 +54,7 @@ export class ClosedLoopSimulationEngine {
   constructor(private readonly config: ClosedLoopSimulationConfig) {
     this.dtSeconds = Math.max(0.1, config.dtSeconds ?? 1); this.maxSteps = Math.max(1, config.maxSteps ?? Math.ceil(24 * 3600 / this.dtSeconds)); this.realTime = config.realTime ?? true;
     this.safetyLimits = { ...config.safetyLimits };
-    this.faultScenario = { id: config.faultScenario?.id ?? 'baseline', label: config.faultScenario?.label ?? 'Baseline / no sensor or actuator fault', sensorFaults: [...(config.faultScenario?.sensorFaults ?? [])], actuatorFaults: [...(config.faultScenario?.actuatorFaults ?? [])] };
+    this.faultScenario = normalizeFaultScenario(config.faultScenario);
     this.target = { chamberSealed: true, pressureMbar: Math.max(1, config.targetPressureMbar), temperatureC: Math.max(25, config.targetTemperatureC), yieldPercent: 100,
       waterRemovedKg: Math.max(0, config.materialWeightKg * config.waterContentPercent / 100), oilRecoveredKg: Math.max(0, config.materialWeightKg * config.oilContentPercent / 100), energyKwh: 0 };
     this.sensors = this.initialSensors();
@@ -80,8 +89,6 @@ export class ClosedLoopSimulationEngine {
     const effectiveCommands = propagateFaults(this.sensors, intendedCommands, this.faultScenario, this.sensors).effectiveCommands;
     const controller = { ...controllerBeforeActuation, commands: intendedCommands };
 
-    // Explicit causal coupling: material state at timestep n supplies vapor and
-    // latent-heat demand to the hardware model that advances to timestep n+1.
     const previousMaterial = this.material.snapshot();
     const latentHeatLoadKW = previousMaterial.latentHeatLoadKW;
     const vaporGenerationKgPerS = Math.max(0, previousMaterial.vaporFlowKgPerHour) / 3600;
@@ -108,7 +115,7 @@ export class ClosedLoopSimulationEngine {
   public getMaterialInventory(): MaterialInventory { return this.material.snapshot(); } public getSafetyEvents(): SafetyEvent[] { return buildSafetyEventTimeline(this.frames); }
 
   public snapshot(): ClosedLoopSnapshot {
-    return { version: 1, config: { ...this.config, realTime: this.realTime, hardware: this.config.hardware ? { ...this.config.hardware } : undefined, faultScenario: { ...this.faultScenario, sensorFaults: [...(this.faultScenario.sensorFaults ?? [])], actuatorFaults: [...(this.faultScenario.actuatorFaults ?? [])] }, },
+    return { version: 1, config: { ...this.config, realTime: this.realTime, hardware: this.config.hardware ? { ...this.config.hardware } : undefined, faultScenario: normalizeFaultScenario(this.faultScenario), },
       target: { ...this.target }, sensors: { ...this.sensors }, elapsedSeconds: this.elapsedSeconds, stepNumber: this.stepNumber, paused: this.paused, lastStepWallClockMs: this.lastStepWallClockMs,
       state: this.state.snapshotState(), dynamics: this.dynamics.snapshot(), materialInventory: this.material.snapshot(), control: this.control.snapshot(), frames: [...this.frames], pausedSteps: [...this.pausedSteps] };
   }
@@ -120,7 +127,7 @@ export class ClosedLoopSimulationEngine {
     const snapshotHardware = snapshot.config.hardware ?? {}; const currentHardware = this.config.hardware ?? {};
     const hardwareKeys: Array<keyof VirtualHardwareDynamicsConfig> = ['chamberVolumeL', 'pumpCapacityM3h', 'thermalMassKJPerC', 'heatingPowerKW', 'coolingPowerKW', 'leakRateMbarPerSecond', 'effectiveHeatLossKWPerC', 'vacuumLineConductanceFactor', 'vacuumLineDiameterM', 'vacuumVaporMolarMassKgPerMol'];
     for (const key of hardwareKeys) if (snapshotHardware[key] !== currentHardware[key]) throw new Error('Snapshot hardware profile does not match simulation configuration');
-    if (JSON.stringify(snapshot.config.faultScenario ?? null) !== JSON.stringify(this.config.faultScenario ?? null)) throw new Error('Snapshot fault scenario does not match simulation configuration');
+    if (JSON.stringify(normalizeFaultScenario(snapshot.config.faultScenario)) !== JSON.stringify(normalizeFaultScenario(this.config.faultScenario))) throw new Error('Snapshot fault scenario does not match simulation configuration');
     this.sensors = { ...snapshot.sensors }; this.elapsedSeconds = snapshot.elapsedSeconds; this.stepNumber = snapshot.stepNumber; this.paused = snapshot.paused; this.lastStepWallClockMs = this.realTime && !this.paused ? Date.now() : snapshot.lastStepWallClockMs;
     this.frames.length = 0; this.frames.push(...snapshot.frames); this.pausedSteps.length = 0; this.pausedSteps.push(...snapshot.pausedSteps); this.state.restore(snapshot.state); this.dynamics.restore(snapshot.dynamics); this.material.restore(snapshot.materialInventory); this.control.restore(snapshot.control);
   }
