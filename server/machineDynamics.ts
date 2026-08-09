@@ -20,6 +20,8 @@ export interface DynamicMachineConfig {
   actuatorLag?: number;
 }
 
+export interface MachineDynamicsSnapshot { state: MachineSensors; }
+
 export class MachineDynamicsEngine {
   private readonly c: Required<DynamicMachineConfig>;
   private state: MachineSensors;
@@ -43,7 +45,6 @@ export class MachineDynamicsEngine {
   public step(target: MachineSensors, commands: MachineCommand, dtSeconds: number): MachineSensors {
     const dt = Math.max(0.05, dtSeconds);
     const lag = Math.max(0.05, Math.min(1, this.c.actuatorLag));
-
     const pressureDemand = commands.vacuumPump
       ? Math.max(1, this.state.pressureMbar - this.c.vacuumRateMbarPerSecond * dt)
       : this.state.pressureMbar + (this.c.ambientPressureMbar - this.state.pressureMbar) * 0.03 * dt;
@@ -65,7 +66,6 @@ export class MachineDynamicsEngine {
     const yieldRatio = yieldPercent / Math.max(target.yieldPercent, 0.001);
     const oilRecoveredKg = Math.max(this.state.oilRecoveredKg, target.oilRecoveredKg * yieldRatio);
     const waterRemovedKg = Math.max(this.state.waterRemovedKg, target.waterRemovedKg * yieldRatio);
-
     const energyRate = (commands.heater ? 0.004 : 0) + (commands.vacuumPump ? 0.0015 : 0) + (commands.extractor ? 0.001 : 0) + (commands.cooling ? 0.001 : 0);
     const energyKwh = this.state.energyKwh + energyRate * dt;
 
@@ -78,11 +78,11 @@ export class MachineDynamicsEngine {
       oilRecoveredKg: Math.min(target.oilRecoveredKg, oilRecoveredKg),
       energyKwh,
     };
-
     return { ...this.state };
   }
 
-  private blend(current: number, next: number, factor: number): number {
-    return current + (next - current) * factor;
-  }
+  public getSnapshot(): MachineDynamicsSnapshot { return { state: { ...this.state } }; }
+  public restore(snapshot: MachineDynamicsSnapshot): void { this.state = { ...snapshot.state }; }
+
+  private blend(current: number, next: number, factor: number): number { return current + (next - current) * factor; }
 }
