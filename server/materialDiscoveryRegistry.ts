@@ -33,7 +33,7 @@ export function registerMaterialDiscovery(discovery: MaterialDiscovery): Materia
   if (discovery.concentration && (!Number.isFinite(discovery.concentration.value) || discovery.concentration.value < 0)) {
     throw new Error("Concentration must be finite and non-negative.");
   }
-  return { ...discovery, provenanceIds: [...new Set(discovery.provenanceIds)] };
+  return { ...discovery, provenanceIds: Array.from(new Set(discovery.provenanceIds)) };
 }
 
 export function enrichMaterialComposition(
@@ -48,8 +48,9 @@ export function enrichMaterialComposition(
     item.sampleId === accepted.sampleId,
   );
   if (duplicate) {
+    const mergedProvenanceIds = Array.from(new Set([...duplicate.provenanceIds, ...accepted.provenanceIds]));
     return existing.map((item) => item.discoveryId === duplicate.discoveryId
-      ? { ...item, properties: { ...item.properties, ...accepted.properties }, provenanceIds: [...new Set([...item.provenanceIds, ...accepted.provenanceIds])] }
+      ? { ...item, properties: { ...item.properties, ...accepted.properties }, provenanceIds: mergedProvenanceIds }
       : item);
   }
   return [...existing, accepted];

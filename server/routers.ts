@@ -7,38 +7,32 @@ import * as db from "./db";
 import { TRPCError } from "@trpc/server";
 import { PhysicsSimulationEngine } from "./physicsEngine";
 import { AIOptimizer, type SimulationDataPoint } from "./aiOptimizer";
+import { closedLoopRouter } from "./closedLoopRouter";
 
 export const appRouter = router({
   system: systemRouter,
+
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+      return { success: true } as const;
     }),
   }),
 
-  // IUVFES Materials Router
   materials: router({
-    list: publicProcedure.query(async () => {
-      return db.getMaterials();
-    }),
-
+    list: publicProcedure.query(async () => db.getMaterials()),
     getById: publicProcedure.input(z.number()).query(async ({ input }) => {
       const material = await db.getMaterialById(input);
       if (!material) throw new TRPCError({ code: "NOT_FOUND" });
       return material;
     }),
-
     getByName: publicProcedure.input(z.string()).query(async ({ input }) => {
       const material = await db.getMaterialByName(input);
       if (!material) throw new TRPCError({ code: "NOT_FOUND" });
       return material;
     }),
-
     create: protectedProcedure.input(z.object({
       name: z.string().min(1).max(100),
       description: z.string().optional(),
@@ -47,12 +41,9 @@ export const appRouter = router({
       oilComposition: z.record(z.string(), z.number()),
       density: z.number().optional(),
       thermalProperties: z.record(z.string(), z.number()).optional(),
-    })).mutation(async ({ input }) => {
-      return db.createMaterial(input);
-    }),
+    })).mutation(async ({ input }) => db.createMaterial(input)),
   }),
 
-  // IUVFES Experiments Router
   experiments: router({
     create: protectedProcedure.input(z.object({
       materialId: z.number(),
@@ -60,48 +51,38 @@ export const appRouter = router({
       inputParameters: z.record(z.string(), z.any()),
     })).mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
-
       const experimentId = await db.createExperiment({
         userId: ctx.user.id,
         materialId: input.materialId,
         experimentName: input.experimentName,
         inputParameters: input.inputParameters,
       });
-
       return { experimentId };
     }),
-
     get: protectedProcedure.input(z.string()).query(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
-
       const experiment = await db.getExperiment(input);
       if (!experiment) throw new TRPCError({ code: "NOT_FOUND" });
       if (experiment.userId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN" });
-
       return experiment;
     }),
-
     list: protectedProcedure.query(async ({ ctx }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
       return db.listUserExperiments(ctx.user.id);
     }),
-
     updateStatus: protectedProcedure.input(z.object({
       experimentId: z.string(),
       status: z.enum(["draft", "running", "paused", "completed", "failed"]),
     })).mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
-
       const experiment = await db.getExperiment(input.experimentId);
       if (!experiment) throw new TRPCError({ code: "NOT_FOUND" });
       if (experiment.userId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN" });
-
-      await db.updateExperimentStatus(input.experimentId, input.status as "draft" | "running" | "paused" | "completed" | "failed");
+      await db.updateExperimentStatus(input.experimentId, input.status);
       return { success: true };
     }),
   }),
 
-  // IUVFES Simulation Router
   simulation: router({
     run: protectedProcedure.input(z.object({
       experimentId: z.string(),
@@ -117,24 +98,10 @@ export const appRouter = router({
       processModel: z.enum(["vacuum", "distillation", "ultrasonic", "hybrid"]),
     })).mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
-
       try {
         await db.updateExperimentStatus(input.experimentId, "running");
-
-        const engine = new PhysicsSimulationEngine({
-          materialWeight: input.materialWeight,
-          waterContent: input.waterContent,
-          oilContent: input.oilContent,
-          targetPressure: input.targetPressure,
-          targetTemperature: input.targetTemperature,
-          ultrasonicFrequency: input.ultrasonicFrequency,
-          duration: input.duration,
-          materialWaterRatio: input.materialWaterRatio,
-          processModel: input.processModel,
-        });
-
+        const engine = new PhysicsSimulationEngine(input);
         const results = await engine.runSimulation();
-
         const resultId = await db.createSimulationResult({
           experimentId: input.experimentId,
           finalYield: results.finalYield,
@@ -146,21 +113,14 @@ export const appRouter = router({
           massBalance: results.massBalance,
           energyBalance: results.energyBalance,
         });
-
         await db.updateExperimentStatus(input.experimentId, "completed");
-
-        return {
-          success: true,
-          resultId,
-          results,
-        };
+        return { success: true, resultId, results };
       } catch (error) {
         await db.updateExperimentStatus(input.experimentId, "failed");
         console.error("Simulation error:", error);
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Simulation failed" });
       }
     }),
-
     getResults: protectedProcedure.input(z.string()).query(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
       const results = await db.getSimulationResult(input);
@@ -169,7 +129,8 @@ export const appRouter = router({
     }),
   }),
 
-  // IUVFES AI Brain Router
+  closedLoop: closedLoopRouter,
+
   ai: router({
     analyze: protectedProcedure.input(z.object({
       experimentId: z.string(),
@@ -185,11 +146,9 @@ export const appRouter = router({
       }),
     })).query(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
-
       const experiment = await db.getExperiment(input.experimentId);
       if (!experiment) throw new TRPCError({ code: "NOT_FOUND" });
       if (experiment.userId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN" });
-
       const result = await db.getSimulationResult(input.experimentId);
       let data: SimulationDataPoint[] = [];
       if (result && result.realTimeData) {
@@ -198,9 +157,7 @@ export const appRouter = router({
           data = data.filter(d => d.time <= input.dataUpToTime!);
         }
       }
-
-      const optimizer = new AIOptimizer(input.params);
-      return optimizer.analyze(data);
+      return new AIOptimizer(input.params).analyze(data);
     }),
   }),
 });

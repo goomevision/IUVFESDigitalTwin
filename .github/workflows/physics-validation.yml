@@ -1,0 +1,49 @@
+name: Closed-Loop Physics Validation
+
+on:
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'shared/**'
+      - 'client/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'tsconfig.json'
+      - '.github/workflows/physics-validation.yml'
+  push:
+    branches:
+      - 'fix/closed-loop-physics-integration'
+
+permissions:
+  contents: read
+
+jobs:
+  physics-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm check
+
+      - name: Closed-loop regression tests
+        run: pnpm exec vitest run server/goldenPatchouliExperiment.test.ts server/vacuumFlowRegime.test.ts server/vacuumClosedLoopIntegration.test.ts
+
+      - name: Full test suite
+        run: pnpm test

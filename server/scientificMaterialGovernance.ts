@@ -1,5 +1,5 @@
 /** Governance checks for the Scientific Material Knowledge Base. */
-import type { MaterialPropertyEvidence, MaterialRecord, ScientificSource } from './scientificMaterialKnowledge';
+import type { MaterialRecord, ScientificSource } from './scientificMaterialKnowledge';
 
 export interface MaterialGovernanceIssue {
   materialId: string;
@@ -22,13 +22,15 @@ export function validateMaterialEvidence(
 
   for (const material of materials) {
     for (const evidence of material.properties) {
-      const source = sourceMap.get(evidence.sourceId);
+      const source = evidence.sourceId ? sourceMap.get(evidence.sourceId) : undefined;
       if (!source) {
         issues.push({
           materialId: material.materialId,
           evidenceId: evidence.evidenceId,
           code: 'MISSING_SOURCE',
-          message: `Evidence ${evidence.evidenceId} references unknown source ${evidence.sourceId}.`,
+          message: evidence.sourceId
+            ? `Evidence ${evidence.evidenceId} references unknown source ${evidence.sourceId}.`
+            : `Evidence ${evidence.evidenceId} does not reference a source.`,
         });
       }
 

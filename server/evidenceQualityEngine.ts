@@ -19,6 +19,12 @@ export type EvidenceQualityReport = {
   sampleCount: number;
 };
 
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
 /**
  * Conservative screening only. Outliers are flagged as candidates and never
  * deleted or corrected automatically. Units must already be normalized by the
@@ -34,14 +40,16 @@ export function assessEvidenceQuality(samples: EvidenceSample[], outlierZ = 3): 
     else if (!Number.isFinite(sample.uncertainty) || sample.uncertainty < 0) issues.push({ evidenceId: sample.evidenceId, code: "NEGATIVE_UNCERTAINTY", message: "Measurement uncertainty is invalid." });
   }
 
-  const valid = samples.filter((sample) => Number.isFinite(sample.value)).map((sample) => sample.value);
+  const valid = samples.filter((sample) => Number.isFinite(sample.value));
   if (valid.length >= 3) {
-    const mean = valid.reduce((sum, value) => sum + value, 0) / valid.length;
-    const variance = valid.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (valid.length - 1);
-    const sd = Math.sqrt(variance);
-    if (sd > 0) {
-      for (const sample of samples) {
-        const z = Math.abs((sample.value - mean) / sd);
+    const values = valid.map((sample) => sample.value);
+    const center = median(values);
+    const deviations = values.map((value) => Math.abs(value - center));
+    const mad = median(deviations);
+    if (mad > 0) {
+      const scale = 1.4826 * mad;
+      for (const sample of valid) {
+        const z = Math.abs((sample.value - center) / scale);
         if (z > outlierZ) issues.push({ evidenceId: sample.evidenceId, code: "OUTLIER_CANDIDATE", message: `Observation is an outlier candidate (|z|=${z.toFixed(3)}).` });
       }
     }

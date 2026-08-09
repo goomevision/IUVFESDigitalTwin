@@ -55,10 +55,10 @@ export function resolveWaterSteamState(temperatureK: number, pressureMPa: number
       properties: {
         specificVolumeM3PerKg: state.specificVolumeM3PerKg,
         densityKgPerM3: 1 / state.specificVolumeM3PerKg,
-        enthalpyKJPerKg: state.enthalpyKJPerKg,
-        internalEnergyKJPerKg: state.internalEnergyKJPerKg,
-        entropyKJPerKgK: state.entropyKJPerKgK,
-        cpKJPerKgK: state.cpKJPerKgK,
+        enthalpyKJPerKg: state.enthalpyJPerKg / 1000,
+        internalEnergyKJPerKg: state.internalEnergyJPerKg / 1000,
+        entropyKJPerKgK: state.entropyJPerKgK / 1000,
+        cpKJPerKgK: state.cpJPerKgK / 1000,
       },
       notes: selection.notes,
     };

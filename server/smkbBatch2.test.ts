@@ -13,28 +13,19 @@ describe('SMKB aromatic biomass batch 2', () => {
       literatureObservations: Array<Record<string, unknown>>;
       dataGaps: string[];
     }>;
+  };
 
   it('contains the expanded aromatic benchmark set', () => {
     expect(catalog.materials).toHaveLength(8);
     expect(catalog.materials.map((m) => m.materialId)).toEqual([
-      'MAT-CITRONELLA-CYMB-NARDUS',
-      'MAT-LAVENDER-L-ANGUSTIFOLIA',
-      'MAT-CLOVE-S-AROMATICUM',
-      'MAT-NUTMEG-M-FRAGRANS',
-      'MAT-GINGER-Z-OFFICINALE',
-      'MAT-ROSE-R-DAMASCENA',
-      'MAT-JASMINE-J-SAMBAC',
-      'MAT-CINNAMON-CINNAMOMUM-SP',
+      'MAT-CITRONELLA-CYMB-NARDUS', 'MAT-LAVENDER-L-ANGUSTIFOLIA', 'MAT-CLOVE-S-AROMATICUM', 'MAT-NUTMEG-M-FRAGRANS',
+      'MAT-GINGER-Z-OFFICINALE', 'MAT-ROSE-R-DAMASCENA', 'MAT-JASMINE-J-SAMBAC', 'MAT-CINNAMON-CINNAMOMUM-SP',
     ]);
   });
 
   it('keeps every material at literature evidence status', () => {
     for (const material of catalog.materials) {
-      expect(material.evidenceGrade).toBe('B');
-      expect(material.validationStatus).toBe('LITERATURE');
-      expect(material.processRoutes.length).toBeGreaterThan(0);
-      expect(material.literatureObservations.length).toBeGreaterThan(0);
-      expect(material.dataGaps.length).toBeGreaterThan(0);
+      expect(material.evidenceGrade).toBe('B'); expect(material.validationStatus).toBe('LITERATURE'); expect(material.processRoutes.length).toBeGreaterThan(0); expect(material.literatureObservations.length).toBeGreaterThan(0); expect(material.dataGaps.length).toBeGreaterThan(0);
     }
   });
 

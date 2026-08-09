@@ -39,20 +39,12 @@ export function validateWithUncertainty(
   meanAbsoluteError?: number,
   maxAbsoluteError?: number,
 ): UncertaintyAwareValidationResult {
-  const reasons: string[] = [];
   const combinedUncertainty = combineIndependentUncertainty(
     criteria.measuredUncertainty,
     criteria.modelUncertainty,
   );
 
   if (comparedPoints < criteria.minimumComparedPoints) {
-    reasons.push(`Compared points ${comparedPoints} is below required minimum ${criteria.minimumComparedPoints}.`);
-  }
-  if (meanAbsoluteError === undefined || maxAbsoluteError === undefined) {
-    reasons.push("Error metrics are incomplete.");
-  }
-
-  if (reasons.length > 0) {
     return {
       metric: criteria.metric,
       status: comparedPoints === 0 ? "INSUFFICIENT_DATA" : "PARTIALLY_VALIDATED",
@@ -61,7 +53,20 @@ export function validateWithUncertainty(
       maxAbsoluteError,
       comparedPoints,
       criteria,
-      reasons,
+      reasons: [`Compared points ${comparedPoints} is below required minimum ${criteria.minimumComparedPoints}.`],
+    };
+  }
+
+  if (meanAbsoluteError === undefined || maxAbsoluteError === undefined) {
+    return {
+      metric: criteria.metric,
+      status: "PARTIALLY_VALIDATED",
+      combinedUncertainty,
+      meanAbsoluteError,
+      maxAbsoluteError,
+      comparedPoints,
+      criteria,
+      reasons: ["Error metrics are incomplete."],
     };
   }
 
