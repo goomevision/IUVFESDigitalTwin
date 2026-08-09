@@ -24,10 +24,10 @@ export const DEFAULT_VIRTUAL_HARDWARE_PROFILE: Readonly<Required<DynamicMachineC
   coolingPowerKW: 3,
   leakRateMbarPerSecond: 0,
   effectiveHeatLossKWPerC: 0,
+  vacuumLineConductanceFactor: 1,
+  vacuumVaporMolarMassKgPerMol: 0.01801528,
 };
 
-export function resolveVirtualHardwareProfile(
-  overrides: Partial<DynamicMachineConfig> = {},
-): Required<DynamicMachineConfig> {
+export function resolveVirtualHardwareProfile(overrides: Partial<DynamicMachineConfig> = {}): Required<DynamicMachineConfig> {
   return { ...DEFAULT_VIRTUAL_HARDWARE_PROFILE, ...overrides };
 }
