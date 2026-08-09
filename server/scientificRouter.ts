@@ -6,6 +6,7 @@ import * as researchDb from "./researchDb";
 import { assessValidationReadiness } from "./scientificValidation";
 import { compareSimulationToExperiment, type ParameterTolerance } from "./comparisonEngine";
 import { validateAgainstReplicates } from "./uncertaintyEngine";
+import { validateEnergyBalance, validateMassBalance } from "./massEnergyBalance";
 
 const simulationChannelMap: Record<string, string> = {
   pressure: "pressure",
@@ -15,6 +16,13 @@ const simulationChannelMap: Record<string, string> = {
   oilRecovered: "oilRecovered",
   energy: "energyConsumed",
 };
+
+const balanceTolerance = z.object({
+  absoluteKg: z.number().nonnegative().optional(),
+  relativePercent: z.number().nonnegative().optional(),
+}).refine(value => value.absoluteKg !== undefined || value.relativePercent !== undefined, {
+  message: "At least one balance tolerance is required for PASS/FAIL; otherwise the result is INCONCLUSIVE.",
+});
 
 export const scientificRouter = router({
   validationReadiness: protectedProcedure
@@ -168,6 +176,58 @@ export const scientificRouter = router({
         researchExperimentId: input.researchExperimentId,
         ...result,
         scientificBoundary: "Replicate uncertainty quantifies repeatability and supplied instrument uncertainty. It does not certify the physical model or measurement system.",
+      };
+    }),
+
+  balanceValidation: protectedProcedure
+    .input(z.object({
+      researchExperimentId: z.string().min(1),
+      mass: z.object({
+        materialInKg: z.number().nonnegative(),
+        waterRemovedKg: z.number().nonnegative().optional(),
+        oilRecoveredKg: z.number().nonnegative().optional(),
+        solidRecoveredKg: z.number().nonnegative().optional(),
+        wasteKg: z.number().nonnegative().optional(),
+        otherOutputKg: z.number().nonnegative().optional(),
+      }).optional(),
+      energy: z.object({
+        energyInputKwh: z.number().nonnegative(),
+        heatingKwh: z.number().nonnegative().optional(),
+        vacuumKwh: z.number().nonnegative().optional(),
+        extractionKwh: z.number().nonnegative().optional(),
+        coolingKwh: z.number().nonnegative().optional(),
+        otherKwh: z.number().nonnegative().optional(),
+      }).optional(),
+      massTolerance: balanceTolerance.optional(),
+      energyTolerance: z.object({
+        absoluteKwh: z.number().nonnegative().optional(),
+        relativePercent: z.number().nonnegative().optional(),
+      }).refine(value => value.absoluteKwh !== undefined || value.relativePercent !== undefined, {
+        message: "At least one energy tolerance is required for PASS/FAIL; otherwise the result is INCONCLUSIVE.",
+      }).optional(),
+    }).refine(input => input.mass !== undefined || input.energy !== undefined, {
+      message: "At least one balance domain must be supplied.",
+    }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const researchExperiment = await researchDb.getResearchExperiment(input.researchExperimentId);
+      if (!researchExperiment) throw new TRPCError({ code: "NOT_FOUND" });
+      if (researchExperiment.researcherId !== String(ctx.user.id) && ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const mass = input.mass ? validateMassBalance(input.mass, input.massTolerance) : null;
+      const energy = input.energy
+        ? validateEnergyBalance(input.energy, input.energyTolerance ? {
+          absoluteKg: input.energyTolerance.absoluteKwh,
+          relativePercent: input.energyTolerance.relativePercent,
+        } : undefined)
+        : null;
+      return {
+        researchExperimentId: input.researchExperimentId,
+        mass,
+        energy,
+        scientificBoundary: "Balance closure evaluates declared accounting against explicit tolerances. It does not prove conservation-law compliance, instrument accuracy, process-model validity, or scientific truth.",
       };
     }),
 });
