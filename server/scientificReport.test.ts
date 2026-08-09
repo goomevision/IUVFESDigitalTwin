@@ -23,6 +23,23 @@ describe("scientific validation report", () => {
     expect(report.schemaVersion).toBe("1.0.0");
   });
 
+  it("can derive evidence presence from the readiness section", () => {
+    const report = buildScientificValidationReport({
+      researchExperimentId: "research-evidence",
+      experimentId: "experiment-evidence",
+      sections: [{
+        key: "evidence",
+        title: "Evidence-chain readiness",
+        verdict: "PASS",
+        summary: "Evidence chain complete",
+        evidence: { checks: { sensorObservations: true, simulationDataset: true, provenance: true } },
+      }],
+      provenance: {},
+    });
+
+    expect(report.readiness).toBe("READY");
+  });
+
   it("propagates a failed section to the overall report", () => {
     const report = buildScientificValidationReport({
       researchExperimentId: "research-2",
