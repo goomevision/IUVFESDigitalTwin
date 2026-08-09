@@ -22,12 +22,14 @@ describe('ProcessStateEngine', () => {
   it('advances to heat-up only after the vacuum condition is actually reached', () => {
     const engine = new ProcessStateEngine({ targetPressureMbar: 100, targetTemperatureC: 70 }, sensors(900, 25));
     expect(engine.tick(sensors(900, 25), 0).stage).toBe('CHARGE');
+    expect(engine.tick(sensors(900, 25), 1).stage).toBe('VACUUM');
     expect(engine.tick(sensors(100, 25), 60).stage).toBe('HEAT_UP');
   });
 
   it('trips over-temperature and disables the heater', () => {
     const engine = new ProcessStateEngine({ targetPressureMbar: 100, targetTemperatureC: 70, maxTemperatureC: 120 }, sensors(900, 25));
     engine.tick(sensors(900, 25), 0);
+    engine.tick(sensors(900, 25), 1);
     engine.tick(sensors(100, 25), 60);
     const state = engine.tick(sensors(100, 130), 120);
     expect(state.stage).toBe('FAULT');
@@ -37,11 +39,12 @@ describe('ProcessStateEngine', () => {
 
   it('reaches complete only after the cooling interlock is satisfied', () => {
     const engine = new ProcessStateEngine({ targetPressureMbar: 100, targetTemperatureC: 70, coolingTemperatureC: 35 }, sensors(900, 25));
-    engine.tick(sensors(900, 25), 0);
-    engine.tick(sensors(100, 25), 60);
-    engine.tick(sensors(100, 70), 120);
-    engine.tick(sensors(100, 70, 99), 180);
-    engine.tick(sensors(200, 50, 99), 240);
-    expect(engine.tick(sensors(200, 35, 99), 300).stage).toBe('COMPLETE');
+    engine.tick(sensors(900, 25), 0); // CHARGE
+    engine.tick(sensors(100, 25), 60); // VACUUM -> HEAT_UP
+    engine.tick(sensors(100, 70), 120); // HEAT_UP -> EXTRACTION
+    engine.tick(sensors(100, 70, 99), 180); // EXTRACTION -> CONDENSATION
+    engine.tick(sensors(200, 50, 99), 240); // CONDENSATION -> COOL_DOWN
+    engine.tick(sensors(200, 35, 99), 300); // COOL_DOWN -> COMPLETE
+    expect(engine.tick(sensors(200, 35, 99), 301).stage).toBe('COMPLETE');
   });
 });
