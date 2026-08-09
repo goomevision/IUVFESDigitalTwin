@@ -5,7 +5,7 @@ export interface ReportSection {
   title: string;
   verdict: ReportVerdict;
   summary: string;
-  evidence: Record<string, unknown>;
+  evidence: unknown;
 }
 
 export interface ScientificValidationReportInput {
