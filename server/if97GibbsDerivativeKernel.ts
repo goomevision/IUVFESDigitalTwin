@@ -44,8 +44,11 @@ export function evaluateDimensionlessGibbs(
     gamma += term.n * p * t;
     if (term.I !== 0) gammaPi += term.n * term.I * Math.pow(pi, term.I - 1) * t;
     if (term.J !== 0) gammaTau += term.n * term.J * p * Math.pow(tau, term.J - 1);
-    if (term.I > 1) gammaPiPi += term.n * term.I * (term.I - 1) * Math.pow(pi, term.I - 2) * t;
-    if (term.J > 1) gammaTauTau += term.n * term.J * (term.J - 1) * p * Math.pow(tau, term.J - 2);
+    // The second derivative is also valid for I/J < 0. IF97 contains
+    // negative exponents in several coefficient sets, so checking > 1
+    // silently drops valid curvature terms.
+    if (term.I !== 0 && term.I !== 1) gammaPiPi += term.n * term.I * (term.I - 1) * Math.pow(pi, term.I - 2) * t;
+    if (term.J !== 0 && term.J !== 1) gammaTauTau += term.n * term.J * (term.J - 1) * p * Math.pow(tau, term.J - 2);
     if (term.I !== 0 && term.J !== 0) {
       gammaPiTau += term.n * term.I * term.J * Math.pow(pi, term.I - 1) * Math.pow(tau, term.J - 1);
     }
@@ -90,8 +93,8 @@ export function evaluateTransformedGibbs(
     gamma += term.n * xp * yj;
     if (term.I !== 0) gammaPi += piSign * term.n * term.I * Math.pow(x, term.I - 1) * yj;
     if (term.J !== 0) gammaTau += tauSign * term.n * term.J * xp * Math.pow(y, term.J - 1);
-    if (term.I > 1) gammaPiPi += term.n * term.I * (term.I - 1) * Math.pow(x, term.I - 2) * yj;
-    if (term.J > 1) gammaTauTau += term.n * term.J * (term.J - 1) * xp * Math.pow(y, term.J - 2);
+    if (term.I !== 0 && term.I !== 1) gammaPiPi += term.n * term.I * (term.I - 1) * Math.pow(x, term.I - 2) * yj;
+    if (term.J !== 0 && term.J !== 1) gammaTauTau += term.n * term.J * (term.J - 1) * xp * Math.pow(y, term.J - 2);
     if (term.I !== 0 && term.J !== 0) {
       gammaPiTau += piSign * tauSign * term.n * term.I * term.J * Math.pow(x, term.I - 1) * Math.pow(y, term.J - 1);
     }
