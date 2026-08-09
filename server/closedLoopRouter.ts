@@ -34,6 +34,9 @@ export const closedLoopRouter = router({
 
     await db.updateExperimentStatus(input.experimentId, "running");
     const result = engine.runToCompletion();
+    const isComplete = result.status === "COMPLETE";
+    const isFault = result.status === "FAULT";
+
     const resultId = await db.createSimulationResult({
       experimentId: input.experimentId,
       finalYield: result.finalSensors.yieldPercent,
@@ -49,10 +52,14 @@ export const closedLoopRouter = router({
       },
       energyBalance: { energyKwh: result.finalSensors.energyKwh },
     });
-    await db.updateExperimentStatus(input.experimentId, result.status === "FAULT" ? "failed" : "completed");
+
+    await db.updateExperimentStatus(
+      input.experimentId,
+      isComplete ? "completed" : isFault ? "failed" : "running",
+    );
 
     return {
-      success: result.status !== "FAULT",
+      success: isComplete,
       resultId,
       status: result.status,
       frames: result.frames,
