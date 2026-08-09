@@ -25,6 +25,7 @@ export const DEFAULT_VIRTUAL_HARDWARE_PROFILE: Readonly<Required<DynamicMachineC
   leakRateMbarPerSecond: 0,
   effectiveHeatLossKWPerC: 0,
   vacuumLineConductanceFactor: 1,
+  vacuumLineDiameterM: 0.02,
   vacuumVaporMolarMassKgPerMol: 0.01801528,
 };
 
