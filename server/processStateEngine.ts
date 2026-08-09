@@ -31,6 +31,15 @@ export class ProcessStateEngine {
     this.state.commands = this.commandsForStage(this.state.stage); this.state.progress = this.progressForStage(this.state.stage, sensors); return this.snapshot();
   }
   public reset(sensors: MachineSensors): ProcessState { this.state = this.initialState(sensors, 'Controller reset; waiting for pre-flight checks.'); return this.snapshot(); }
+  public getSnapshot(): ProcessState { return this.snapshot(); }
+  public restore(snapshot: ProcessState): void {
+    this.state = {
+      ...snapshot,
+      sensors: { ...snapshot.sensors },
+      commands: { ...snapshot.commands },
+      interlocks: { ...snapshot.interlocks },
+    };
+  }
   private initialState(sensors: MachineSensors, reason: string): ProcessState { return { stage: 'PRE_FLIGHT', progress: 0, elapsedSeconds: 0, sensors: { ...sensors }, commands: this.off(), interlocks: this.evaluateInterlocks(sensors), alarm: null, transitionReason: reason }; }
   private evaluateInterlocks(sensors: MachineSensors): InterlockState { const overTemperature = sensors.temperatureC >= this.config.maxTemperatureC; const pressureSafeForHeating = sensors.pressureMbar <= Math.max(this.config.targetPressureMbar * 1.15, 5); const vacuumAchieved = sensors.pressureMbar <= this.config.targetPressureMbar * 1.05; const temperatureSafeForCooling = sensors.temperatureC <= this.config.coolingTemperatureC; return { chamberSealed: sensors.chamberSealed, pressureSafeForHeating, temperatureSafeForCooling, overTemperature, vacuumAchieved, allSystemsSafe: sensors.chamberSealed && !overTemperature }; }
   private commandsForStage(stage: ProcessStage): MachineCommand { const off = this.off(); if (stage === 'VACUUM') return { ...off, vacuumPump: true }; if (stage === 'HEAT_UP') return { ...off, vacuumPump: true, heater: true }; if (stage === 'EXTRACTION') return { ...off, vacuumPump: true, heater: true, extractor: true, condenser: true }; if (stage === 'CONDENSATION') return { ...off, vacuumPump: true, condenser: true }; if (stage === 'COOL_DOWN') return { ...off, cooling: true, condenser: true }; return off; }
