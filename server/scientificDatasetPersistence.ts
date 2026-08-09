@@ -8,7 +8,7 @@ function canonicalize(value: unknown): string {
   if (value === null || typeof value !== "object") return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
   const object = value as Record<string, unknown>;
-  return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(object[key])}`).join(",")}}`;
+  return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${canonicalize(object[key])}`).join(",`)}}`;
 }
 
 export interface PersistedScientificDataset {
@@ -18,10 +18,12 @@ export interface PersistedScientificDataset {
   eventHash: string | null;
   eventCount: number;
   qualityStatus: "RAW";
+  researchExperimentId: string | null;
 }
 
 export async function persistSimulationDataset(input: {
   experimentId: string;
+  researchExperimentId?: string | null;
   parameters: Record<string, unknown>;
   result: ClosedLoopResult;
   events: ScientificEvent[];
@@ -37,6 +39,7 @@ export async function persistSimulationDataset(input: {
     origin: "SIMULATION",
     qualityStatus: "RAW",
     experimentId: input.experimentId,
+    researchExperimentId: input.researchExperimentId ?? null,
     parameters: input.parameters,
     status: input.result.status,
     finalSensors: input.result.finalSensors,
@@ -52,7 +55,7 @@ export async function persistSimulationDataset(input: {
     INSERT INTO datasetManifests
       (id, experimentId, version, origin, qualityStatus, sha256, storageRef, metadata)
     VALUES
-      (${datasetId}, ${input.experimentId}, ${"1.0.0"}, ${"SIMULATION"}, ${"RAW"}, ${sha256}, ${storageRef}, ${JSON.stringify(payload)})
+      (${datasetId}, ${input.researchExperimentId ?? null}, ${"1.0.0"}, ${"SIMULATION"}, ${"RAW"}, ${sha256}, ${storageRef}, ${JSON.stringify(payload)})
   `);
 
   await db.execute(sql`
@@ -60,7 +63,7 @@ export async function persistSimulationDataset(input: {
       (id, entityId, activityId, agentId, inputRefs, outputRefs)
     VALUES
       (${provenanceId}, ${datasetId}, ${`simulation:${input.experimentId}`}, ${"IUVFES-CLOSED-LOOP"},
-       ${JSON.stringify({ experimentId: input.experimentId, parameters: input.parameters })},
+       ${JSON.stringify({ experimentId: input.experimentId, researchExperimentId: input.researchExperimentId ?? null, parameters: input.parameters })},
        ${JSON.stringify({ datasetId, sha256, eventHash })})
   `);
 
@@ -71,5 +74,6 @@ export async function persistSimulationDataset(input: {
     eventHash,
     eventCount: input.events.length,
     qualityStatus: "RAW",
+    researchExperimentId: input.researchExperimentId ?? null,
   };
 }
