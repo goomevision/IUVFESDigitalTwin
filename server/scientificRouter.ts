@@ -24,6 +24,13 @@ const balanceTolerance = z.object({
   message: "At least one balance tolerance is required for PASS/FAIL; otherwise the result is INCONCLUSIVE.",
 });
 
+const energyBalanceTolerance = z.object({
+  absoluteKwh: z.number().nonnegative().optional(),
+  relativePercent: z.number().nonnegative().optional(),
+}).refine(value => value.absoluteKwh !== undefined || value.relativePercent !== undefined, {
+  message: "At least one energy tolerance is required for PASS/FAIL; otherwise the result is INCONCLUSIVE.",
+});
+
 export const scientificRouter = router({
   validationReadiness: protectedProcedure
     .input(z.string().min(1))
@@ -199,12 +206,7 @@ export const scientificRouter = router({
         otherKwh: z.number().nonnegative().optional(),
       }).optional(),
       massTolerance: balanceTolerance.optional(),
-      energyTolerance: z.object({
-        absoluteKwh: z.number().nonnegative().optional(),
-        relativePercent: z.number().nonnegative().optional(),
-      }).refine(value => value.absoluteKwh !== undefined || value.relativePercent !== undefined, {
-        message: "At least one energy tolerance is required for PASS/FAIL; otherwise the result is INCONCLUSIVE.",
-      }).optional(),
+      energyTolerance: energyBalanceTolerance.optional(),
     }).refine(input => input.mass !== undefined || input.energy !== undefined, {
       message: "At least one balance domain must be supplied.",
     }))
@@ -217,12 +219,7 @@ export const scientificRouter = router({
       }
 
       const mass = input.mass ? validateMassBalance(input.mass, input.massTolerance) : null;
-      const energy = input.energy
-        ? validateEnergyBalance(input.energy, input.energyTolerance ? {
-          absoluteKg: input.energyTolerance.absoluteKwh,
-          relativePercent: input.energyTolerance.relativePercent,
-        } : undefined)
-        : null;
+      const energy = input.energy ? validateEnergyBalance(input.energy, input.energyTolerance) : null;
       return {
         researchExperimentId: input.researchExperimentId,
         mass,
