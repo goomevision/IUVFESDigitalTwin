@@ -2,7 +2,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
-import { ClosedLoopSimulationEngine } from "./closedLoopSimulation";
+import { ClosedLoopSimulationEngine, type ClosedLoopSimulationConfig } from "./closedLoopSimulation";
 import { getClosedLoopSession, saveClosedLoopSession } from "./closedLoopSessionStore";
 
 const hardwareSchema = z.object({
@@ -11,6 +11,8 @@ const hardwareSchema = z.object({
   thermalMassKJPerC: z.number().positive().max(1000000),
   heatingPowerKW: z.number().nonnegative().max(100000),
   coolingPowerKW: z.number().nonnegative().max(100000),
+  vacuumLineConductanceFactor: z.number().positive().max(100),
+  vacuumLineDiameterM: z.number().positive().max(10),
   leakRateMbarPerSecond: z.number().nonnegative().max(1000),
 }).optional();
 
@@ -28,6 +30,20 @@ const configSchema = z.object({
 });
 
 const experimentIdSchema = z.object({ experimentId: z.string().min(1) });
+
+function toEngineConfig(input: z.infer<typeof configSchema>): ClosedLoopSimulationConfig {
+  return {
+    targetPressureMbar: input.targetPressure,
+    targetTemperatureC: input.targetTemperature,
+    materialWeightKg: input.materialWeight,
+    waterContentPercent: input.waterContent,
+    oilContentPercent: input.oilContent,
+    dtSeconds: input.dtSeconds,
+    maxSteps: input.maxSteps,
+    realTime: input.realTime,
+    hardware: input.hardware,
+  };
+}
 
 async function authorize(experimentId: string, user: { id: number; role: string }) {
   const experiment = await db.getExperiment(experimentId);
@@ -50,7 +66,7 @@ export const closedLoopRouter = router({
     if (existing && ["running", "paused"].includes(existing.status)) {
       return { success: true, status: existing.status, step: existing.lastStep, frames: existing.snapshot.frames, sensors: existing.snapshot.sensors, state: existing.snapshot.state };
     }
-    const engine = new ClosedLoopSimulationEngine(input);
+    const engine = new ClosedLoopSimulationEngine(toEngineConfig(input));
     const snapshot = engine.snapshot();
     await saveClosedLoopSession(input.experimentId, "running", snapshot);
     await db.updateExperimentStatus(input.experimentId, "running");
