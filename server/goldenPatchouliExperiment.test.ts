@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { runGoldenPatchouliExperiment } from './goldenPatchouliExperiment';
 
 describe('golden patchouli experiment', () => {
