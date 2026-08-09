@@ -61,20 +61,22 @@ export class MachineDynamicsEngine {
     const vacuumFactor = Math.max(0, Math.min(1, 1 - pressure / this.c.ambientPressureMbar));
     const extractionDrive = commands.extractor ? vacuumFactor * (0.35 + thermalFactor * 0.65) : 0;
     const yieldIncrease = this.c.extractionYieldRatePerSecond * extractionDrive * dt * 100;
-    const yieldPercentage = Math.min(target.yieldPercentage, this.state.yieldPercent + yieldIncrease);
-    const oilRecoveredKg = Math.max(this.state.oilRecoveredKg, target.oilRecoveredKg * (yieldPercentage / Math.max(target.yieldPercentage, 0.001)));
-    const waterRemovedKg = Math.max(this.state.waterRemovedKg, target.waterRemovedKg * (yieldPercentage / Math.max(target.yieldPercentage, 0.001)));
+    const yieldPercent = Math.min(target.yieldPercent, this.state.yieldPercent + yieldIncrease);
+    const yieldRatio = yieldPercent / Math.max(target.yieldPercent, 0.001);
+    const oilRecoveredKg = Math.max(this.state.oilRecoveredKg, target.oilRecoveredKg * yieldRatio);
+    const waterRemovedKg = Math.max(this.state.waterRemovedKg, target.waterRemovedKg * yieldRatio);
 
     const energyRate = (commands.heater ? 0.004 : 0) + (commands.vacuumPump ? 0.0015 : 0) + (commands.extractor ? 0.001 : 0) + (commands.cooling ? 0.001 : 0);
-    const energyConsumed = this.state.energyConsumed + energyRate * dt;
+    const energyKwh = this.state.energyKwh + energyRate * dt;
 
     this.state = {
+      chamberSealed: this.state.chamberSealed,
       pressureMbar: pressure,
       temperatureC: temperature,
       yieldPercent,
       waterRemovedKg: Math.min(target.waterRemovedKg, waterRemovedKg),
       oilRecoveredKg: Math.min(target.oilRecoveredKg, oilRecoveredKg),
-      energyKwh: Math.max(target.energyConsumed, energyConsumed),
+      energyKwh,
     };
 
     return { ...this.state };
