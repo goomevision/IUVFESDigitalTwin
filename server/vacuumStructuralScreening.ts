@@ -45,6 +45,7 @@ export function screenVacuumShell(
     !finitePositive(input.cylindricalLengthM) ||
     !finitePositive(input.wallThicknessM) ||
     !Number.isFinite(input.designExternalPressureBar) ||
+    input.designExternalPressureBar < 0 ||
     !finitePositive(input.elasticModulusGPa) ||
     !Number.isFinite(input.poissonRatio) ||
     input.poissonRatio <= -1 || input.poissonRatio >= 0.5 ||
@@ -73,8 +74,8 @@ export function screenVacuumShell(
   if (tOverD > 0.05) {
     warnings.push('Shell is outside the intended thin-shell screening range; use a qualified detailed method.');
   }
-  if (input.designExternalPressureBar <= 0) {
-    warnings.push('No positive external-pressure design case supplied.');
+  if (input.designExternalPressureBar === 0) {
+    warnings.push('No positive external-pressure design case supplied; screening utilization is not representative of an operating vacuum case.');
   }
   if (utilization > 1) {
     warnings.push('Design external pressure exceeds the preliminary screening allowable.');
