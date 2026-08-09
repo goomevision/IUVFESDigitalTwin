@@ -55,7 +55,7 @@ export const scientificRouter = router({
   validationReadiness: protectedProcedure.input(z.string().min(1)).query(async ({ ctx, input }) => {
     const researchExperiment = await loadAuthorizedResearchExperiment(ctx, input);
     const [observations, instruments, datasets, provenance] = await Promise.all([
-      researchDb.listSensorObservations(input, 1),
+      researchDb.listSensorObservations(input, 10000),
       researchDb.listExperimentInstruments(input),
       researchDb.listDatasetManifests(input),
       researchDb.listProvenanceRecords(researchExperiment.provenanceId ?? researchExperiment.id),
@@ -90,7 +90,7 @@ export const scientificRouter = router({
       researchExperimentId: researchExperiment.id,
       experimentId: researchExperiment.experimentId,
       evidence: {
-        sensorObservationPresent: observations.length > 0,
+        sensorObservationCount: observations.length,
         instrumentCount: instruments.length,
         calibratedInstrumentCount: instruments.filter(item => {
           const calibration = item.calibrationId ? calibrations.find(candidate => candidate.id === item.calibrationId) : calibrationByInstrument.get(item.instrumentId);
@@ -161,38 +161,58 @@ export const scientificRouter = router({
     massTolerance: balanceTolerance.optional(), energyTolerance: energyBalanceTolerance.optional(),
   })).query(async ({ ctx, input }) => {
     const researchExperiment = await loadAuthorizedResearchExperiment(ctx, input.researchExperimentId);
-    const readiness = await (async () => {
-      const [observations, instruments, datasets, provenance] = await Promise.all([
-        researchDb.listSensorObservations(input.researchExperimentId, 10000),
-        researchDb.listExperimentInstruments(input.researchExperimentId),
-        researchDb.listDatasetManifests(input.researchExperimentId),
-        researchDb.listProvenanceRecords(researchExperiment.provenanceId ?? researchExperiment.id),
-      ]);
-      const calibrations = await researchDb.listInstrumentCalibrations(instruments.map(item => item.instrumentId));
-      const now = new Date();
-      const calibrated = instruments.length > 0 && instruments.every(item => {
-        const c = item.calibrationId ? calibrations.find(candidate => candidate.id === item.calibrationId) : calibrations.filter(candidate => candidate.instrumentId === item.instrumentId).sort((a, b) => b.calibratedAt.getTime() - a.calibratedAt.getTime())[0];
-        return Boolean(c && (!c.expiresAt || c.expiresAt > now));
-      });
-      return assessValidationReadiness({ experimentExists: true, hasSensorObservations: observations.length > 0, hasInstrumentAssignments: instruments.length > 0, allAssignedInstrumentsCalibrated: calibrated, hasSimulationDataset: datasets.some(d => d.origin === "SIMULATION"), hasExperimentalDataset: datasets.some(d => d.origin === "EXPERIMENTAL"), hasProvenance: provenance.length > 0, experimentStatus: researchExperiment.status });
-    })();
+    const [observations, instruments, datasets, provenance] = await Promise.all([
+      researchDb.listSensorObservations(input.researchExperimentId, 10000),
+      researchDb.listExperimentInstruments(input.researchExperimentId),
+      researchDb.listDatasetManifests(input.researchExperimentId),
+      researchDb.listProvenanceRecords(researchExperiment.provenanceId ?? researchExperiment.id),
+    ]);
+    const calibrations = await researchDb.listInstrumentCalibrations(instruments.map(item => item.instrumentId));
+    const now = new Date();
+    const calibrated = instruments.length > 0 && instruments.every(item => {
+      const calibration = item.calibrationId ? calibrations.find(candidate => candidate.id === item.calibrationId) : calibrations.filter(candidate => candidate.instrumentId === item.instrumentId).sort((a, b) => b.calibratedAt.getTime() - a.calibratedAt.getTime())[0];
+      return Boolean(calibration && (!calibration.expiresAt || calibration.expiresAt > now));
+    });
+    const readiness = assessValidationReadiness({
+      experimentExists: true,
+      hasSensorObservations: observations.length > 0,
+      hasInstrumentAssignments: instruments.length > 0,
+      allAssignedInstrumentsCalibrated: calibrated,
+      hasSimulationDataset: datasets.some(d => d.origin === "SIMULATION"),
+      hasExperimentalDataset: datasets.some(d => d.origin === "EXPERIMENTAL"),
+      hasProvenance: provenance.length > 0,
+      experimentStatus: researchExperiment.status,
+    });
 
-    const sections: ReportSection[] = [{ key: "evidence", title: "Evidence-chain readiness", verdict: readiness.status === "READY_FOR_REVIEW" ? "PASS" : "INCONCLUSIVE", summary: readiness.message, evidence: readiness }];
+    const sections: ReportSection[] = [{
+      key: "evidence",
+      title: "Evidence-chain readiness",
+      verdict: readiness.status === "READY_FOR_REVIEW" ? "PASS" : "INCONCLUSIVE",
+      summary: readiness.reasons.length === 0 ? "Evidence chain is complete for scientific review." : readiness.reasons.join(" "),
+      evidence: readiness,
+    }];
+
     if (input.tolerances) {
       try {
-        const comparison = await (async () => {
-          const observations = await researchDb.listSensorObservations(input.researchExperimentId, 10000);
-          const simulationResult = await db.getSimulationResult(researchExperiment.experimentId);
-          if (!simulationResult) return null;
+        const simulationResult = await db.getSimulationResult(researchExperiment.experimentId);
+        let comparison: Awaited<ReturnType<typeof compareSimulationToExperiment>> | null = null;
+        if (simulationResult) {
           const validTimes = observations.map(item => item.observedAt.getTime()).filter(Number.isFinite);
-          if (validTimes.length === 0) return null;
-          const start = Math.min(...validTimes);
-          const experimental = observations.map(item => ({ parameter: item.parameter, timeSeconds: (item.observedAt.getTime() - start) / 1000, value: Number(item.value), qualityFlag: item.qualityFlag }));
-          const frames = Array.isArray(simulationResult.realTimeData) ? simulationResult.realTimeData as Array<Record<string, unknown>> : [];
-          const simulation = frames.map(frame => { const values: Record<string, number> = {}; for (const [parameter, channel] of Object.entries(simulationChannelMap)) { const value = Number(frame[channel]); if (Number.isFinite(value)) values[parameter] = value; } return { timeSeconds: Number(frame.timestamp), values }; }).filter(frame => Number.isFinite(frame.timeSeconds));
-          if (!simulation.length) return null;
-          return compareSimulationToExperiment({ experimental, simulation, tolerances: input.tolerances as Record<string, ParameterTolerance> });
-        })();
+          if (validTimes.length > 0) {
+            const start = Math.min(...validTimes);
+            const experimental = observations.map(item => ({ parameter: item.parameter, timeSeconds: (item.observedAt.getTime() - start) / 1000, value: Number(item.value), qualityFlag: item.qualityFlag }));
+            const frames = Array.isArray(simulationResult.realTimeData) ? simulationResult.realTimeData as Array<Record<string, unknown>> : [];
+            const simulation = frames.map(frame => {
+              const values: Record<string, number> = {};
+              for (const [parameter, channel] of Object.entries(simulationChannelMap)) {
+                const value = Number(frame[channel]);
+                if (Number.isFinite(value)) values[parameter] = value;
+              }
+              return { timeSeconds: Number(frame.timestamp), values };
+            }).filter(frame => Number.isFinite(frame.timeSeconds));
+            if (simulation.length > 0) comparison = compareSimulationToExperiment({ experimental, simulation, tolerances: input.tolerances as Record<string, ParameterTolerance> });
+          }
+        }
         sections.push({ key: "comparison", title: "Simulation versus experiment", verdict: comparison?.overallVerdict ?? "INCONCLUSIVE", summary: comparison ? "Comparison metrics were computed using the supplied acceptance thresholds." : "Comparison evidence could not be computed from the linked data.", evidence: comparison ?? {} });
       } catch (error) {
         sections.push({ key: "comparison", title: "Simulation versus experiment", verdict: "INCONCLUSIVE", summary: error instanceof Error ? error.message : "Comparison could not be computed.", evidence: {} });
@@ -210,16 +230,12 @@ export const scientificRouter = router({
       sections.push({ key: "balances", title: "Mass and energy balance", verdict: "INCONCLUSIVE", summary: "No mass or energy balance evidence was supplied to this report.", evidence: {} });
     }
 
-    const [datasets, provenance] = await Promise.all([
-      researchDb.listDatasetManifests(input.researchExperimentId),
-      researchDb.listProvenanceRecords(researchExperiment.provenanceId ?? researchExperiment.id),
-    ]);
     const simulationResult = await db.getSimulationResult(researchExperiment.experimentId);
     return buildScientificValidationReport({
       researchExperimentId: researchExperiment.id,
       experimentId: researchExperiment.experimentId,
       sections,
-      provenance: { datasetIds: datasets.map(dataset => dataset.id), observationCount: undefined, simulationResultPresent: Boolean(simulationResult), provenanceRecordCount: provenance.length },
+      provenance: { datasetIds: datasets.map(dataset => dataset.id), observationCount: observations.length, simulationResultPresent: Boolean(simulationResult), provenanceRecordCount: provenance.length },
     });
   }),
 });
