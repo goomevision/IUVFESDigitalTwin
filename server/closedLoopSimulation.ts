@@ -98,13 +98,9 @@ export class ClosedLoopSimulationEngine {
 
   public isPaused(): boolean { return this.paused; }
 
-  public pause(): void {
-    this.paused = true;
-  }
+  public pause(): void { this.paused = true; }
 
-  public resume(): void {
-    this.paused = false;
-  }
+  public resume(): void { this.paused = false; }
 
   public reset(): void {
     this.paused = false;
@@ -135,7 +131,6 @@ export class ClosedLoopSimulationEngine {
 
     const sensorBefore = { ...this.sensors };
     const controllerBeforeActuation = this.state.tick(this.sensors, this.elapsedSeconds);
-
     const controlOutput = this.control.update({
       targetTemperatureC: this.target.temperatureC,
       targetPressureMbar: this.target.pressureMbar,
@@ -152,7 +147,6 @@ export class ClosedLoopSimulationEngine {
       condenser: controlOutput.valve.vaporToCondenser > 0.01,
       cooling: controlOutput.valve.coolingWater > 0.01,
     };
-
     const controller = { ...controllerBeforeActuation, commands };
     const sensorAfter = this.dynamics.step(this.target, commands, this.dtSeconds);
     this.elapsedSeconds += this.dtSeconds;
@@ -172,8 +166,10 @@ export class ClosedLoopSimulationEngine {
   }
 
   public runToCompletion(): ClosedLoopResult {
-    while (this.stepNumber < this.maxSteps && this.state.tick(this.sensors, this.elapsedSeconds).stage !== 'COMPLETE' && this.state.tick(this.sensors, this.elapsedSeconds).stage !== 'FAULT') {
-      this.step();
+    while (this.stepNumber < this.maxSteps) {
+      const currentState = this.state.tick(this.sensors, this.elapsedSeconds);
+      if (currentState.stage === 'COMPLETE' || currentState.stage === 'FAULT') break;
+      if (this.step() === null) break;
     }
     const finalState = this.state.tick(this.sensors, this.elapsedSeconds);
     return {
@@ -186,4 +182,5 @@ export class ClosedLoopSimulationEngine {
 
   public getFrames(): CausalFrame[] { return [...this.frames]; }
   public getSensors(): MachineSensors { return { ...this.sensors }; }
+  public getState(): ProcessState { return this.state.tick(this.sensors, this.elapsedSeconds); }
 }
