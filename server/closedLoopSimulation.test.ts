@@ -54,4 +54,28 @@ describe('closed-loop real-time pacing', () => {
     expect(state.interlocks.pressureTransient).toBe(false);
     expect(state.interlocks.temperatureTransient).toBe(false);
   });
+
+  it('records the state observed after the dynamics step in the causal frame', () => {
+    vi.setSystemTime(new Date('2026-08-09T00:00:00.000Z'));
+    const engine = new ClosedLoopSimulationEngine({ ...config, realTime: true });
+    const frame = engine.step();
+
+    expect(frame).not.toBeNull();
+    expect(frame?.stateAfter).toBeDefined();
+    expect(frame?.stateAfter?.elapsedSeconds).toBe(frame?.timestampSeconds);
+    expect(frame?.stateAfter?.sensors.pressureMbar).toBe(frame?.sensorAfter.pressureMbar);
+    expect(engine.getState().elapsedSeconds).toBe(frame?.timestampSeconds);
+  });
+
+  it('does not mutate the process state merely by reading getState()', () => {
+    vi.setSystemTime(new Date('2026-08-09T00:00:00.000Z'));
+    const engine = new ClosedLoopSimulationEngine({ ...config, realTime: true });
+    const first = engine.step();
+    expect(first).not.toBeNull();
+
+    const before = engine.getState();
+    const after = engine.getState();
+
+    expect(after).toEqual(before);
+  });
 });
