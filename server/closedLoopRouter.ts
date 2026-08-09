@@ -3,6 +3,7 @@ import { protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { ClosedLoopSimulationEngine } from "./closedLoopSimulation";
+import { recordClosedLoopRun } from "./scientificEventJournal";
 
 const inputSchema = z.object({
   experimentId: z.string().min(1),
@@ -37,6 +38,10 @@ export const closedLoopRouter = router({
     const isComplete = result.status === "COMPLETE";
     const isFault = result.status === "FAULT";
 
+    // Persist the causal chain before publishing the result. A scientific run
+    // without its event journal is not considered auditable.
+    const events = await recordClosedLoopRun(input.experimentId, result);
+
     const resultId = await db.createSimulationResult({
       experimentId: input.experimentId,
       finalYield: result.finalSensors.yieldPercent,
@@ -62,6 +67,8 @@ export const closedLoopRouter = router({
       success: isComplete,
       resultId,
       status: result.status,
+      eventCount: events.length,
+      lastEventHash: events.at(-1)?.eventHash ?? null,
       frames: result.frames,
       finalSensors: result.finalSensors,
     };
