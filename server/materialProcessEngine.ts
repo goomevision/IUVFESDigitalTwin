@@ -4,6 +4,7 @@
  * Engineering simulation model. Coefficients are simulation defaults and must
  * be calibrated against experiment data before scientific or production claims.
  */
+import { classifyVacuumFlowRegime } from './vacuumFlowRegime';
 
 export interface MaterialProcessInputs {
   materialMassKg: number;
@@ -17,6 +18,7 @@ export interface MaterialProcessInputs {
   condenserPowerFraction: number;
   coolingPowerFraction: number;
   dtSeconds: number;
+  vacuumLineDiameterM?: number;
 }
 
 export interface MaterialInventory {
@@ -34,12 +36,16 @@ export interface MaterialInventory {
   vaporFlowKgPerHour: number;
   moistureFraction: number;
   oilRecoveryFraction: number;
-  /** Current-step latent heat demand in kW, retained for the next thermal step. */
   latentHeatLoadKW: number;
-  /** Cumulative energy absorbed by water phase change in kWh. */
   latentHeatEnergyKWh: number;
   waterPhase: 'LIQUID' | 'ICE' | 'VAPOR' | 'TWO_PHASE' | 'UNKNOWN';
   waterStateStatus: 'READY_FOR_SIMULATION' | 'DATA_GAP' | 'OUT_OF_DOMAIN';
+  flowRegime: 'VISCOUS' | 'TRANSITIONAL' | 'MOLECULAR' | 'UNKNOWN';
+  knudsenNumber?: number;
+  meanFreePathM?: number;
+  flowRegimeProvenance?: 'KINETIC_THEORY_SCREENING';
+  massBalanceResidualKg: number;
+  energyBalanceResidualKWh: number;
 }
 
 export interface MaterialProcessConfig {
@@ -50,8 +56,10 @@ export interface MaterialProcessConfig {
   condenserEfficiency?: number;
   coolingCoefficient?: number;
   volatileLossFraction?: number;
-  /** Approximate latent heat of vaporization used until a phase-specific enthalpy adapter is available. */
   latentHeatKJPerKg?: number;
+  vacuumLineDiameterM?: number;
+  massBalanceToleranceKg?: number;
+  energyBalanceToleranceKWh?: number;
 }
 
 const DEFAULTS: Required<MaterialProcessConfig> = {
@@ -63,6 +71,9 @@ const DEFAULTS: Required<MaterialProcessConfig> = {
   coolingCoefficient: 0.015,
   volatileLossFraction: 0.01,
   latentHeatKJPerKg: 2257,
+  vacuumLineDiameterM: 0.02,
+  massBalanceToleranceKg: 1e-9,
+  energyBalanceToleranceKWh: 1e-9,
 };
 
 export class MaterialProcessEngine {
@@ -71,6 +82,7 @@ export class MaterialProcessEngine {
   private readonly materialMassKg: number;
   private readonly initialWaterFraction: number;
   private readonly initialOilFraction: number;
+  private cumulativeInputLatentEnergyKWh = 0;
 
   constructor(inputs: Pick<MaterialProcessInputs, 'materialMassKg' | 'initialWaterFraction' | 'initialOilFraction'>, config: MaterialProcessConfig = {}) {
     this.config = { ...DEFAULTS, ...config };
@@ -90,12 +102,14 @@ export class MaterialProcessEngine {
     const condenserFactor = Math.max(0, Math.min(1, inputs.condenserPowerFraction));
     const coolingFactor = Math.max(0, Math.min(1, inputs.coolingPowerFraction));
 
-    const evaporationPotential = this.inventory.moistureKg * this.config.evaporationCoefficient * pressureFactor * thermalFactor * (0.35 + 0.65 * heaterFactor) * (0.25 + 0.75 * vacuumFactor);
+    const flow = this.resolveFlowRegime(inputs);
+    const regimeFactor = flow.regime === 'UNKNOWN' ? 1 : ({ VISCOUS: 1, TRANSITIONAL: 0.65, MOLECULAR: 0.35 } as const)[flow.regime];
+    const evaporationPotential = this.inventory.moistureKg * this.config.evaporationCoefficient * pressureFactor * thermalFactor * regimeFactor * (0.35 + 0.65 * heaterFactor) * (0.25 + 0.75 * vacuumFactor);
     const evaporationKg = Math.min(this.inventory.moistureKg, Math.max(0, evaporationPotential * dtHours));
     this.inventory.moistureKg -= evaporationKg;
     this.inventory.vaporKg += evaporationKg;
 
-    const extractionPotential = this.inventory.oilInMatrixKg * this.config.extractionCoefficient * thermalFactor * (0.20 + 0.80 * extractorFactor) * (0.35 + 0.65 * vacuumFactor);
+    const extractionPotential = this.inventory.oilInMatrixKg * this.config.extractionCoefficient * thermalFactor * regimeFactor * (0.20 + 0.80 * extractorFactor) * (0.35 + 0.65 * vacuumFactor);
     const extractedOilKg = Math.min(this.inventory.oilInMatrixKg, Math.max(0, extractionPotential * dtHours));
     this.inventory.oilInMatrixKg -= extractedOilKg;
     this.inventory.oilVaporKg += extractedOilKg;
@@ -117,16 +131,29 @@ export class MaterialProcessEngine {
     this.inventory.oilRecoveryRateKgPerHour = dtHours > 0 ? condensedOil / dtHours : 0;
     this.inventory.vaporFlowKgPerHour = dtHours > 0 ? availableVapor / dtHours : 0;
     this.inventory.latentHeatLoadKW = evaporationKg > 0 && dtHours > 0 ? (evaporationKg / dtHours) * this.config.latentHeatKJPerKg / 3600 : 0;
-    this.inventory.latentHeatEnergyKWh += evaporationKg * this.config.latentHeatKJPerKg / 3600;
+    const latentStepKWh = evaporationKg * this.config.latentHeatKJPerKg / 3600;
+    this.cumulativeInputLatentEnergyKWh += latentStepKWh;
+    this.inventory.latentHeatEnergyKWh += latentStepKWh;
     this.inventory.totalTrackedMassKg = this.totalMass();
     this.inventory.moistureFraction = this.inventory.moistureKg / Math.max(this.inventory.totalTrackedMassKg, 1e-9);
     const initialOil = Math.max(this.materialMassKg * this.initialOilFraction, 1e-9);
     this.inventory.oilRecoveryFraction = this.inventory.recoveredOilKg / initialOil;
+    this.inventory.flowRegime = flow.regime;
+    this.inventory.knudsenNumber = flow.knudsenNumber;
+    this.inventory.meanFreePathM = flow.meanFreePathM;
+    this.inventory.flowRegimeProvenance = flow.provenance;
+    this.inventory.massBalanceResidualKg = this.inventory.totalTrackedMassKg - this.materialMassKg;
+    this.inventory.energyBalanceResidualKWh = this.inventory.latentHeatEnergyKWh - this.cumulativeInputLatentEnergyKWh;
+    if (Math.abs(this.inventory.massBalanceResidualKg) > this.config.massBalanceToleranceKg) throw new Error('Material mass balance residual exceeds configured tolerance.');
+    if (Math.abs(this.inventory.energyBalanceResidualKWh) > this.config.energyBalanceToleranceKWh) throw new Error('Material latent-energy balance residual exceeds configured tolerance.');
     return { ...this.inventory };
   }
 
   snapshot(): MaterialInventory { return { ...this.inventory }; }
-  restore(snapshot: MaterialInventory): void { this.inventory = { ...snapshot }; }
+  restore(snapshot: MaterialInventory): void {
+    this.inventory = { ...snapshot };
+    this.cumulativeInputLatentEnergyKWh = snapshot.latentHeatEnergyKWh;
+  }
 
   private initialInventory(): MaterialInventory {
     const water = Math.max(0, this.materialMassKg * this.initialWaterFraction);
@@ -136,13 +163,24 @@ export class MaterialProcessEngine {
       solidKg: solid, moistureKg: water, vaporKg: 0, condensateWaterKg: 0, oilInMatrixKg: oil, oilVaporKg: 0, recoveredOilKg: 0, volatileLossKg: 0,
       totalTrackedMassKg: this.materialMassKg, evaporationRateKgPerHour: 0, oilRecoveryRateKgPerHour: 0, vaporFlowKgPerHour: 0,
       moistureFraction: water / Math.max(this.materialMassKg, 1e-9), oilRecoveryFraction: 0, latentHeatLoadKW: 0, latentHeatEnergyKWh: 0,
-      waterPhase: 'LIQUID', waterStateStatus: 'READY_FOR_SIMULATION',
+      waterPhase: 'LIQUID', waterStateStatus: 'READY_FOR_SIMULATION', flowRegime: 'UNKNOWN', massBalanceResidualKg: 0, energyBalanceResidualKWh: 0,
     };
   }
 
   private totalMass(): number {
     const i = this.inventory;
     return i.solidKg + i.moistureKg + i.vaporKg + i.condensateWaterKg + i.oilInMatrixKg + i.oilVaporKg + i.recoveredOilKg + i.volatileLossKg;
+  }
+
+  private resolveFlowRegime(inputs: MaterialProcessInputs) {
+    const absolutePressurePa = Math.max(1, inputs.chamberPressureMbar * 100);
+    const gasTemperatureK = Math.max(1, inputs.materialTemperatureC + 273.15);
+    const characteristicDiameterM = inputs.vacuumLineDiameterM ?? this.config.vacuumLineDiameterM;
+    try {
+      return classifyVacuumFlowRegime({ absolutePressurePa, gasTemperatureK, characteristicDiameterM });
+    } catch {
+      return { regime: 'UNKNOWN' as const, meanFreePathM: undefined, knudsenNumber: undefined, provenance: undefined };
+    }
   }
 
   private pressureFactor(pressureMbar: number): number { return Math.max(0.05, Math.min(1, 1 - pressureMbar / this.config.referencePressureMbar)); }
