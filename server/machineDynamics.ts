@@ -7,6 +7,7 @@
  */
 
 import type { MachineCommand, MachineSensors } from './processStateEngine';
+import { stepThermalModel } from './thermalEngineering';
 
 export interface VirtualHardwareDynamicsConfig {
   /** Connected reactor/vacuum volume in litres. */
@@ -21,6 +22,8 @@ export interface VirtualHardwareDynamicsConfig {
   coolingPowerKW?: number;
   /** Effective pressure-rise rate caused by leaks in mbar/s. */
   leakRateMbarPerSecond?: number;
+  /** Effective heat-loss coefficient to ambient in kW/K. */
+  effectiveHeatLossKWPerC?: number;
 }
 
 export interface DynamicMachineConfig extends VirtualHardwareDynamicsConfig {
@@ -61,6 +64,7 @@ export class MachineDynamicsEngine {
       heatingPowerKW: 9,
       coolingPowerKW: 3,
       leakRateMbarPerSecond: 0,
+      effectiveHeatLossKWPerC: 0,
       ...config,
     };
     this.state = { ...initial };
@@ -87,13 +91,19 @@ export class MachineDynamicsEngine {
       lag,
     );
 
-    let temperature = this.state.temperatureC;
-    const thermalMassFactor = 250 / Math.max(this.c.thermalMassKJPerC, 1);
-    const heatingRate = (this.c.heaterRateCPerSecond * thermalMassFactor) * (this.c.heatingPowerKW / 9);
-    const coolingRate = (this.c.coolingRateCPerSecond * thermalMassFactor) * (this.c.coolingPowerKW / 3);
-    if (commands.heater) temperature += heatingRate * dt;
-    else temperature -= this.c.passiveHeatLossCPerSecond * dt;
-    if (commands.cooling) temperature -= coolingRate * dt;
+    const thermal = stepThermalModel({
+      initialTemperatureC: this.state.temperatureC,
+      ambientTemperatureC: this.c.ambientTemperatureC,
+      targetTemperatureC: target.temperatureC,
+      thermalMassKJPerC: this.c.thermalMassKJPerC,
+      heaterPowerKW: commands.heater ? this.c.heatingPowerKW : 0,
+      coolingPowerKW: commands.cooling ? this.c.coolingPowerKW : 0,
+      effectiveHeatLossKWPerC: this.c.effectiveHeatLossKWPerC,
+      heaterEfficiency: this.c.heaterRateCPerSecond / 0.18,
+      coolingEfficiency: this.c.coolingRateCPerSecond / 0.12,
+    }, dt);
+
+    let temperature = thermal.temperatureC;
     if (commands.condenser) temperature -= this.c.condenserCoolingFactor * dt;
     temperature = Math.max(this.c.ambientTemperatureC, Math.min(200, temperature));
     temperature = this.blend(this.state.temperatureC, temperature, lag);
