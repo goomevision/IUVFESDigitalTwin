@@ -100,7 +100,9 @@ export class ClosedLoopSimulationEngine {
 
   public restore(snapshot: ClosedLoopSnapshot): void {
     if (snapshot.version !== 1) throw new Error(`Unsupported simulation snapshot version: ${snapshot.version}`);
+    const snapshotRealTime = snapshot.config.realTime ?? true;
+    if (snapshotRealTime !== this.realTime) throw new Error('Snapshot real-time mode does not match simulation configuration');
     if (snapshot.config.targetPressureMbar !== this.config.targetPressureMbar || snapshot.config.targetTemperatureC !== this.config.targetTemperatureC || snapshot.config.materialWeightKg !== this.config.materialWeightKg || snapshot.config.waterContentPercent !== this.config.waterContentPercent || snapshot.config.oilContentPercent !== this.config.oilContentPercent) throw new Error('Snapshot configuration does not match simulation configuration');
-    this.sensors = { ...snapshot.sensors }; this.elapsedSeconds = snapshot.elapsedSeconds; this.stepNumber = snapshot.stepNumber; this.paused = snapshot.paused; this.lastStepWallClockMs = snapshot.lastStepWallClockMs; this.frames.length = 0; this.frames.push(...snapshot.frames); this.pausedSteps.length = 0; this.pausedSteps.push(...snapshot.pausedSteps); this.state.restore(snapshot.state); this.dynamics.restore(snapshot.dynamics); this.control.restore(snapshot.control);
+    this.sensors = { ...snapshot.sensors }; this.elapsedSeconds = snapshot.elapsedSeconds; this.stepNumber = snapshot.stepNumber; this.paused = snapshot.paused; this.lastStepWallClockMs = this.realTime && !this.paused ? Date.now() : snapshot.lastStepWallClockMs; this.frames.length = 0; this.frames.push(...snapshot.frames); this.pausedSteps.length = 0; this.pausedSteps.push(...snapshot.pausedSteps); this.state.restore(snapshot.state); this.dynamics.restore(snapshot.dynamics); this.control.restore(snapshot.control);
   }
 }
