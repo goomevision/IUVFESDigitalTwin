@@ -17,6 +17,9 @@ export type GoldenPatchouliRow = {
   energyKWh: number;
   flowRegime?: string;
   knudsenNumber?: number;
+  meanFreePathM?: number;
+  massBalanceResidualKg: number;
+  energyBalanceResidualKWh: number;
   safetyStatus: string;
 };
 
@@ -79,9 +82,9 @@ function toGoldenRow(frame: CausalFrame): GoldenPatchouliRow {
     tSeconds: frame.timestampSeconds,
     temperatureC: frame.sensorAfter.temperatureC,
     pressureMbar: frame.sensorAfter.pressureMbar,
-    massKg: Number(m.totalMassKg ?? 0),
-    waterKg: Number(m.waterInMatrixKg ?? 0),
-    vaporKg: Number(m.vaporWaterKg ?? 0),
+    massKg: Number(m.totalTrackedMassKg ?? 0),
+    waterKg: Number(m.moistureKg ?? 0),
+    vaporKg: Number(m.vaporKg ?? 0),
     condensateWaterKg: Number(m.condensateWaterKg ?? 0),
     oilInMatrixKg: Number(m.oilInMatrixKg ?? 0),
     oilVaporKg: Number(m.oilVaporKg ?? 0),
@@ -92,6 +95,9 @@ function toGoldenRow(frame: CausalFrame): GoldenPatchouliRow {
     energyKWh: frame.sensorAfter.energyKwh,
     flowRegime: m.flowRegime,
     knudsenNumber: m.knudsenNumber,
+    meanFreePathM: m.meanFreePathM,
+    massBalanceResidualKg: Number(m.massBalanceResidualKg ?? 0),
+    energyBalanceResidualKWh: Number(m.energyBalanceResidualKWh ?? 0),
     safetyStatus,
   };
 }
