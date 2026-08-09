@@ -7,17 +7,14 @@ import * as db from "./db";
 import { TRPCError } from "@trpc/server";
 import { PhysicsSimulationEngine } from "./physicsEngine";
 import { AIOptimizer, type SimulationDataPoint } from "./aiOptimizer";
-import { ProcessStateEngine, type ProcessState } from "./processStateEngine";
+import { ProcessStateEngine, type ProcessState, type MachineSensors } from "./processStateEngine";
+import { MachineDynamicsEngine } from "./machineDynamics";
 
 export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return { success: true } as const;
-    }),
+    logout: publicProcedure.mutation(({ ctx }) => { const cookieOptions = getSessionCookieOptions(ctx.req); ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 }); return { success: true } as const; }),
   }),
   materials: router({
     list: publicProcedure.query(async () => db.getMaterials()),
@@ -38,8 +35,18 @@ export const appRouter = router({
         await db.updateExperimentStatus(input.experimentId, "running");
         const engine = new PhysicsSimulationEngine({ materialWeight: input.materialWeight, waterContent: input.waterContent, oilContent: input.oilContent, targetPressure: input.targetPressure, targetTemperature: input.targetTemperature, ultrasonicFrequency: input.ultrasonicFrequency, duration: input.duration, materialWaterRatio: input.materialWaterRatio, processModel: input.processModel });
         const results = await engine.runSimulation();
-        const controller = new ProcessStateEngine({ targetPressureMbar: input.targetPressure, targetTemperatureC: input.targetTemperature }, { chamberSealed: true, pressureMbar: 1013.25, temperatureC: 25, yieldPercent: 0, waterRemovedKg: 0, oilRecoveredKg: 0, energyKwh: 0 });
-        const processTimeline: ProcessState[] = results.realTimeData.map((frame) => controller.tick({ chamberSealed: true, pressureMbar: frame.pressure, temperatureC: frame.temperature, yieldPercent: frame.yieldPercentage, waterRemovedKg: frame.waterRemoved, oilRecoveredKg: frame.oilRecovered, energyKwh: frame.energyConsumed }, frame.timestamp));
+        const initialSensors: MachineSensors = { chamberSealed: true, pressureMbar: 1013.25, temperatureC: 25, yieldPercent: 0, waterRemovedKg: 0, oilRecoveredKg: 0, energyKwh: 0 };
+        const controller = new ProcessStateEngine({ targetPressureMbar: input.targetPressure, targetTemperatureC: input.targetTemperature }, initialSensors);
+        const dynamics = new MachineDynamicsEngine(initialSensors, { vacuumRateMbarPerSecond: 7, heaterRateCPerSecond: Math.max(0.08, input.targetTemperature / 550), coolingRateCPerSecond: 0.12 });
+        const processTimeline: ProcessState[] = [];
+        let sensors = initialSensors;
+        for (const frame of results.realTimeData) {
+          const demanded: MachineSensors = { chamberSealed: true, pressureMbar: frame.pressure, temperatureC: frame.temperature, yieldPercent: frame.yieldPercentage, waterRemovedKg: frame.waterRemoved, oilRecoveredKg: frame.oilRecovered, energyKwh: frame.energyConsumed };
+          const stateBeforeActuation = controller.tick(sensors, frame.timestamp);
+          sensors = dynamics.step(demanded, stateBeforeActuation.commands, Math.max(1, frame.timestamp - (processTimeline.at(-1)?.elapsedSeconds ?? 0)));
+          const stateAfterActuation = controller.tick(sensors, frame.timestamp);
+          processTimeline.push(stateAfterActuation);
+        }
         const resultId = await db.createSimulationResult({ experimentId: input.experimentId, finalYield: results.finalYield, oilComposition: results.oilComposition, energyConsumed: results.energyConsumed, efficiency: results.efficiency, wasteComposition: results.wasteComposition, realTimeData: results.realTimeData, massBalance: results.massBalance, energyBalance: results.energyBalance });
         await db.updateExperimentStatus(input.experimentId, "completed");
         return { success: true, resultId, results, processTimeline };
