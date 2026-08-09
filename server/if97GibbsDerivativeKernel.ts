@@ -21,15 +21,7 @@ export type GibbsPropertyState = {
   cpJPerKgK: number;
 };
 
-/**
- * Generic evaluator for the dimensionless Gibbs formulation used by IF97
- * Regions 1 and 2. Coefficients are supplied by the region-specific tables.
- *
- * This module deliberately contains no guessed coefficient tables. The official
- * IAPWS coefficients must be loaded by a region adapter and verified against
- * IAPWS reference states before the resulting properties are promoted to
- * operational simulation inputs.
- */
+/** Evaluates gamma = sum(n*pi^I*tau^J) and its first/second derivatives. */
 export function evaluateDimensionlessGibbs(
   pi: number,
   tau: number,
@@ -49,9 +41,7 @@ export function evaluateDimensionlessGibbs(
   for (const term of coefficients) {
     const p = Math.pow(pi, term.I);
     const t = Math.pow(tau, term.J);
-    const base = term.n * p * t;
-    gamma += base;
-
+    gamma += term.n * p * t;
     if (term.I !== 0) gammaPi += term.n * term.I * Math.pow(pi, term.I - 1) * t;
     if (term.J !== 0) gammaTau += term.n * term.J * p * Math.pow(tau, term.J - 1);
     if (term.I > 1) gammaPiPi += term.n * term.I * (term.I - 1) * Math.pow(pi, term.I - 2) * t;
@@ -65,16 +55,52 @@ export function evaluateDimensionlessGibbs(
 }
 
 /**
- * Converts the Gibbs derivatives into core thermodynamic properties.
- *
- * For a region using g = R*T*gamma with pi = p/p* and tau = T*/T:
- *
- * v  = R*T/p* * gammaPi
- * h  = R*T * tau*gammaTau
- * s  = R * (tau*gammaTau - gamma)
- * u  = R*T * (tau*gammaTau - pi*gammaPi)
- * cp = -R*tau^2*gammaTauTau
+ * Evaluates a Gibbs polynomial in transformed variables x = piOffset + piSign*pi
+ * and y = tauOffset + tauSign*tau. The signs propagate through derivatives.
+ * This supports IF97 Region 1, whose polynomial uses x = 7.1 - pi and
+ * y = tau - 1.222.
  */
+export function evaluateTransformedGibbs(
+  pi: number,
+  tau: number,
+  coefficients: readonly GibbsCoefficient[],
+  piOffset: number,
+  tauOffset: number,
+  piSign: 1 | -1 = 1,
+  tauSign: 1 | -1 = 1,
+): GibbsEvaluation {
+  if (!Number.isFinite(pi) || !Number.isFinite(tau) || pi <= 0 || tau <= 0) {
+    throw new Error("IF97 Gibbs inputs must be finite and positive");
+  }
+
+  const x = piOffset + piSign * pi;
+  const y = tauOffset + tauSign * tau;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) throw new Error("Invalid transformed Gibbs state");
+
+  let gamma = 0;
+  let gammaPi = 0;
+  let gammaTau = 0;
+  let gammaPiPi = 0;
+  let gammaTauTau = 0;
+  let gammaPiTau = 0;
+
+  for (const term of coefficients) {
+    const xp = Math.pow(x, term.I);
+    const yj = Math.pow(y, term.J);
+    gamma += term.n * xp * yj;
+    if (term.I !== 0) gammaPi += piSign * term.n * term.I * Math.pow(x, term.I - 1) * yj;
+    if (term.J !== 0) gammaTau += tauSign * term.n * term.J * xp * Math.pow(y, term.J - 1);
+    if (term.I > 1) gammaPiPi += term.n * term.I * (term.I - 1) * Math.pow(x, term.I - 2) * yj;
+    if (term.J > 1) gammaTauTau += term.n * term.J * (term.J - 1) * xp * Math.pow(y, term.J - 2);
+    if (term.I !== 0 && term.J !== 0) {
+      gammaPiTau += piSign * tauSign * term.n * term.I * term.J * Math.pow(x, term.I - 1) * Math.pow(y, term.J - 1);
+    }
+  }
+
+  return { gamma, gammaPi, gammaTau, gammaPiPi, gammaTauTau, gammaPiTau };
+}
+
+/** Converts Gibbs derivatives into core thermodynamic properties. */
 export function gibbsProperties(
   evaluation: GibbsEvaluation,
   temperatureK: number,
@@ -89,7 +115,7 @@ export function gibbsProperties(
 
   const pi = pressureMPa / pressureScaleMPa;
   const tau = temperatureScaleK / temperatureK;
-  const v = gasConstantJPerKgK * temperatureK / pressureScaleMPa / 1_000_000 * evaluation.gammaPi;
+  const v = gasConstantJPerKgK * temperatureK / (pressureScaleMPa * 1_000_000) * evaluation.gammaPi;
   const h = gasConstantJPerKgK * temperatureK * tau * evaluation.gammaTau;
   const s = gasConstantJPerKgK * (tau * evaluation.gammaTau - evaluation.gamma);
   const u = gasConstantJPerKgK * temperatureK * (tau * evaluation.gammaTau - pi * evaluation.gammaPi);
