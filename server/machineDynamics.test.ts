@@ -41,4 +41,15 @@ describe('MachineDynamicsEngine', () => {
     const next = engine.step(target, { vacuumPump: false, heater: false, extractor: false, condenser: true, cooling: true }, 10);
     expect(next.temperatureC).toBeLessThan(hot.temperatureC);
   });
+
+  it('keeps extraction outputs finite and uses MachineSensors field names', () => {
+    const engine = new MachineDynamicsEngine({ ...initial, pressureMbar: 100, temperatureC: 80 }, { actuatorLag: 1 });
+    const next = engine.step(target, { vacuumPump: true, heater: true, extractor: true, condenser: true, cooling: false }, 10);
+    expect(Number.isFinite(next.yieldPercent)).toBe(true);
+    expect(Number.isFinite(next.oilRecoveredKg)).toBe(true);
+    expect(Number.isFinite(next.waterRemovedKg)).toBe(true);
+    expect(Number.isFinite(next.energyKwh)).toBe(true);
+    expect(next.yieldPercent).toBeGreaterThanOrEqual(0);
+    expect(next.energyKwh).toBeGreaterThanOrEqual(0);
+  });
 });
