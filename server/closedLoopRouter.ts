@@ -5,6 +5,15 @@ import * as db from "./db";
 import { ClosedLoopSimulationEngine } from "./closedLoopSimulation";
 import { getClosedLoopSession, saveClosedLoopSession } from "./closedLoopSessionStore";
 
+const hardwareSchema = z.object({
+  chamberVolumeL: z.number().positive().max(100000),
+  pumpCapacityM3h: z.number().nonnegative().max(100000),
+  thermalMassKJPerC: z.number().positive().max(1000000),
+  heatingPowerKW: z.number().nonnegative().max(100000),
+  coolingPowerKW: z.number().nonnegative().max(100000),
+  leakRateMbarPerSecond: z.number().nonnegative().max(1000),
+}).optional();
+
 const configSchema = z.object({
   experimentId: z.string().min(1),
   materialWeight: z.number().min(0.1).max(1000),
@@ -15,6 +24,7 @@ const configSchema = z.object({
   dtSeconds: z.number().min(0.1).max(10).default(1),
   maxSteps: z.number().int().min(1).max(100000).default(10000),
   realTime: z.boolean().default(true),
+  hardware: hardwareSchema,
 });
 
 const experimentIdSchema = z.object({ experimentId: z.string().min(1) });
