@@ -1,13 +1,72 @@
-import type { ComparisonReport, ComparisonVerdict, ExperimentalObservation, ParameterComparison, ParameterTolerance, SimulationObservation } from "./types";
+/**
+ * Deterministic comparison of simulation time-series against laboratory observations.
+ * Residual convention: simulation - experimental.
+ */
+
+export type ComparisonVerdict = "PASS" | "FAIL" | "INCONCLUSIVE";
+
+export interface ExperimentalObservation {
+  parameter: string;
+  timeSeconds: number;
+  value: number;
+  qualityFlag?: "RAW" | "VALIDATED" | "REJECTED" | "CORRECTED";
+}
+
+export interface SimulationObservation {
+  timeSeconds: number;
+  values: Record<string, number>;
+}
+
+export interface ParameterTolerance {
+  maxBias?: number;
+  maxMae?: number;
+  maxRmse?: number;
+  maxAbsoluteError?: number;
+}
+
+export interface ParameterComparison {
+  parameter: string;
+  sampleCount: number;
+  excludedCount: number;
+  bias: number;
+  mae: number;
+  rmse: number;
+  maxAbsoluteError: number;
+  meanExperimental: number;
+  meanSimulation: number;
+  residuals: Array<{ timeSeconds: number; experimental: number; simulation: number; residual: number }>;
+  verdict: ComparisonVerdict;
+}
+
+export interface ComparisonReport {
+  verdict: ComparisonVerdict;
+  parameters: ParameterComparison[];
+  totalExperimentalObservations: number;
+  matchedObservations: number;
+  unmatchedObservations: number;
+  medianAlignmentErrorSeconds: number;
+  notes: string[];
+}
 
 function finite(value: number): boolean {
   return Number.isFinite(value);
 }
 
-function interpolate(series: SimulationObservation[], parameter: string, timeSeconds: number): number | null {
+function mean(values: number[]): number {
+  return values.length === 0 ? NaN : values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return NaN;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
+}
+
+function interpolate(series: SimulationObservation[], parameter: string, timeSeconds: number) {
   const points = series
-    .filter(point => point.parameter === parameter && finite(point.timeSeconds) && finite(point.value))
-    .map(point => ({ time: point.timeSeconds, value: point.value }))
+    .map(point => ({ time: point.timeSeconds, value: point.values[parameter] }))
+    .filter(point => finite(point.time) && finite(point.value))
     .sort((a, b) => a.time - b.time);
 
   if (points.length === 0 || timeSeconds < points[0].time || timeSeconds > points[points.length - 1].time) return null;
@@ -36,10 +95,7 @@ function hasExplicitTolerance(tolerance?: ParameterTolerance): boolean {
 
 function verdictFor(metrics: { bias: number; mae: number; rmse: number; maxAbsoluteError: number }, tolerance?: ParameterTolerance): ComparisonVerdict {
   if (!hasExplicitTolerance(tolerance)) return "INCONCLUSIVE";
-
-  // Capture the narrowed object in a local constant so TypeScript can retain the
-  // invariant established by hasExplicitTolerance() across each check.
-  const criteria = tolerance as ParameterTolerance;
+  const criteria: ParameterTolerance = tolerance!;
   const checks = [
     criteria.maxBias === undefined || Math.abs(metrics.bias) <= criteria.maxBias,
     criteria.maxMae === undefined || metrics.mae <= criteria.maxMae,
@@ -74,27 +130,17 @@ export function compareSimulationToExperiment(input: {
         unmatched += 1;
         continue;
       }
-      residuals.push({
-        timeSeconds: observation.timeSeconds,
-        experimentalValue: observation.value,
-        simulationValue,
-        residual: simulationValue - observation.value,
-        alignmentErrorSeconds: alignmentError ?? 0,
-      });
+      const residual = simulationValue - observation.value;
+      residuals.push({ timeSeconds: observation.timeSeconds, experimental: observation.value, simulation: simulationValue, residual });
     }
 
-    if (residuals.length === 0) {
-      reports.push({ parameter, sampleCount: 0, excludedCount, bias: NaN, mae: NaN, rmse: NaN, maxAbsoluteError: NaN, verdict: "INCONCLUSIVE", residuals });
-      continue;
-    }
-
-    const errors = residuals.map(item => item.residual);
-    const bias = errors.reduce((sum, value) => sum + value, 0) / errors.length;
-    const mae = errors.reduce((sum, value) => sum + Math.abs(value), 0) / errors.length;
-    const rmse = Math.sqrt(errors.reduce((sum, value) => sum + value ** 2, 0) / errors.length);
-    const maxAbsoluteError = Math.max(...errors.map(value => Math.abs(value)));
-
-    reports.push({
+    const residualValues = residuals.map(item => item.residual);
+    const absResiduals = residualValues.map(Math.abs);
+    const bias = mean(residualValues);
+    const mae = mean(absResiduals);
+    const rmse = residualValues.length === 0 ? NaN : Math.sqrt(mean(residualValues.map(value => value * value)));
+    const maxAbsoluteError = residualValues.length === 0 ? NaN : Math.max(...absResiduals);
+    const report: ParameterComparison = {
       parameter,
       sampleCount: residuals.length,
       excludedCount,
@@ -102,26 +148,30 @@ export function compareSimulationToExperiment(input: {
       mae,
       rmse,
       maxAbsoluteError,
-      verdict: verdictFor({ bias, mae, rmse, maxAbsoluteError }, input.tolerances?.[parameter]),
+      meanExperimental: mean(residuals.map(item => item.experimental)),
+      meanSimulation: mean(residuals.map(item => item.simulation)),
       residuals,
-    });
+      verdict: residuals.length === 0 ? "INCONCLUSIVE" : verdictFor({ bias, mae, rmse, maxAbsoluteError }, input.tolerances?.[parameter]),
+    };
+    reports.push(report);
   }
 
-  const matchedCount = reports.reduce((sum, report) => sum + report.sampleCount, 0);
-  const medianAlignmentErrorSeconds = alignmentErrors.length === 0 ? null : [...alignmentErrors].sort((a, b) => a - b)[Math.floor(alignmentErrors.length / 2)];
-  const verdict: ComparisonVerdict = reports.length === 0
-    ? "INCONCLUSIVE"
-    : reports.every(report => report.verdict === "PASS")
-      ? "PASS"
-      : reports.some(report => report.verdict === "FAIL")
-        ? "FAIL"
-        : "INCONCLUSIVE";
+  const hasFail = reports.some(report => report.verdict === "FAIL");
+  const allPass = reports.length > 0 && reports.every(report => report.verdict === "PASS");
+  const notes: string[] = [];
+  if (accepted.length !== input.experimental.length) notes.push("Rejected or non-finite experimental observations were excluded from comparison.");
+  if (unmatched > 0) notes.push("Some experimental timestamps fell outside the simulation time domain and were not compared.");
+  if (reports.some(report => report.verdict === "INCONCLUSIVE")) notes.push("At least one parameter has no explicit acceptance tolerance; metrics are reported but no scientific pass/fail verdict is assigned.");
+  notes.push("Residuals are defined as simulation minus experimental measurement.");
+  notes.push("This report evaluates numerical agreement only; it does not certify physical model validity or measurement accuracy.");
 
   return {
+    verdict: hasFail ? "FAIL" : allPass ? "PASS" : "INCONCLUSIVE",
     parameters: reports,
-    matchedCount,
-    unmatchedCount: unmatched,
-    medianAlignmentErrorSeconds,
-    verdict,
+    totalExperimentalObservations: input.experimental.length,
+    matchedObservations: reports.reduce((sum, report) => sum + report.sampleCount, 0),
+    unmatchedObservations: unmatched,
+    medianAlignmentErrorSeconds: median(alignmentErrors),
+    notes,
   };
 }
