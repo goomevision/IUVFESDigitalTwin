@@ -16,7 +16,7 @@ import { propagateFaults, type FaultPropagationScenario } from './faultPropagati
 import { resolveVirtualHardwareProfile } from './virtualHardwareProfile';
 
 export interface ClosedLoopSimulationConfig {
-  targetPressureMbar: number; targetTemperatureC: number; materialWeightKg: number; waterContentPercent: number; oilContentPercent: number;
+  targetPressureMbar: number; targetTemperatureC: number; materialWeightKg: number; waterContentPercent: number; oilContentPercent;
   dtSeconds?: number; maxSteps?: number; realTime?: boolean; hardware?: VirtualHardwareDynamicsConfig; safetyLimits?: Partial<SafetyLimits>; faultScenario?: FaultPropagationScenario;
 }
 
