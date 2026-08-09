@@ -16,6 +16,7 @@ export interface ValidationReadiness {
   eligibleForScientificReview: boolean;
   reasons: string[];
   checks: Record<string, boolean>;
+  message: string;
 }
 
 /**
@@ -47,11 +48,15 @@ export function assessValidationReadiness(input: ValidationReadinessInput): Vali
 
   const evidenceComplete = Object.values(checks).every(Boolean);
   const eligibleForScientificReview = evidenceComplete;
+  const message = evidenceComplete
+    ? 'Evidence chain is complete enough to enter scientific review.'
+    : reasons.join(' ');
 
   return {
     status: evidenceComplete ? 'READY_FOR_REVIEW' : input.experimentExists ? 'INCOMPLETE' : 'BLOCKED',
     eligibleForScientificReview,
     reasons,
     checks,
+    message,
   };
 }
