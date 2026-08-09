@@ -1,12 +1,12 @@
 # IUVFES Scientific Data Roadmap
 
-## Implemented foundation
+## Implemented in this branch
 
 - Experiment notebook data contract.
 - Experiment lifecycle adapter.
 - Researcher-facing notebook UI.
-- Provenance contracts and journal.
-- Dataset manifest hashing.
+- Provenance contracts and journal foundation.
+- Dataset manifest hashing foundation.
 - Explicit experimental/simulation/derived/AI origins.
 - Preservation of failed experiments and anomalies.
 
@@ -18,7 +18,7 @@ Move `ExperimentNotebookStore` to Drizzle-backed tables. Keep raw sensor observa
 
 ### Phase 2 — Instrument ingestion
 
-Create a normalized ingestion adapter for laboratory instruments. Preserve the original vendor payload and record instrument serial, calibration version, acquisition time, unit and quality flags.
+Create normalized laboratory-instrument adapters. Preserve the original vendor payload and record instrument serial, calibration version, acquisition time, unit and quality flags.
 
 ### Phase 3 — Dataset release
 
