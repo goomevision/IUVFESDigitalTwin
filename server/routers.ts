@@ -12,6 +12,7 @@ import { AIOptimizer, type SimulationDataPoint } from "./aiOptimizer";
 import { ProcessStateEngine, type ProcessState, type MachineSensors } from "./processStateEngine";
 import { MachineDynamicsEngine } from "./machineDynamics";
 import { closedLoopRouter } from "./closedLoopRouter";
+import { scientificRouter } from "./scientificRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -43,6 +44,7 @@ export const appRouter = router({
     datasetManifest: protectedProcedure.input(z.object({ id: z.string().min(1).max(128), experimentId: z.string().optional(), version: z.string().min(1).max(32), origin: z.enum(["EXPERIMENTAL", "SIMULATION", "DERIVED", "AI_ANALYSIS"]), qualityStatus: z.enum(["RAW", "VALIDATED", "REVIEWED", "CALIBRATED", "REPLICATED", "PUBLISHED", "RETRACTED", "SUPERSEDED"]), sha256: z.string().length(64), storageRef: z.string().min(1).max(512), metadata: z.record(z.string(), z.any()) })).mutation(async ({ ctx, input }) => { if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" }); if (input.experimentId) { const experiment = await researchDb.getResearchExperiment(input.experimentId); if (!experiment) throw new TRPCError({ code: "NOT_FOUND" }); if (experiment.researcherId !== String(ctx.user.id) && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" }); } await researchDb.createDatasetManifest(input); return { datasetId: input.id }; }),
   }),
   closedLoop: closedLoopRouter,
+  scientific: scientificRouter,
   simulation: router({
     run: protectedProcedure.input(z.object({ experimentId: z.string(), materialId: z.number(), materialWeight: z.number().min(0.1).max(1000), waterContent: z.number().min(0).max(100), oilContent: z.number().min(0).max(100), targetPressure: z.number().min(1).max(1000), targetTemperature: z.number().min(20).max(150), ultrasonicFrequency: z.number().min(20).max(100), duration: z.number().min(0.5).max(24), materialWaterRatio: z.string(), processModel: z.enum(["vacuum", "distillation", "ultrasonic", "hybrid"]) })).mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
