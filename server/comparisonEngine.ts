@@ -88,8 +88,13 @@ function nearestAlignmentError(series: SimulationObservation[], timeSeconds: num
   return Math.min(...times.map(time => Math.abs(time - timeSeconds)));
 }
 
+function hasExplicitTolerance(tolerance?: ParameterTolerance): boolean {
+  return tolerance !== undefined && [tolerance.maxBias, tolerance.maxMae, tolerance.maxRmse, tolerance.maxAbsoluteError]
+    .some(value => value !== undefined);
+}
+
 function verdictFor(metrics: { bias: number; mae: number; rmse: number; maxAbsoluteError: number }, tolerance?: ParameterTolerance): ComparisonVerdict {
-  if (!tolerance) return "INCONCLUSIVE";
+  if (!hasExplicitTolerance(tolerance)) return "INCONCLUSIVE";
   const checks = [
     tolerance.maxBias === undefined || Math.abs(metrics.bias) <= tolerance.maxBias,
     tolerance.maxMae === undefined || metrics.mae <= tolerance.maxMae,
@@ -155,7 +160,7 @@ export function compareSimulationToExperiment(input: {
   const notes: string[] = [];
   if (accepted.length !== input.experimental.length) notes.push("Rejected or non-finite experimental observations were excluded from comparison.");
   if (unmatched > 0) notes.push("Some experimental timestamps fell outside the simulation time domain and were not compared.");
-  if (reports.some(report => report.verdict === "INCONCLUSIVE")) notes.push("At least one parameter has no acceptance tolerance; metrics are reported but no scientific pass/fail verdict is assigned.");
+  if (reports.some(report => report.verdict === "INCONCLUSIVE")) notes.push("At least one parameter has no explicit acceptance tolerance; metrics are reported but no scientific pass/fail verdict is assigned.");
   notes.push("Residuals are defined as simulation minus experimental measurement.");
   notes.push("This report evaluates numerical agreement only; it does not certify physical model validity or measurement accuracy.");
 
