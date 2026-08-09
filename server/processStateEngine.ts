@@ -35,7 +35,12 @@ export class ProcessStateEngine {
   }
 
   public tick(sensors: MachineSensors, elapsedSeconds: number): ProcessState {
-    const interlocks = this.evaluateInterlocks(sensors, this.previousSensors, Math.max(0.001, elapsedSeconds - this.state.elapsedSeconds));
+    const timeAdvanced = elapsedSeconds > this.state.elapsedSeconds;
+    const interlocks = this.evaluateInterlocks(
+      sensors,
+      timeAdvanced ? this.previousSensors : sensors,
+      timeAdvanced ? elapsedSeconds - this.state.elapsedSeconds : 1,
+    );
     this.state.sensors = { ...sensors };
     this.state.interlocks = interlocks;
     this.state.elapsedSeconds = elapsedSeconds;
