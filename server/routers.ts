@@ -4,7 +4,9 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { COOKIE_NAME } from "@shared/const";
 import { z } from "zod";
 import * as db from "./db";
+import * as researchDb from "./researchDb";
 import { TRPCError } from "@trpc/server";
+import { randomUUID } from "crypto";
 import { PhysicsSimulationEngine } from "./physicsEngine";
 import { AIOptimizer, type SimulationDataPoint } from "./aiOptimizer";
 import { ProcessStateEngine, type ProcessState, type MachineSensors } from "./processStateEngine";
@@ -27,6 +29,57 @@ export const appRouter = router({
     get: protectedProcedure.input(z.string()).query(async ({ ctx, input }) => { if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" }); const experiment = await db.getExperiment(input); if (!experiment) throw new TRPCError({ code: "NOT_FOUND" }); if (experiment.userId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN" }); return experiment; }),
     list: protectedProcedure.query(async ({ ctx }) => { if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" }); return db.listUserExperiments(ctx.user.id); }),
     updateStatus: protectedProcedure.input(z.object({ experimentId: z.string(), status: z.enum(["draft", "running", "paused", "completed", "failed"]) })).mutation(async ({ ctx, input }) => { if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" }); const experiment = await db.getExperiment(input.experimentId); if (!experiment) throw new TRPCError({ code: "NOT_FOUND" }); if (experiment.userId !== ctx.user.id) throw new TRPCError({ code: "FORBIDDEN" }); await db.updateExperimentStatus(input.experimentId, input.status); return { success: true }; }),
+  }),
+  research: router({
+    create: protectedProcedure.input(z.object({ title: z.string().min(1).max(255), objective: z.string().min(1), hypothesis: z.string().optional(), materialId: z.number().int().positive(), sampleId: z.string().min(1).max(128), batchId: z.string().max(128).optional(), massKg: z.number().positive(), environment: z.record(z.string(), z.any()).optional(), procedure: z.array(z.string().min(1)).min(1), inputParameters: z.record(z.string(), z.any()) })).mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const experimentId = randomUUID();
+      const researchId = `IUVFES-EXP-${experimentId}`;
+      await researchDb.createResearchExperiment({ id: researchId, experimentId, title: input.title, status: "ready", researcherId: String(ctx.user.id), objective: input.objective, hypothesis: input.hypothesis, materialId: input.materialId, sampleId: input.sampleId, batchId: input.batchId, massKg: String(input.massKg), environment: input.environment, procedure: input.procedure, inputParameters: input.inputParameters });
+      return { researchId, experimentId };
+    }),
+    get: protectedProcedure.input(z.string()).query(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const experiment = await researchDb.getResearchExperiment(input); if (!experiment) throw new TRPCError({ code: "NOT_FOUND" });
+      if (experiment.researcherId !== String(ctx.user.id) && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      return experiment;
+    }),
+    start: protectedProcedure.input(z.string()).mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const experiment = await researchDb.getResearchExperiment(input); if (!experiment) throw new TRPCError({ code: "NOT_FOUND" });
+      if (experiment.researcherId !== String(ctx.user.id) && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      await researchDb.updateResearchExperimentStatus(input, "running");
+      return { success: true };
+    }),
+    pause: protectedProcedure.input(z.string()).mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const experiment = await researchDb.getResearchExperiment(input); if (!experiment) throw new TRPCError({ code: "NOT_FOUND" });
+      if (experiment.researcherId !== String(ctx.user.id) && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      await researchDb.updateResearchExperimentStatus(input, "paused"); return { success: true };
+    }),
+    recordSensor: protectedProcedure.input(z.object({ experimentId: z.string(), observedAt: z.coerce.date(), instrumentId: z.string().min(1), parameter: z.string().min(1), value: z.number(), unit: z.string().max(32).optional(), qualityFlag: z.enum(["RAW", "VALIDATED", "REJECTED", "CORRECTED"]).default("RAW"), rawPayloadRef: z.string().max(512).optional(), rawPayloadSha256: z.string().length(64).optional() })).mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const experiment = await researchDb.getResearchExperiment(input.experimentId); if (!experiment) throw new TRPCError({ code: "NOT_FOUND" });
+      if (experiment.researcherId !== String(ctx.user.id) && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      await researchDb.appendSensorObservation({ ...input, value: String(input.value) }); return { success: true };
+    }),
+    recordNote: protectedProcedure.input(z.object({ experimentId: z.string(), observedAt: z.coerce.date(), note: z.string().min(1), eventId: z.string().max(128).optional() })).mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const experiment = await researchDb.getResearchExperiment(input.experimentId); if (!experiment) throw new TRPCError({ code: "NOT_FOUND" });
+      if (experiment.researcherId !== String(ctx.user.id) && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      await researchDb.appendOperatorObservation({ ...input, authorId: String(ctx.user.id) }); return { success: true };
+    }),
+    sensorHistory: protectedProcedure.input(z.object({ experimentId: z.string(), limit: z.number().int().min(1).max(10000).default(1000) })).query(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const experiment = await researchDb.getResearchExperiment(input.experimentId); if (!experiment) throw new TRPCError({ code: "NOT_FOUND" });
+      if (experiment.researcherId !== String(ctx.user.id) && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      return researchDb.listSensorObservations(input.experimentId, input.limit);
+    }),
+    datasetManifest: protectedProcedure.input(z.object({ id: z.string().min(1).max(128), experimentId: z.string().optional(), version: z.string().min(1).max(32), origin: z.enum(["EXPERIMENTAL", "SIMULATION", "DERIVED", "AI_ANALYSIS"]), qualityStatus: z.enum(["RAW", "VALIDATED", "REVIEWED", "CALIBRATED", "REPLICATED", "PUBLISHED", "RETRACTED", "SUPERSEDED"]), sha256: z.string().length(64), storageRef: z.string().min(1).max(512), metadata: z.record(z.string(), z.any()) })).mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      if (input.experimentId) { const experiment = await researchDb.getResearchExperiment(input.experimentId); if (!experiment) throw new TRPCError({ code: "NOT_FOUND" }); if (experiment.researcherId !== String(ctx.user.id) && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" }); }
+      await researchDb.createDatasetManifest(input); return { datasetId: input.id };
+    }),
   }),
   simulation: router({
     run: protectedProcedure.input(z.object({ experimentId: z.string(), materialId: z.number(), materialWeight: z.number().min(0.1).max(1000), waterContent: z.number().min(0).max(100), oilContent: z.number().min(0).max(100), targetPressure: z.number().min(1).max(1000), targetTemperature: z.number().min(20).max(150), ultrasonicFrequency: z.number().min(20).max(100), duration: z.number().min(0.5).max(24), materialWaterRatio: z.string(), processModel: z.enum(["vacuum", "distillation", "ultrasonic", "hybrid"]) })).mutation(async ({ ctx, input }) => {
