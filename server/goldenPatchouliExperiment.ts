@@ -77,7 +77,7 @@ export function runGoldenPatchouliExperiment(overrides: Partial<ClosedLoopSimula
 
 function toGoldenRow(frame: CausalFrame): GoldenPatchouliRow {
   const m = frame.materialInventory as any;
-  const safetyStatus = frame.safety.faults?.length ? 'FAULT' : 'SAFE_OR_UNFLAGGED';
+  const safetyStatus = frame.safety.severity === 'CRITICAL' ? 'FAULT' : frame.safety.severity;
   return {
     tSeconds: frame.timestampSeconds,
     temperatureC: frame.sensorAfter.temperatureC,
