@@ -21,6 +21,7 @@ export interface VirtualHardwareDynamicsConfig {
   leakRateMbarPerSecond?: number;
   effectiveHeatLossKWPerC?: number;
   vacuumLineConductanceFactor?: number;
+  vacuumLineDiameterM?: number;
   vacuumVaporMolarMassKgPerMol?: number;
 }
 
@@ -60,7 +61,7 @@ export class MachineDynamicsEngine {
     const regime = classifyVacuumFlowRegime({
       absolutePressurePa: pressurePa,
       gasTemperatureK,
-      characteristicDiameterM: 0.02,
+      characteristicDiameterM: Math.max(1e-6, this.c.vacuumLineDiameterM),
       molecularDiameterM: this.c.vacuumVaporMolarMassKgPerMol <= 0.025 ? 3.641e-10 : 3.7e-10,
     });
     const regimeFactor = regimeConductanceScreeningFactor(regime.regime);
