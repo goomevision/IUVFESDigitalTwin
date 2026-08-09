@@ -41,10 +41,12 @@ function deriveOverallVerdict(sections: ReportSection[]): ReportVerdict {
   return "PASS";
 }
 
-function deriveReadiness(reportVerdict: ReportVerdict, provenance: ScientificValidationReportInput["provenance"]): "READY" | "NOT_READY" {
-  const hasExperimentEvidence = (provenance.observationCount ?? 0) > 0;
-  const hasSimulationEvidence = provenance.simulationResultPresent === true;
-  const hasProvenance = (provenance.provenanceRecordCount ?? 0) > 0;
+function deriveReadiness(reportVerdict: ReportVerdict, provenance: ScientificValidationReportInput["provenance"], sections: ReportSection[]): "READY" | "NOT_READY" {
+  const evidenceSection = sections.find(section => section.key === "evidence");
+  const evidence = evidenceSection?.evidence as { checks?: Record<string, unknown> } | undefined;
+  const hasExperimentEvidence = (provenance.observationCount ?? 0) > 0 || evidence?.checks?.sensorObservations === true;
+  const hasSimulationEvidence = provenance.simulationResultPresent === true || evidence?.checks?.simulationDataset === true;
+  const hasProvenance = (provenance.provenanceRecordCount ?? 0) > 0 || evidence?.checks?.provenance === true;
   return reportVerdict !== "FAIL" && hasExperimentEvidence && hasSimulationEvidence && hasProvenance ? "READY" : "NOT_READY";
 }
 
@@ -60,7 +62,7 @@ export function buildScientificValidationReport(input: ScientificValidationRepor
     experimentId: input.experimentId,
     generatedAt,
     overallVerdict,
-    readiness: deriveReadiness(overallVerdict, input.provenance),
+    readiness: deriveReadiness(overallVerdict, input.provenance, input.sections),
     sections: input.sections,
     provenance: input.provenance,
     scientificBoundary: "This report organizes supplied evidence and validation metrics. It does not establish scientific truth, instrument accuracy, causality, or physical-model validity beyond the declared evidence and acceptance criteria.",
