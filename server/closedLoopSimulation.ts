@@ -16,7 +16,7 @@ import { propagateFaults, type FaultPropagationScenario } from './faultPropagati
 import { resolveVirtualHardwareProfile } from './virtualHardwareProfile';
 
 export interface ClosedLoopSimulationConfig {
-  targetPressureMbar: number; targetTemperatureC: number; materialWeightKg: number; waterContentPercent: number; oilContentPercent;
+  targetPressureMbar: number; targetTemperatureC: number; materialWeightKg: number; waterContentPercent: number; oilContentPercent: number;
   dtSeconds?: number; maxSteps?: number; realTime?: boolean; hardware?: VirtualHardwareDynamicsConfig; safetyLimits?: Partial<SafetyLimits>; faultScenario?: FaultPropagationScenario;
 }
 
@@ -118,7 +118,7 @@ export class ClosedLoopSimulationEngine {
     if ((snapshot.config.realTime ?? true) !== this.realTime) throw new Error('Snapshot real-time mode does not match simulation configuration');
     if (snapshot.config.targetPressureMbar !== this.config.targetPressureMbar || snapshot.config.targetTemperatureC !== this.config.targetTemperatureC || snapshot.config.materialWeightKg !== this.config.materialWeightKg || snapshot.config.waterContentPercent !== this.config.waterContentPercent || snapshot.config.oilContentPercent !== this.config.oilContentPercent) throw new Error('Snapshot configuration does not match simulation configuration');
     const snapshotHardware = snapshot.config.hardware ?? {}; const currentHardware = this.config.hardware ?? {};
-    const hardwareKeys: Array<keyof VirtualHardwareDynamicsConfig> = ['chamberVolumeL', 'pumpCapacityM3h', 'thermalMassKJPerC', 'heatingPowerKW', 'coolingPowerKW', 'leakRateMbarPerSecond', 'effectiveHeatLossKWPerC', 'vacuumLineConductanceFactor', 'vacuumVaporMolarMassKgPerMol'];
+    const hardwareKeys: Array<keyof VirtualHardwareDynamicsConfig> = ['chamberVolumeL', 'pumpCapacityM3h', 'thermalMassKJPerC', 'heatingPowerKW', 'coolingPowerKW', 'leakRateMbarPerSecond', 'effectiveHeatLossKWPerC', 'vacuumLineConductanceFactor', 'vacuumLineDiameterM', 'vacuumVaporMolarMassKgPerMol'];
     for (const key of hardwareKeys) if (snapshotHardware[key] !== currentHardware[key]) throw new Error('Snapshot hardware profile does not match simulation configuration');
     if (JSON.stringify(snapshot.config.faultScenario ?? null) !== JSON.stringify(this.config.faultScenario ?? null)) throw new Error('Snapshot fault scenario does not match simulation configuration');
     this.sensors = { ...snapshot.sensors }; this.elapsedSeconds = snapshot.elapsedSeconds; this.stepNumber = snapshot.stepNumber; this.paused = snapshot.paused; this.lastStepWallClockMs = this.realTime && !this.paused ? Date.now() : snapshot.lastStepWallClockMs;
