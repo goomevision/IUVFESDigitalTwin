@@ -7,9 +7,7 @@ export class PIDController {
   private integral = 0;
   private previousError = 0;
   private initialized = false;
-
   constructor(private readonly config: Required<PIDConfig>) {}
-
   public update(setpoint: number, measurement: number, dtSeconds: number): number {
     const dt = Math.max(dtSeconds, 0.001);
     const error = setpoint - measurement;
@@ -23,14 +21,9 @@ export class PIDController {
     this.initialized = true;
     return clamped;
   }
-
   public reset(): void { this.integral = 0; this.previousError = 0; this.initialized = false; }
   public getSnapshot(): PIDSnapshot { return { integral: this.integral, previousError: this.previousError, initialized: this.initialized }; }
-  public restore(snapshot: PIDSnapshot): void {
-    this.integral = snapshot.integral;
-    this.previousError = snapshot.previousError;
-    this.initialized = snapshot.initialized;
-  }
+  public restore(snapshot: PIDSnapshot): void { this.integral = snapshot.integral; this.previousError = snapshot.previousError; this.initialized = snapshot.initialized; }
 }
 
 export interface ValveCommand { vacuumIsolation: number; vaporToCondenser: number; coolingWater: number; }
@@ -40,12 +33,12 @@ export interface ProcessControlSnapshot { heater: PIDSnapshot; vacuum: PIDSnapsh
 export class ProcessControlLoop {
   private readonly heater = new PIDController({ kp: 0.025, ki: 0.0015, kd: 0.01, minOutput: 0, maxOutput: 1 });
   private readonly vacuum = new PIDController({ kp: 0.003, ki: 0.0004, kd: 0.001, minOutput: 0, maxOutput: 1 });
-
   public update(input: { targetTemperatureC: number; targetPressureMbar: number; temperatureC: number; pressureMbar: number; stage: string; dtSeconds: number }): ControlOutput {
     const activeHeat = ['HEAT_UP', 'EXTRACTION'].includes(input.stage);
     const activeVacuum = ['VACUUM', 'HEAT_UP', 'EXTRACTION', 'CONDENSATION'].includes(input.stage);
     const heaterPower = activeHeat ? this.heater.update(input.targetTemperatureC, input.temperatureC, input.dtSeconds) : 0;
-    const vacuumPumpPower = activeVacuum ? this.vacuum.update(input.targetPressureMbar, input.pressureMbar, input.dtSeconds) : 0;
+    // Vacuum pump demand is proportional to how far measured pressure is above the target.
+    const vacuumPumpPower = activeVacuum ? this.vacuum.update(input.pressureMbar, input.targetPressureMbar, input.dtSeconds) : 0;
     return {
       heaterPower,
       vacuumPumpPower,
@@ -56,7 +49,6 @@ export class ProcessControlLoop {
       },
     };
   }
-
   public reset(): void { this.heater.reset(); this.vacuum.reset(); }
   public getSnapshot(): ProcessControlSnapshot { return { heater: this.heater.getSnapshot(), vacuum: this.vacuum.getSnapshot() }; }
   public restore(snapshot: ProcessControlSnapshot): void { this.heater.restore(snapshot.heater); this.vacuum.restore(snapshot.vacuum); }
