@@ -5,6 +5,7 @@ import * as db from "./db";
 import * as researchDb from "./researchDb";
 import { assessValidationReadiness } from "./scientificValidation";
 import { compareSimulationToExperiment, type ParameterTolerance } from "./comparisonEngine";
+import { validateAgainstReplicates } from "./uncertaintyEngine";
 
 const simulationChannelMap: Record<string, string> = {
   pressure: "pressure",
@@ -133,5 +134,40 @@ export const scientificRouter = router({
         simulation,
         tolerances: input.tolerances as Record<string, ParameterTolerance> | undefined,
       });
+    }),
+
+  replicateValidation: protectedProcedure
+    .input(z.object({
+      researchExperimentId: z.string().min(1),
+      parameter: z.string().min(1),
+      simulationValue: z.number(),
+      experimentalValues: z.array(z.number()).min(1),
+      instrumentStandardUncertainty: z.number().nonnegative().optional(),
+      confidenceMultiplier: z.number().positive().optional(),
+      tolerance: z.number().nonnegative().optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const researchExperiment = await researchDb.getResearchExperiment(input.researchExperimentId);
+      if (!researchExperiment) throw new TRPCError({ code: "NOT_FOUND" });
+      if (researchExperiment.researcherId !== String(ctx.user.id) && ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const finiteValues = input.experimentalValues.filter(Number.isFinite);
+      if (finiteValues.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "No finite experimental replicate values are available." });
+      const result = validateAgainstReplicates({
+        experimentalValues: finiteValues,
+        simulationValue: input.simulationValue,
+        instrumentStandardUncertainty: input.instrumentStandardUncertainty,
+        confidenceMultiplier: input.confidenceMultiplier,
+        tolerance: input.tolerance,
+      });
+      return {
+        parameter: input.parameter,
+        researchExperimentId: input.researchExperimentId,
+        ...result,
+        scientificBoundary: "Replicate uncertainty quantifies repeatability and supplied instrument uncertainty. It does not certify the physical model or measurement system.",
+      };
     }),
 });
