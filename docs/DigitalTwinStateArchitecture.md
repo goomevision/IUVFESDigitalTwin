@@ -45,7 +45,13 @@ The current machine dynamics model includes:
 - actuator lag;
 - cumulative energy demand.
 
-These are deterministic simulation parameters, not calibrated machine specifications.
+## Closed-loop controls
+
+`ProcessControlLoop` adds deterministic PID-like control for heater power and vacuum-pump power. It also calculates valve positions for vacuum isolation, vapor routing to the condenser, and cooling water. The control loop is constrained by process stage; when the process is COMPLETE or inactive, the outputs are driven to zero/closed.
+
+## Event journal
+
+`MachineEventJournal` provides an append-only in-memory event stream with sequence numbers, timestamps, severity, event codes and process stage. It can record state transitions and alarms and is intended to become the source for the operator event-history panel.
 
 ## Important fidelity rule
 
@@ -53,14 +59,14 @@ A UI progress percentage must never be the authority for a physical transition. 
 
 ## Next engineering layers
 
+- connect PID outputs directly to `MachineDynamicsEngine` actuator power inputs;
 - calibrated pump curves and valve coefficients;
 - sensor noise, lag and calibration offsets;
-- explicit valve states and chamber isolation;
-- PID-like control loops;
+- explicit valve states and chamber isolation in the main process state;
 - material-bed moisture and temperature gradients;
 - vapor/condensate inventory;
 - abnormal-event injection and recovery procedures;
-- event journal for every state transition;
+- persist the event journal with each experiment;
 - 3D machine visualization driven by actuator state rather than animation progress;
 - calibration mode comparing simulator telemetry with real machine logs.
 
