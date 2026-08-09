@@ -47,7 +47,9 @@ function deriveReadiness(reportVerdict: ReportVerdict, provenance: ScientificVal
   const hasExperimentEvidence = (provenance.observationCount ?? 0) > 0 || evidence?.checks?.sensorObservations === true;
   const hasSimulationEvidence = provenance.simulationResultPresent === true || evidence?.checks?.simulationDataset === true;
   const hasProvenance = (provenance.provenanceRecordCount ?? 0) > 0 || evidence?.checks?.provenance === true;
-  return reportVerdict !== "FAIL" && hasExperimentEvidence && hasSimulationEvidence && hasProvenance ? "READY" : "NOT_READY";
+
+  // Readiness is stricter than evidence presence: only a fully passing report can be READY.
+  return reportVerdict === "PASS" && hasExperimentEvidence && hasSimulationEvidence && hasProvenance ? "READY" : "NOT_READY";
 }
 
 export function buildScientificValidationReport(input: ScientificValidationReportInput): ScientificValidationReport {
