@@ -40,6 +40,7 @@ export interface ParameterComparison {
 
 export interface ComparisonReport {
   verdict: ComparisonVerdict;
+  overallVerdict: ComparisonVerdict;
   parameters: ParameterComparison[];
   totalExperimentalObservations: number;
   matchedObservations: number;
@@ -152,6 +153,7 @@ export function compareSimulationToExperiment(input: {
 
   const hasFail = reports.some(report => report.verdict === "FAIL");
   const allPass = reports.length > 0 && reports.every(report => report.verdict === "PASS");
+  const overallVerdict: ComparisonVerdict = hasFail ? "FAIL" : allPass ? "PASS" : "INCONCLUSIVE";
   const notes: string[] = [];
   if (accepted.length !== input.experimental.length) notes.push("Rejected or non-finite experimental observations were excluded from comparison.");
   if (unmatched > 0) notes.push("Some experimental timestamps fell outside the simulation time domain and were not compared.");
@@ -160,7 +162,8 @@ export function compareSimulationToExperiment(input: {
   notes.push("This report evaluates numerical agreement only; it does not certify physical model validity or measurement accuracy.");
 
   return {
-    verdict: hasFail ? "FAIL" : allPass ? "PASS" : "INCONCLUSIVE",
+    verdict: overallVerdict,
+    overallVerdict,
     parameters: reports,
     totalExperimentalObservations: input.experimental.length,
     matchedObservations: reports.reduce((sum, report) => sum + report.sampleCount, 0),
