@@ -1,8 +1,9 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   researchExperiments,
   experimentInstruments,
+  instrumentCalibrations,
   sensorObservations,
   operatorObservations,
   datasetManifests,
@@ -57,10 +58,20 @@ export async function createDatasetManifest(data: InsertDatasetManifest) {
   return data.id;
 }
 
+export async function listDatasetManifests(experimentId: string) {
+  const db = requireDb(await getDb());
+  return db.select().from(datasetManifests).where(eq(datasetManifests.experimentId, experimentId)).orderBy(desc(datasetManifests.createdAt));
+}
+
 export async function createProvenanceRecord(data: InsertProvenanceRecord) {
   const db = requireDb(await getDb());
   await db.insert(provenanceRecords).values(data);
   return data.id;
+}
+
+export async function listProvenanceRecords(entityId: string) {
+  const db = requireDb(await getDb());
+  return db.select().from(provenanceRecords).where(eq(provenanceRecords.entityId, entityId)).orderBy(desc(provenanceRecords.createdAt));
 }
 
 export async function attachExperimentInstrument(data: {
@@ -71,4 +82,15 @@ export async function attachExperimentInstrument(data: {
 }) {
   const db = requireDb(await getDb());
   await db.insert(experimentInstruments).values(data);
+}
+
+export async function listExperimentInstruments(experimentId: string) {
+  const db = requireDb(await getDb());
+  return db.select().from(experimentInstruments).where(eq(experimentInstruments.experimentId, experimentId));
+}
+
+export async function listInstrumentCalibrations(instrumentIds: string[]) {
+  if (instrumentIds.length === 0) return [];
+  const db = requireDb(await getDb());
+  return db.select().from(instrumentCalibrations).where(inArray(instrumentCalibrations.instrumentId, instrumentIds));
 }
