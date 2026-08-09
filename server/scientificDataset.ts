@@ -15,17 +15,34 @@ export function buildDatasetManifest(input: {
   storageRef: string;
   experimentIds: string[];
   provenanceRefs: string[];
+  createdBy?: string;
+  softwareVersion?: string;
 }): DatasetManifest {
+  const uniqueExperimentIds = [...new Set(input.experimentIds)];
+  const uniqueProvenanceRefs = [...new Set(input.provenanceRefs)];
   return {
     datasetId: input.datasetId,
     version: input.version,
-    name: input.name,
+    title: input.name,
+    description: 'IUVFES scientific dataset manifest',
     origin: input.origin,
     qualityStatus: input.qualityStatus,
-    sha256: sha256Utf8(input.content),
-    storageRef: input.storageRef,
-    experimentIds: [...new Set(input.experimentIds)],
-    provenanceRefs: [...new Set(input.provenanceRefs)],
     createdAt: new Date().toISOString(),
+    createdBy: input.createdBy ?? 'system',
+    experimentId: uniqueExperimentIds[0],
+    instrumentIds: [],
+    calibrationIds: [],
+    softwareVersion: input.softwareVersion ?? 'unknown',
+    provenance: uniqueProvenanceRefs.map((id) => ({ id, type: 'REFERENCE', role: 'SOURCE' })),
+    sha256: sha256Utf8(input.content),
+    license: undefined,
+    doi: undefined,
+    storageRef: input.storageRef,
+    experimentIds: uniqueExperimentIds,
+    provenanceRefs: uniqueProvenanceRefs,
+  } as DatasetManifest & {
+    storageRef: string;
+    experimentIds: string[];
+    provenanceRefs: string[];
   };
 }
