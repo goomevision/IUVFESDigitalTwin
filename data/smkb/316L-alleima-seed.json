@@ -1,0 +1,42 @@
+{
+  "materialId": "MAT-SS316L",
+  "material": "AISI 316L",
+  "source": {
+    "sourceId": "SRC-ALLEIMA-316L",
+    "title": "Sanmac 316/316L material datasheet",
+    "publisher": "Alleima",
+    "sourceType": "DATASHEET",
+    "url": "https://www.alleima.com/contentassets/25bc5bd6738148499b011782f7482ee9/datasheet-sanmac-316316l-en-v2025-05-09-0637-version-1.pdf/download",
+    "evidenceGrade": "C"
+  },
+  "conditions": {
+    "materialCondition": "manufacturer datasheet; product/condition dependent",
+    "temperatureUnit": "degC"
+  },
+  "properties": {
+    "density": {
+      "value": 8000,
+      "unit": "kg/m3",
+      "temperatureC": 20,
+      "validationStatus": "LITERATURE"
+    },
+    "thermalConductivity": [
+      { "temperatureC": 20, "value": 14, "unit": "W/m/K" },
+      { "temperatureC": 100, "value": 15, "unit": "W/m/K" },
+      { "temperatureC": 200, "value": 17, "unit": "W/m/K" },
+      { "temperatureC": 300, "value": 18, "unit": "W/m/K" },
+      { "temperatureC": 400, "value": 20, "unit": "W/m/K" }
+    ],
+    "thermalExpansionMean": [
+      { "rangeC": [30, 100], "value": 16.5, "unit": "1e-6/K" },
+      { "rangeC": [30, 200], "value": 17.0, "unit": "1e-6/K" },
+      { "rangeC": [30, 300], "value": 17.5, "unit": "1e-6/K" },
+      { "rangeC": [30, 400], "value": 18.0, "unit": "1e-6/K" }
+    ]
+  },
+  "notes": [
+    "The conductivity and expansion values are reported for AISI/ASTM 316L in the cited Alleima datasheet and should not be treated as universal values for every 316L product condition.",
+    "This seed intentionally does not invent a 316L specific-heat curve because the cited excerpt does not provide a dedicated 316L Cp table.",
+    "Mechanical allowable stress, weld condition, pressure-vessel code limits and corrosion allowance require separate authoritative sources and engineering context."
+  ]
+}
