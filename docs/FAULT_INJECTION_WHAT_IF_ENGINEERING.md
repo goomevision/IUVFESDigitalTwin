@@ -1,7 +1,5 @@
 # IUVFES Fault Injection / What-if Engineering
 
-## Purpose
-
 This layer extends deterministic fault-injection analysis from virtual hardware into explicit sensor-observation and actuator-execution faults.
 
 ## Causal chain
@@ -27,44 +25,19 @@ PHYSICAL PROCESS STATE
  observed sensorAfter
 ```
 
-Every causal frame now distinguishes:
+Every causal frame distinguishes `physicalSensorAfter`, `sensorAfter`, `intendedCommands`, and `effectiveCommands`.
 
-- `physicalSensorAfter` — virtual process result before observation fault;
-- `sensorAfter` — what controller/safety logic observes;
-- `intendedCommands` — controller request;
-- `effectiveCommands` — command after actuator fault transformation.
+## Hardware faults
 
-## Hardware fault classes
+`VACUUM_LEAK`, `PUMP_CAPACITY_DEGRADATION`, `HEATING_POWER_LOSS`, `COOLING_POWER_LOSS`, `THERMAL_MASS_INCREASE`, `CHAMBER_VOLUME_INCREASE`.
 
-| Fault | Simulation effect |
-|---|---|
-| `VACUUM_LEAK` | increases effective pressure-rise rate |
-| `PUMP_CAPACITY_DEGRADATION` | reduces pump capacity |
-| `HEATING_POWER_LOSS` | reduces heater power |
-| `COOLING_POWER_LOSS` | reduces cooling power |
-| `THERMAL_MASS_INCREASE` | increases effective thermal mass |
-| `CHAMBER_VOLUME_INCREASE` | increases connected chamber volume |
+## Sensor faults
 
-## Sensor fault classes
+`PRESSURE_BIAS`, `TEMPERATURE_BIAS`, `PRESSURE_SCALE`, `TEMPERATURE_SCALE`, `PRESSURE_STUCK`, `TEMPERATURE_STUCK`.
 
-| Fault | Observation effect |
-|---|---|
-| `PRESSURE_BIAS` | adds deterministic pressure-reading bias |
-| `TEMPERATURE_BIAS` | adds deterministic temperature-reading bias |
-| `PRESSURE_SCALE` | scales pressure observation |
-| `TEMPERATURE_SCALE` | scales temperature observation |
-| `PRESSURE_STUCK` | holds previous pressure observation |
-| `TEMPERATURE_STUCK` | holds previous temperature observation |
+## Actuator faults
 
-## Actuator fault classes
-
-| Fault | Execution effect |
-|---|---|
-| `VACUUM_PUMP_UNAVAILABLE` | prevents pump command execution |
-| `HEATER_UNAVAILABLE` | prevents heater command execution |
-| `COOLING_UNAVAILABLE` | prevents cooling command execution |
-| `EXTRACTOR_UNAVAILABLE` | prevents extractor command execution |
-| `CONDENSER_UNAVAILABLE` | prevents condenser command execution |
+`VACUUM_PUMP_UNAVAILABLE`, `HEATER_UNAVAILABLE`, `COOLING_UNAVAILABLE`, `EXTRACTOR_UNAVAILABLE`, `CONDENSER_UNAVAILABLE`.
 
 Severity is normalized to `0..1`. Transformations are deterministic and do not mutate baseline input objects.
 
@@ -76,34 +49,11 @@ The closed-loop snapshot includes the fault scenario and refuses restore when th
 
 A fault-injection result is **simulation evidence**. It must not be presented as evidence that a physical component will fail at the same threshold, rate, or sequence.
 
-A useful engineering record should preserve:
-
-1. base simulation configuration;
-2. exact fault type and severity;
-3. resulting hardware profile;
-4. sensor/actuator fault scenario;
-5. simulation/model version;
-6. causal frames;
-7. physical-versus-observed sensor distinction;
-8. intended-versus-effective command distinction;
-9. safety-event timeline;
-10. summary metrics;
-11. comparison against baseline;
-12. provenance and validation status.
+A useful engineering record should preserve the base configuration, exact fault definition, resulting hardware profile, simulation/model version, causal frames, physical-versus-observed sensor distinction, intended-versus-effective commands, safety-event timeline, summary metrics, baseline comparison, provenance and validation status.
 
 ## Not yet modeled
 
-The current layer does **not** claim to model:
-
-- probabilistic sensor noise or intermittent failure;
-- sensor calibration drift over time;
-- valve-specific dynamics or partial-stroke behavior;
-- controller software faults;
-- physical fracture, weld failure, fatigue or material failure;
-- certified relief-system behavior;
-- experimentally calibrated failure distributions.
-
-These remain separate engineering layers and require explicit assumptions, provenance and validation boundaries.
+The current layer does not claim probabilistic sensor noise, intermittent failure, calibration drift, valve-specific dynamics, controller software faults, physical fracture/weld/fatigue/material failure, certified relief-system behavior, or experimentally calibrated failure distributions.
 
 ## Next extension
 
