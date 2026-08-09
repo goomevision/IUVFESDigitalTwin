@@ -13,6 +13,7 @@ import { ProcessStateEngine, type MachineSensors, type ProcessState } from './pr
 import { evaluateSafety, type SafetyEvaluation, type SafetyLimits } from './safetyKernel';
 import { buildSafetyEventTimeline, type SafetyEvent } from './safetyEventTimeline';
 import { propagateFaults, type FaultPropagationScenario } from './faultPropagation';
+import { resolveVirtualHardwareProfile } from './virtualHardwareProfile';
 
 export interface ClosedLoopSimulationConfig {
   targetPressureMbar: number;
@@ -119,18 +120,8 @@ export class ClosedLoopSimulationEngine {
       { targetPressureMbar: config.targetPressureMbar, targetTemperatureC: config.targetTemperatureC, ...config.safetyLimits },
       this.sensors,
     );
-    this.dynamics = new MachineDynamicsEngine(this.sensors, {
-      ambientPressureMbar: 1013.25,
-      ambientTemperatureC: 25,
-      vacuumRateMbarPerSecond: 7,
-      heaterRateCPerSecond: 0.18,
-      passiveHeatLossCPerSecond: 0.035,
-      coolingRateCPerSecond: 0.12,
-      condenserCoolingFactor: 0.05,
-      extractionYieldRatePerSecond: 0.00035,
-      actuatorLag: 0.35,
-      ...config.hardware,
-    });
+    const hardware = resolveVirtualHardwareProfile(config.hardware);
+    this.dynamics = new MachineDynamicsEngine(this.sensors, hardware);
     this.control = new ProcessControlLoop();
   }
 
