@@ -2,10 +2,11 @@
  * Causal closed-loop simulation coordinator.
  *
  * Every interactive step follows sensors -> interlocks/state machine ->
- * controller -> actuator commands -> machine dynamics -> next sensors.
- * Interactive steps are wall-clock paced by default so process time cannot be
- * skipped accidentally. Batch completion intentionally bypasses wall-clock
- * pacing and remains available for deterministic offline computation.
+ * controller -> actuator commands -> machine dynamics -> next sensors ->
+ * post-dynamics state observation. Interactive steps are wall-clock paced by
+ * default so process time cannot be skipped accidentally. Batch completion
+ * intentionally bypasses wall-clock pacing and remains available for
+ * deterministic offline computation.
  */
 
 import { ProcessControlLoop, type ProcessControlSnapshot } from './controlLoop';
@@ -13,7 +14,7 @@ import { MachineDynamicsEngine, type MachineDynamicsSnapshot } from './machineDy
 import { ProcessStateEngine, type MachineSensors, type ProcessState } from './processStateEngine';
 
 export interface ClosedLoopSimulationConfig { targetPressureMbar: number; targetTemperatureC: number; materialWeightKg: number; waterContentPercent: number; oilContentPercent: number; dtSeconds?: number; maxSteps?: number; realTime?: boolean; }
-export interface CausalFrame { step: number; timestampSeconds: number; wallClockTimestampMs?: number; wallClockDeltaMs?: number; sensorBefore: MachineSensors; controller: ProcessState; sensorAfter: MachineSensors; paused: boolean; }
+export interface CausalFrame { step: number; timestampSeconds: number; wallClockTimestampMs?: number; wallClockDeltaMs?: number; sensorBefore: MachineSensors; controller: ProcessState; sensorAfter: MachineSensors; stateAfter?: ProcessState; paused: boolean; }
 export interface ClosedLoopResult { status: ProcessState['stage']; frames: CausalFrame[]; finalSensors: MachineSensors; pausedSteps: number[]; }
 export interface ClosedLoopSnapshot { version: 1; config: ClosedLoopSimulationConfig; target: MachineSensors; sensors: MachineSensors; elapsedSeconds: number; stepNumber: number; paused: boolean; lastStepWallClockMs?: number; state: ProcessState; dynamics: MachineDynamicsSnapshot; control: ProcessControlSnapshot; frames: CausalFrame[]; pausedSteps: number[]; }
 
@@ -70,7 +71,12 @@ export class ClosedLoopSimulationEngine {
     this.stepNumber += 1;
     this.sensors = sensorAfter;
     this.lastStepWallClockMs = now;
-    const frame: CausalFrame = { step: this.stepNumber, timestampSeconds: this.elapsedSeconds, wallClockTimestampMs: now, wallClockDeltaMs: previousWallClockMs === undefined ? undefined : now - previousWallClockMs, sensorBefore, controller, sensorAfter: { ...sensorAfter }, paused: false };
+
+    // Observe the newly produced sensors at the new simulation timestamp. This
+    // keeps state transitions causal without inventing a second elapsed-time
+    // interval when the state is read again by the next step.
+    const stateAfter = this.state.tick(this.sensors, this.elapsedSeconds);
+    const frame: CausalFrame = { step: this.stepNumber, timestampSeconds: this.elapsedSeconds, wallClockTimestampMs: now, wallClockDeltaMs: previousWallClockMs === undefined ? undefined : now - previousWallClockMs, sensorBefore, controller, sensorAfter: { ...sensorAfter }, stateAfter, paused: false };
     this.frames.push(frame);
     return frame;
   }
@@ -78,17 +84,17 @@ export class ClosedLoopSimulationEngine {
   /** Offline deterministic completion. This intentionally does not wait for wall-clock time. */
   public runToCompletion(): ClosedLoopResult {
     while (this.stepNumber < this.maxSteps) {
-      const currentState = this.state.tick(this.sensors, this.elapsedSeconds);
+      const currentState = this.state.snapshotState();
       if (currentState.stage === 'COMPLETE' || currentState.stage === 'FAULT') break;
       this.advanceStep(Date.now());
     }
-    const finalState = this.state.tick(this.sensors, this.elapsedSeconds);
+    const finalState = this.state.snapshotState();
     return { status: finalState.stage, frames: [...this.frames], finalSensors: { ...this.sensors }, pausedSteps: [...this.pausedSteps] };
   }
 
   public getFrames(): CausalFrame[] { return [...this.frames]; }
   public getSensors(): MachineSensors { return { ...this.sensors }; }
-  public getState(): ProcessState { return this.state.tick(this.sensors, this.elapsedSeconds); }
+  public getState(): ProcessState { return this.state.snapshotState(); }
 
   public snapshot(): ClosedLoopSnapshot { return { version: 1, config: { ...this.config, realTime: this.realTime }, target: { ...this.target }, sensors: { ...this.sensors }, elapsedSeconds: this.elapsedSeconds, stepNumber: this.stepNumber, paused: this.paused, lastStepWallClockMs: this.lastStepWallClockMs, state: this.state.snapshotState(), dynamics: this.dynamics.snapshot(), control: this.control.snapshot(), frames: [...this.frames], pausedSteps: [...this.pausedSteps] }; }
 
