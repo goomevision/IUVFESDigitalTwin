@@ -5,24 +5,9 @@ This layer extends deterministic fault-injection analysis from virtual hardware 
 ## Causal chain
 
 ```text
-PHYSICAL PROCESS STATE
-        |
-        v
-  SENSOR OBSERVATION
-        |
-        v
- INTERLOCK / CONTROLLER
-        |
-        v
- ACTUATOR EXECUTION
-        |
-        v
- HARDWARE DYNAMICS
-        |
-        +----> physicalSensorAfter
-        |
-        v
- observed sensorAfter
+PHYSICAL PROCESS STATE -> SENSOR OBSERVATION -> INTERLOCK / CONTROLLER
+        -> ACTUATOR EXECUTION -> HARDWARE DYNAMICS -> physicalSensorAfter
+        -> observed sensorAfter
 ```
 
 Every causal frame distinguishes `physicalSensorAfter`, `sensorAfter`, `intendedCommands`, and `effectiveCommands`.
@@ -43,13 +28,11 @@ Severity is normalized to `0..1`. Transformations are deterministic and do not m
 
 ## Snapshot integrity
 
-The closed-loop snapshot includes the fault scenario and refuses restore when the configured fault scenario differs. This prevents a saved trajectory from being silently resumed under a different fault definition.
+The closed-loop snapshot includes the fault scenario and refuses restore when the configured fault scenario differs.
 
 ## Evidence discipline
 
-A fault-injection result is **simulation evidence**. It must not be presented as evidence that a physical component will fail at the same threshold, rate, or sequence.
-
-A useful engineering record should preserve the base configuration, exact fault definition, resulting hardware profile, simulation/model version, causal frames, physical-versus-observed sensor distinction, intended-versus-effective commands, safety-event timeline, summary metrics, baseline comparison, provenance and validation status.
+A fault-injection result is **simulation evidence**. It must not be presented as evidence that a physical component will fail at the same threshold, rate, or sequence. Preserve the base configuration, exact fault definition, resulting hardware profile, model version, causal frames, physical-versus-observed sensor distinction, intended-versus-effective commands, safety-event timeline, metrics, baseline comparison, provenance and validation status.
 
 ## Not yet modeled
 
@@ -57,4 +40,4 @@ The current layer does not claim probabilistic sensor noise, intermittent failur
 
 ## Next extension
 
-The next high-value layer is **fault propagation evidence and comparative analysis**: automatically compare baseline vs fault trajectories, identify first divergence, map the causal chain to safety events, and produce a deterministic what-if report without turning simulation outcomes into unverified physical claims.
+Automatically compare baseline vs fault trajectories, identify first divergence, map the causal chain to safety events, and produce a deterministic what-if report without turning simulation outcomes into unverified physical claims.
