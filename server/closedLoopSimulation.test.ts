@@ -72,6 +72,8 @@ describe('closed-loop real-time pacing', () => {
       realTime: true,
       safetyLimits: { maxPressureRateMbarPerSecond: 1 },
     });
+    expect(engine.step()).not.toBeNull();
+    vi.advanceTimersByTime(1000);
     const frame = engine.step();
 
     expect(frame).not.toBeNull();
