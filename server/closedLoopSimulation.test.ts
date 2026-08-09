@@ -35,12 +35,22 @@ describe('closed-loop real-time pacing', () => {
     expect(engine.step()).not.toBeNull();
     const snapshot = engine.snapshot();
 
+    vi.advanceTimersByTime(60_000);
     const restored = new ClosedLoopSimulationEngine({ ...config, realTime: true });
     restored.restore(snapshot);
     expect(restored.step()).toBeNull();
 
     vi.advanceTimersByTime(1000);
     expect(restored.step()).not.toBeNull();
+  });
+
+  it('rejects restoring a snapshot into a different timing mode', () => {
+    vi.setSystemTime(new Date('2026-08-09T00:00:00.000Z'));
+    const realTimeEngine = new ClosedLoopSimulationEngine({ ...config, realTime: true });
+    const snapshot = realTimeEngine.snapshot();
+    const batchEngine = new ClosedLoopSimulationEngine({ ...config, realTime: false });
+
+    expect(() => batchEngine.restore(snapshot)).toThrow('Snapshot real-time mode does not match simulation configuration');
   });
 
   it('does not create a false transient when state is read at the same simulation timestamp', () => {
