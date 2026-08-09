@@ -12,6 +12,7 @@
 import { ProcessControlLoop, type ProcessControlSnapshot } from './controlLoop';
 import { MachineDynamicsEngine, type MachineDynamicsSnapshot, type VirtualHardwareDynamicsConfig } from './machineDynamics';
 import { ProcessStateEngine, type MachineSensors, type ProcessState } from './processStateEngine';
+import { evaluateSafety, type SafetyEvaluation, type SafetyLimits } from './safetyKernel';
 
 export interface ClosedLoopSimulationConfig {
   targetPressureMbar: number;
@@ -23,6 +24,7 @@ export interface ClosedLoopSimulationConfig {
   maxSteps?: number;
   realTime?: boolean;
   hardware?: VirtualHardwareDynamicsConfig;
+  safetyLimits?: Partial<SafetyLimits>;
 }
 
 export interface CausalFrame {
@@ -34,6 +36,7 @@ export interface CausalFrame {
   controller: ProcessState;
   sensorAfter: MachineSensors;
   stateAfter?: ProcessState;
+  safety: SafetyEvaluation;
   paused: boolean;
 }
 
@@ -68,6 +71,7 @@ export class ClosedLoopSimulationEngine {
   private readonly dynamics: MachineDynamicsEngine;
   private readonly control: ProcessControlLoop;
   private readonly target: MachineSensors;
+  private readonly safetyLimits: Partial<SafetyLimits>;
   private sensors: MachineSensors;
   private elapsedSeconds = 0;
   private stepNumber = 0;
@@ -80,6 +84,7 @@ export class ClosedLoopSimulationEngine {
     this.dtSeconds = Math.max(0.1, config.dtSeconds ?? 1);
     this.maxSteps = Math.max(1, config.maxSteps ?? Math.ceil(24 * 3600 / this.dtSeconds));
     this.realTime = config.realTime ?? true;
+    this.safetyLimits = { ...config.safetyLimits };
     this.target = {
       chamberSealed: true,
       pressureMbar: Math.max(1, config.targetPressureMbar),
@@ -99,7 +104,11 @@ export class ClosedLoopSimulationEngine {
       energyKwh: 0,
     };
     this.state = new ProcessStateEngine(
-      { targetPressureMbar: config.targetPressureMbar, targetTemperatureC: config.targetTemperatureC },
+      {
+        targetPressureMbar: config.targetPressureMbar,
+        targetTemperatureC: config.targetTemperatureC,
+        ...config.safetyLimits,
+      },
       this.sensors,
     );
     this.dynamics = new MachineDynamicsEngine(this.sensors, {
@@ -144,7 +153,8 @@ export class ClosedLoopSimulationEngine {
 
   /** Interactive step. In REAL_TIME mode, one simulation dt must be backed by the same wall-clock duration. */
   public step(): CausalFrame | null {
-    if (this.paused || this.stepNumber >= this.maxSteps) {
+    const currentStage = this.state.snapshotState().stage;
+    if (this.paused || this.stepNumber >= this.maxSteps || currentStage === 'COMPLETE' || currentStage === 'FAULT') {
       if (this.paused) this.pausedSteps.push(this.stepNumber);
       return null;
     }
@@ -180,6 +190,7 @@ export class ClosedLoopSimulationEngine {
     this.sensors = sensorAfter;
     this.lastStepWallClockMs = now;
 
+    const safety = evaluateSafety(this.sensors, sensorAfter, this.dtSeconds, this.safetyLimits);
     const stateAfter = this.state.tick(this.sensors, this.elapsedSeconds);
     const frame: CausalFrame = {
       step: this.stepNumber,
@@ -190,6 +201,7 @@ export class ClosedLoopSimulationEngine {
       controller,
       sensorAfter: { ...sensorAfter },
       stateAfter,
+      safety,
       paused: false,
     };
     this.frames.push(frame);
@@ -255,6 +267,7 @@ export class ClosedLoopSimulationEngine {
       'heatingPowerKW',
       'coolingPowerKW',
       'leakRateMbarPerSecond',
+      'effectiveHeatLossKWPerC',
     ];
     for (const key of hardwareKeys) {
       if (snapshotHardware[key] !== currentHardware[key]) {
