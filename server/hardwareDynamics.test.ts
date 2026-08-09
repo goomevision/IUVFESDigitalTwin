@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MachineDynamicsEngine } from './machineDynamics';
 import { ClosedLoopSimulationEngine } from './closedLoopSimulation';
 import type { MachineCommand, MachineSensors } from './processStateEngine';
@@ -40,5 +40,50 @@ describe('virtual hardware coupling', () => {
     expect(snapshot.config.hardware).toEqual(config.hardware);
     const mismatched = new ClosedLoopSimulationEngine({ ...config, hardware: { ...config.hardware, chamberVolumeL: 500 } });
     expect(() => mismatched.restore(snapshot)).toThrow('Snapshot hardware profile does not match simulation configuration');
+  });
+
+  it('does not advance an interactive real-time step before the configured wall-clock interval', () => {
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(1_000_000);
+    const engine = new ClosedLoopSimulationEngine({
+      targetPressureMbar: 50,
+      targetTemperatureC: 60,
+      materialWeightKg: 10,
+      waterContentPercent: 20,
+      oilContentPercent: 10,
+      dtSeconds: 1,
+      realTime: true,
+    });
+
+    expect(engine.step()).not.toBeNull();
+    const stepAfterFirst = engine.snapshot().stepNumber;
+    expect(engine.step()).toBeNull();
+    expect(engine.snapshot().stepNumber).toBe(stepAfterFirst);
+
+    now.mockReturnValue(1_001_000);
+    expect(engine.step()).not.toBeNull();
+    expect(engine.snapshot().stepNumber).toBe(stepAfterFirst + 1);
+    now.mockRestore();
+  });
+
+  it('records a wall-clock interval on accepted real-time frames', () => {
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(2_000_000);
+    const engine = new ClosedLoopSimulationEngine({
+      targetPressureMbar: 50,
+      targetTemperatureC: 60,
+      materialWeightKg: 10,
+      waterContentPercent: 20,
+      oilContentPercent: 10,
+      dtSeconds: 2,
+      realTime: true,
+    });
+
+    engine.step();
+    now.mockReturnValue(2_002_000);
+    const frame = engine.step();
+    expect(frame?.wallClockDeltaMs).toBe(2000);
+    expect(frame?.timestampSeconds).toBe(4);
+    now.mockRestore();
   });
 });
