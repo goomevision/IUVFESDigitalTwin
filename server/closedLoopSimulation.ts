@@ -2,20 +2,16 @@
  * Causal closed-loop simulation coordinator.
  *
  * Every simulation step follows:
- *   sensors -> interlocks/state machine -> actuator commands -> dynamics -> sensors
+ * sensors -> interlocks/state machine -> actuator commands -> dynamics -> sensors
  *
  * The coordinator is deterministic and pauseable. It is a simulation model, not
  * an industrial control system and must be calibrated against laboratory data
  * before scientific or engineering claims are made from its outputs.
  */
 
-import { ProcessControlLoop } from './controlLoop';
-import { MachineDynamicsEngine } from './machineDynamics';
-import {
-  ProcessStateEngine,
-  type MachineSensors,
-  type ProcessState,
-} from './processStateEngine';
+import { ProcessControlLoop, type ProcessControlSnapshot } from './controlLoop';
+import { MachineDynamicsEngine, type MachineDynamicsSnapshot } from './machineDynamics';
+import { ProcessStateEngine, type MachineSensors, type ProcessState } from './processStateEngine';
 
 export interface ClosedLoopSimulationConfig {
   targetPressureMbar: number;
@@ -36,12 +32,14 @@ export interface CausalFrame {
   paused: boolean;
 }
 
-/** Serializable session state used by the persistence layer for replay/audit. */
 export interface ClosedLoopSnapshot {
   stepNumber: number;
   elapsedSeconds: number;
   paused: boolean;
   sensors: MachineSensors;
+  state: ProcessState;
+  dynamics: MachineDynamicsSnapshot;
+  control: ProcessControlSnapshot;
   frames: CausalFrame[];
   pausedSteps: number[];
 }
@@ -88,10 +86,7 @@ export class ClosedLoopSimulationEngine {
       oilRecoveredKg: 0,
       energyKwh: 0,
     };
-    this.state = new ProcessStateEngine(
-      { targetPressureMbar: config.targetPressureMbar, targetTemperatureC: config.targetTemperatureC },
-      this.sensors,
-    );
+    this.state = new ProcessStateEngine({ targetPressureMbar: config.targetPressureMbar, targetTemperatureC: config.targetTemperatureC }, this.sensors);
     this.dynamics = new MachineDynamicsEngine(this.sensors, {
       ambientPressureMbar: 1013.25,
       ambientTemperatureC: 25,
@@ -116,24 +111,14 @@ export class ClosedLoopSimulationEngine {
     this.stepNumber = 0;
     this.frames.length = 0;
     this.pausedSteps.length = 0;
-    this.sensors = {
-      chamberSealed: true,
-      pressureMbar: 1013.25,
-      temperatureC: 25,
-      yieldPercent: 0,
-      waterRemovedKg: 0,
-      oilRecoveredKg: 0,
-      energyKwh: 0,
-    };
+    this.sensors = { chamberSealed: true, pressureMbar: 1013.25, temperatureC: 25, yieldPercent: 0, waterRemovedKg: 0, oilRecoveredKg: 0, energyKwh: 0 };
     this.state.reset(this.sensors);
+    this.dynamics.restore({ state: this.sensors });
     this.control.reset();
   }
 
   public step(): CausalFrame | null {
-    if (this.paused) {
-      this.pausedSteps.push(this.stepNumber);
-      return null;
-    }
+    if (this.paused) { this.pausedSteps.push(this.stepNumber); return null; }
     if (this.stepNumber >= this.maxSteps) return null;
 
     const sensorBefore = { ...this.sensors };
@@ -146,7 +131,6 @@ export class ClosedLoopSimulationEngine {
       stage: controllerBeforeActuation.stage,
       dtSeconds: this.dtSeconds,
     });
-
     const commands = {
       ...controllerBeforeActuation.commands,
       heater: controlOutput.heaterPower > 0.01,
@@ -159,15 +143,7 @@ export class ClosedLoopSimulationEngine {
     this.elapsedSeconds += this.dtSeconds;
     this.stepNumber += 1;
     this.sensors = sensorAfter;
-
-    const frame: CausalFrame = {
-      step: this.stepNumber,
-      timestampSeconds: this.elapsedSeconds,
-      sensorBefore,
-      controller,
-      sensorAfter: { ...sensorAfter },
-      paused: false,
-    };
+    const frame: CausalFrame = { step: this.stepNumber, timestampSeconds: this.elapsedSeconds, sensorBefore, controller, sensorAfter: { ...sensorAfter }, paused: false };
     this.frames.push(frame);
     return frame;
   }
@@ -179,25 +155,38 @@ export class ClosedLoopSimulationEngine {
       if (this.step() === null) break;
     }
     const finalState = this.state.tick(this.sensors, this.elapsedSeconds);
-    return {
-      status: finalState.stage,
-      frames: [...this.frames],
-      finalSensors: { ...this.sensors },
-      pausedSteps: [...this.pausedSteps],
-    };
+    return { status: finalState.stage, frames: [...this.frames], finalSensors: { ...this.sensors }, pausedSteps: [...this.pausedSteps] };
   }
 
-  public getSnapshot(): ClosedLoopSnapshot {
+  public snapshot(): ClosedLoopSnapshot {
     return {
       stepNumber: this.stepNumber,
       elapsedSeconds: this.elapsedSeconds,
       paused: this.paused,
       sensors: { ...this.sensors },
-      frames: [...this.frames],
+      state: this.state.getSnapshot(),
+      dynamics: this.dynamics.getSnapshot(),
+      control: this.control.getSnapshot(),
+      frames: this.frames.map(frame => ({ ...frame, sensorBefore: { ...frame.sensorBefore }, sensorAfter: { ...frame.sensorAfter }, controller: { ...frame.controller, sensors: { ...frame.controller.sensors }, commands: { ...frame.controller.commands }, interlocks: { ...frame.controller.interlocks } } })),
       pausedSteps: [...this.pausedSteps],
     };
   }
 
+  public restore(snapshot: ClosedLoopSnapshot): void {
+    this.stepNumber = snapshot.stepNumber;
+    this.elapsedSeconds = snapshot.elapsedSeconds;
+    this.paused = snapshot.paused;
+    this.sensors = { ...snapshot.sensors };
+    this.state.restore(snapshot.state);
+    this.dynamics.restore(snapshot.dynamics);
+    this.control.restore(snapshot.control);
+    this.frames.length = 0;
+    this.frames.push(...snapshot.frames.map(frame => ({ ...frame, sensorBefore: { ...frame.sensorBefore }, sensorAfter: { ...frame.sensorAfter }, controller: { ...frame.controller, sensors: { ...frame.controller.sensors }, commands: { ...frame.controller.commands }, interlocks: { ...frame.controller.interlocks } } })));
+    this.pausedSteps.length = 0;
+    this.pausedSteps.push(...snapshot.pausedSteps);
+  }
+
+  public getSnapshot(): ClosedLoopSnapshot { return this.snapshot(); }
   public getFrames(): CausalFrame[] { return [...this.frames]; }
   public getSensors(): MachineSensors { return { ...this.sensors }; }
   public getState(): ProcessState { return this.state.tick(this.sensors, this.elapsedSeconds); }
