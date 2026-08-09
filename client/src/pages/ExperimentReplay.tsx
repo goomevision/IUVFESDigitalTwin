@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Pause, Play, RotateCcw, SkipBack, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
+import { useParams } from "wouter";
 
 type ReplayFrame = { time: number; temperature: number; pressure: number; oilRecovered: number };
 type Stage = "PRE_FLIGHT" | "CHARGE" | "VACUUM" | "HEAT_UP" | "EXTRACTION" | "CONDENSATION" | "COOL_DOWN" | "COMPLETE";
@@ -21,9 +22,10 @@ function inferStage(frame: ReplayFrame, previous: ReplayFrame | undefined, final
   return "EXTRACTION";
 }
 
-export default function ExperimentReplay({ experimentId }: { experimentId: string }) {
-  const experiment = trpc.experiments.get.useQuery(experimentId);
-  const results = trpc.simulation.getResults.useQuery(experimentId);
+export default function ExperimentReplay() {
+  const { experimentId } = useParams<{ experimentId: string }>();
+  const experiment = trpc.experiments.get.useQuery(experimentId ?? "", { enabled: Boolean(experimentId) });
+  const results = trpc.simulation.getResults.useQuery(experimentId ?? "", { enabled: Boolean(experimentId) });
   const [playing, setPlaying] = useState(false);
   const [cursor, setCursor] = useState(0);
   const [speed, setSpeed] = useState(1);
@@ -47,7 +49,7 @@ export default function ExperimentReplay({ experimentId }: { experimentId: strin
   const chart = frames.slice(Math.max(0, cursor - 100), cursor + 1).map((f, i, arr) => `${arr.length === 1 ? 0 : i / (arr.length - 1) * 100},${100 - Math.min(100, f.temperature / 150 * 100)}`).join(" ");
   return <div className="min-h-screen bg-[radial-gradient(circle_at_top,#10263a_0%,#050912_45%,#02040a_100%)] p-4 text-slate-100 md:p-6">
     <div className="mx-auto max-w-[1500px] space-y-4">
-      <header className="rounded-2xl border border-cyan-500/20 bg-slate-950/70 p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-mono text-xs tracking-[0.35em] text-cyan-400">IUVFES // EXPERIMENT REPLAY</p><h1 className="mt-2 text-2xl font-bold">SCIENTIFIC EXPERIMENT REPLAY</h1><p className="font-mono text-xs text-slate-500">{experiment.data?.experimentName ?? experimentId}</p></div><Button variant="outline" className="border-slate-700 bg-transparent" onClick={() => window.history.back()}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button></div></header>
+      <header className="rounded-2xl border border-cyan-500/20 bg-slate-950/70 p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-mono text-xs tracking-[0.35em] text-cyan-400">IUVFES // EXPERIMENT REPLAY</p><h1 className="mt-2 text-2xl font-bold">SCIENTIFIC EXPERIMENT REPLAY</h1><p className="font-mono text-xs text-slate-500">{experiment.data?.experimentName ?? experimentId ?? "UNKNOWN EXPERIMENT"}</p></div><Button variant="outline" className="border-slate-700 bg-transparent" onClick={() => window.history.back()}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button></div></header>
       <section className="rounded-2xl border border-cyan-500/20 bg-slate-950/60 p-4"><div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">{stages.map((s, i) => <div key={s.id} className={`rounded-lg border p-3 ${i === stageIndex ? "border-cyan-400/70 bg-cyan-400/10" : i < stageIndex ? "border-emerald-500/30 bg-emerald-500/5" : "border-slate-800"}`}><div className="font-mono text-[10px] text-slate-600">0{i + 1}</div><div className="mt-1 text-[11px] font-semibold tracking-wider">{s.label}</div></div>)}</div><div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full bg-cyan-400 transition-all" style={{ width: `${progress * 100}%` }} /></div></section>
       <div className="grid gap-4 lg:grid-cols-4">{[["TIME", `${frame.time.toFixed(1)} s`], ["PRESSURE", `${frame.pressure.toFixed(1)} mbar`], ["TEMPERATURE", `${frame.temperature.toFixed(1)} °C`], ["OIL RECOVERED", `${frame.oilRecovered.toFixed(3)} kg`]].map(([label, value]) => <div key={label} className="rounded-xl border border-cyan-500/20 bg-slate-950/70 p-4"><div className="text-xs tracking-widest text-slate-500">{label}</div><div className="mt-2 font-mono text-2xl text-cyan-300">{value}</div></div>)}</div>
       <section className="rounded-2xl border border-cyan-500/20 bg-slate-950/60 p-4"><div className="mb-3 flex items-center justify-between"><h2 className="font-semibold tracking-wider text-cyan-300">TIME-SERIES REPLAY</h2><span className="font-mono text-xs text-slate-500">FRAME {frames.length ? `${cursor + 1}/${frames.length}` : "0/0"}</span></div><div className="relative h-72 overflow-hidden rounded-xl border border-slate-800 bg-slate-950"><div className="absolute inset-0 opacity-20" style={{ backgroundImage: "linear-gradient(rgba(34,211,238,.25) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,.25) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />{chart && <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full p-5"><polyline points={chart} fill="none" stroke="rgb(34 211 238)" strokeWidth="1.2" vectorEffect="non-scaling-stroke" /></svg>}<div className="absolute bottom-3 left-3 font-mono text-[10px] text-slate-600">TEMPERATURE HISTORY • REPLAY CURSOR</div><div className="absolute bottom-0 top-0 w-px bg-amber-300" style={{ left: `${progress * 100}%` }} /></div></section>
