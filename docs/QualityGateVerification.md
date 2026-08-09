@@ -10,3 +10,7 @@ The Quality Gate must pass the repository checks before the branch is considered
 4. `pnpm build`
 
 A green Quality Gate is evidence that the repository passes these automated checks; it is not a scientific claim about the validity of simulation results.
+
+## Revalidation
+
+The branch is revalidated through GitHub Actions after the latest report-readiness correction. The intended result is a fully green Quality Gate with all four checks passing.
