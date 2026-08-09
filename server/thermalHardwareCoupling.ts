@@ -59,7 +59,7 @@ export function buildCoupledThermalModel(input: ThermalHardwareInput): CoupledTh
     estimatedHeatLossCoefficientKWPerC,
     modelConfig: {
       thermalMassKJPerC: effectiveThermalMassKJPerC,
-      heatLossKWPerC: estimatedHeatLossCoefficientKWPerC,
+      effectiveHeatLossKWPerC: estimatedHeatLossCoefficientKWPerC,
     },
     derivedShellMassKg: shellMassKg,
   };
