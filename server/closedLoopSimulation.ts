@@ -1,12 +1,10 @@
 /**
  * Causal closed-loop simulation coordinator.
  *
- * Every interactive step follows sensors -> interlocks/state machine ->
- * controller -> actuator commands -> machine dynamics -> next sensors ->
- * post-dynamics state observation. Interactive steps are wall-clock paced by
- * default so process time cannot be skipped accidentally. Batch completion
- * intentionally bypasses wall-clock pacing and remains available for
- * deterministic offline computation.
+ * Every interactive step follows observed sensors -> interlocks/state machine ->
+ * controller -> actuator fault layer -> machine dynamics -> physical sensors ->
+ * sensor fault layer -> observed sensors. Interactive steps are wall-clock paced
+ * by default so process time cannot be skipped accidentally.
  */
 
 import { ProcessControlLoop, type ProcessControlSnapshot } from './controlLoop';
@@ -14,6 +12,7 @@ import { MachineDynamicsEngine, type MachineDynamicsSnapshot, type VirtualHardwa
 import { ProcessStateEngine, type MachineSensors, type ProcessState } from './processStateEngine';
 import { evaluateSafety, type SafetyEvaluation, type SafetyLimits } from './safetyKernel';
 import { buildSafetyEventTimeline, type SafetyEvent } from './safetyEventTimeline';
+import { propagateFaults, type FaultPropagationScenario } from './faultPropagation';
 
 export interface ClosedLoopSimulationConfig {
   targetPressureMbar: number;
@@ -26,6 +25,7 @@ export interface ClosedLoopSimulationConfig {
   realTime?: boolean;
   hardware?: VirtualHardwareDynamicsConfig;
   safetyLimits?: Partial<SafetyLimits>;
+  faultScenario?: FaultPropagationScenario;
 }
 
 export interface CausalFrame {
@@ -35,6 +35,9 @@ export interface CausalFrame {
   wallClockDeltaMs?: number;
   sensorBefore: MachineSensors;
   controller: ProcessState;
+  intendedCommands: ProcessState['commands'];
+  effectiveCommands: ProcessState['commands'];
+  physicalSensorAfter: MachineSensors;
   sensorAfter: MachineSensors;
   stateAfter?: ProcessState;
   safety: SafetyEvaluation;
@@ -74,6 +77,7 @@ export class ClosedLoopSimulationEngine {
   private readonly control: ProcessControlLoop;
   private readonly target: MachineSensors;
   private readonly safetyLimits: Partial<SafetyLimits>;
+  private readonly faultScenario: FaultPropagationScenario;
   private sensors: MachineSensors;
   private elapsedSeconds = 0;
   private stepNumber = 0;
@@ -87,6 +91,12 @@ export class ClosedLoopSimulationEngine {
     this.maxSteps = Math.max(1, config.maxSteps ?? Math.ceil(24 * 3600 / this.dtSeconds));
     this.realTime = config.realTime ?? true;
     this.safetyLimits = { ...config.safetyLimits };
+    this.faultScenario = {
+      id: config.faultScenario?.id ?? 'baseline',
+      label: config.faultScenario?.label ?? 'Baseline / no sensor or actuator fault',
+      sensorFaults: [...(config.faultScenario?.sensorFaults ?? [])],
+      actuatorFaults: [...(config.faultScenario?.actuatorFaults ?? [])],
+    };
     this.target = {
       chamberSealed: true,
       pressureMbar: Math.max(1, config.targetPressureMbar),
@@ -106,11 +116,7 @@ export class ClosedLoopSimulationEngine {
       energyKwh: 0,
     };
     this.state = new ProcessStateEngine(
-      {
-        targetPressureMbar: config.targetPressureMbar,
-        targetTemperatureC: config.targetTemperatureC,
-        ...config.safetyLimits,
-      },
+      { targetPressureMbar: config.targetPressureMbar, targetTemperatureC: config.targetTemperatureC, ...config.safetyLimits },
       this.sensors,
     );
     this.dynamics = new MachineDynamicsEngine(this.sensors, {
@@ -139,21 +145,12 @@ export class ClosedLoopSimulationEngine {
     this.lastStepWallClockMs = undefined;
     this.frames.length = 0;
     this.pausedSteps.length = 0;
-    this.sensors = {
-      chamberSealed: true,
-      pressureMbar: 1013.25,
-      temperatureC: 25,
-      yieldPercent: 0,
-      waterRemovedKg: 0,
-      oilRecoveredKg: 0,
-      energyKwh: 0,
-    };
+    this.sensors = { chamberSealed: true, pressureMbar: 1013.25, temperatureC: 25, yieldPercent: 0, waterRemovedKg: 0, oilRecoveredKg: 0, energyKwh: 0 };
     this.state.reset(this.sensors);
     this.control.reset();
     this.dynamics.restore({ state: { ...this.sensors }, config: { ...this.dynamics.snapshot().config } });
   }
 
-  /** Interactive step. In REAL_TIME mode, one simulation dt must be backed by the same wall-clock duration. */
   public step(): CausalFrame | null {
     const currentStage = this.state.snapshotState().stage;
     if (this.paused || this.stepNumber >= this.maxSteps || currentStage === 'COMPLETE' || currentStage === 'FAULT') {
@@ -177,15 +174,17 @@ export class ClosedLoopSimulationEngine {
       stage: controllerBeforeActuation.stage,
       dtSeconds: this.dtSeconds,
     });
-    const commands = {
+    const intendedCommands = {
       ...controllerBeforeActuation.commands,
       heater: controlOutput.heaterPower > 0.01,
       vacuumPump: controlOutput.vacuumPumpPower > 0.01,
       condenser: controlOutput.valve.vaporToCondenser > 0.01,
       cooling: controlOutput.valve.coolingWater > 0.01,
     };
-    const controller = { ...controllerBeforeActuation, commands };
-    const sensorAfter = this.dynamics.step(this.target, commands, this.dtSeconds);
+    const effectiveCommands = propagateFaults(this.sensors, intendedCommands, this.faultScenario, this.sensors).effectiveCommands;
+    const controller = { ...controllerBeforeActuation, commands: intendedCommands };
+    const physicalSensorAfter = this.dynamics.step(this.target, effectiveCommands, this.dtSeconds);
+    const sensorAfter = propagateFaults(physicalSensorAfter, effectiveCommands, this.faultScenario, this.sensors).observedSensors;
     const previousWallClockMs = this.lastStepWallClockMs;
     this.elapsedSeconds += this.dtSeconds;
     this.stepNumber += 1;
@@ -201,6 +200,9 @@ export class ClosedLoopSimulationEngine {
       wallClockDeltaMs: previousWallClockMs === undefined ? undefined : now - previousWallClockMs,
       sensorBefore,
       controller,
+      intendedCommands,
+      effectiveCommands,
+      physicalSensorAfter,
       sensorAfter: { ...sensorAfter },
       stateAfter,
       safety,
@@ -210,7 +212,6 @@ export class ClosedLoopSimulationEngine {
     return frame;
   }
 
-  /** Offline deterministic completion. This intentionally does not wait for wall-clock time. */
   public runToCompletion(): ClosedLoopResult {
     while (this.stepNumber < this.maxSteps) {
       const currentState = this.state.snapshotState();
@@ -218,13 +219,7 @@ export class ClosedLoopSimulationEngine {
       this.advanceStep(Date.now());
     }
     const finalState = this.state.snapshotState();
-    return {
-      status: finalState.stage,
-      frames: [...this.frames],
-      finalSensors: { ...this.sensors },
-      pausedSteps: [...this.pausedSteps],
-      safetyEvents: buildSafetyEventTimeline(this.frames),
-    };
+    return { status: finalState.stage, frames: [...this.frames], finalSensors: { ...this.sensors }, pausedSteps: [...this.pausedSteps], safetyEvents: buildSafetyEventTimeline(this.frames) };
   }
 
   public getFrames(): CausalFrame[] { return [...this.frames]; }
@@ -235,18 +230,9 @@ export class ClosedLoopSimulationEngine {
   public snapshot(): ClosedLoopSnapshot {
     return {
       version: 1,
-      config: { ...this.config, realTime: this.realTime, hardware: this.config.hardware ? { ...this.config.hardware } : undefined },
-      target: { ...this.target },
-      sensors: { ...this.sensors },
-      elapsedSeconds: this.elapsedSeconds,
-      stepNumber: this.stepNumber,
-      paused: this.paused,
-      lastStepWallClockMs: this.lastStepWallClockMs,
-      state: this.state.snapshotState(),
-      dynamics: this.dynamics.snapshot(),
-      control: this.control.snapshot(),
-      frames: [...this.frames],
-      pausedSteps: [...this.pausedSteps],
+      config: { ...this.config, realTime: this.realTime, hardware: this.config.hardware ? { ...this.config.hardware } : undefined, faultScenario: { ...this.faultScenario, sensorFaults: [...(this.faultScenario.sensorFaults ?? [])], actuatorFaults: [...(this.faultScenario.actuatorFaults ?? [])] } },
+      target: { ...this.target }, sensors: { ...this.sensors }, elapsedSeconds: this.elapsedSeconds, stepNumber: this.stepNumber, paused: this.paused, lastStepWallClockMs: this.lastStepWallClockMs,
+      state: this.state.snapshotState(), dynamics: this.dynamics.snapshot(), control: this.control.snapshot(), frames: [...this.frames], pausedSteps: [...this.pausedSteps],
     };
   }
 
@@ -254,42 +240,17 @@ export class ClosedLoopSimulationEngine {
     if (snapshot.version !== 1) throw new Error(`Unsupported simulation snapshot version: ${snapshot.version}`);
     const snapshotRealTime = snapshot.config.realTime ?? true;
     if (snapshotRealTime !== this.realTime) throw new Error('Snapshot real-time mode does not match simulation configuration');
-    if (
-      snapshot.config.targetPressureMbar !== this.config.targetPressureMbar ||
-      snapshot.config.targetTemperatureC !== this.config.targetTemperatureC ||
-      snapshot.config.materialWeightKg !== this.config.materialWeightKg ||
-      snapshot.config.waterContentPercent !== this.config.waterContentPercent ||
-      snapshot.config.oilContentPercent !== this.config.oilContentPercent
-    ) throw new Error('Snapshot configuration does not match simulation configuration');
+    if (snapshot.config.targetPressureMbar !== this.config.targetPressureMbar || snapshot.config.targetTemperatureC !== this.config.targetTemperatureC || snapshot.config.materialWeightKg !== this.config.materialWeightKg || snapshot.config.waterContentPercent !== this.config.waterContentPercent || snapshot.config.oilContentPercent !== this.config.oilContentPercent) throw new Error('Snapshot configuration does not match simulation configuration');
 
     const snapshotHardware = snapshot.config.hardware ?? {};
     const currentHardware = this.config.hardware ?? {};
-    const hardwareKeys: Array<keyof VirtualHardwareDynamicsConfig> = [
-      'chamberVolumeL',
-      'pumpCapacityM3h',
-      'thermalMassKJPerC',
-      'heatingPowerKW',
-      'coolingPowerKW',
-      'leakRateMbarPerSecond',
-      'effectiveHeatLossKWPerC',
-    ];
-    for (const key of hardwareKeys) {
-      if (snapshotHardware[key] !== currentHardware[key]) {
-        throw new Error('Snapshot hardware profile does not match simulation configuration');
-      }
-    }
+    const hardwareKeys: Array<keyof VirtualHardwareDynamicsConfig> = ['chamberVolumeL', 'pumpCapacityM3h', 'thermalMassKJPerC', 'heatingPowerKW', 'coolingPowerKW', 'leakRateMbarPerSecond', 'effectiveHeatLossKWPerC'];
+    for (const key of hardwareKeys) if (snapshotHardware[key] !== currentHardware[key]) throw new Error('Snapshot hardware profile does not match simulation configuration');
+    if (JSON.stringify(snapshot.config.faultScenario ?? null) !== JSON.stringify(this.config.faultScenario ?? null)) throw new Error('Snapshot fault scenario does not match simulation configuration');
 
-    this.sensors = { ...snapshot.sensors };
-    this.elapsedSeconds = snapshot.elapsedSeconds;
-    this.stepNumber = snapshot.stepNumber;
-    this.paused = snapshot.paused;
+    this.sensors = { ...snapshot.sensors }; this.elapsedSeconds = snapshot.elapsedSeconds; this.stepNumber = snapshot.stepNumber; this.paused = snapshot.paused;
     this.lastStepWallClockMs = this.realTime && !this.paused ? Date.now() : snapshot.lastStepWallClockMs;
-    this.frames.length = 0;
-    this.frames.push(...snapshot.frames);
-    this.pausedSteps.length = 0;
-    this.pausedSteps.push(...snapshot.pausedSteps);
-    this.state.restore(snapshot.state);
-    this.dynamics.restore(snapshot.dynamics);
-    this.control.restore(snapshot.control);
+    this.frames.length = 0; this.frames.push(...snapshot.frames); this.pausedSteps.length = 0; this.pausedSteps.push(...snapshot.pausedSteps);
+    this.state.restore(snapshot.state); this.dynamics.restore(snapshot.dynamics); this.control.restore(snapshot.control);
   }
 }
