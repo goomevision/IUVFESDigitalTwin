@@ -17,7 +17,7 @@ ProcessStateEngine
  ├── state transitions
  └── alarms
           ↓
-Control-room telemetry
+3D Machine Twin + Control Room
 ```
 
 ## Process lifecycle
@@ -45,29 +45,33 @@ The current machine dynamics model includes:
 - actuator lag;
 - cumulative energy demand.
 
-## Closed-loop controls
+These are deterministic simulation parameters, not calibrated machine specifications.
 
-`ProcessControlLoop` adds deterministic PID-like control for heater power and vacuum-pump power. It also calculates valve positions for vacuum isolation, vapor routing to the condenser, and cooling water. The control loop is constrained by process stage; when the process is COMPLETE or inactive, the outputs are driven to zero/closed.
+## 3D digital twin
 
-## Event journal
+`client/src/components/ProcessMachine3D.tsx` renders a state-driven reactor, pump, condenser, pipes and process particles. The scene consumes the same machine state as the control room. Heater activity changes the reactor thermal visualization; vacuum activity drives the pump; condenser activity changes the condenser state; pressure and temperature are shown as live telemetry.
 
-`MachineEventJournal` provides an append-only in-memory event stream with sequence numbers, timestamps, severity, event codes and process stage. It can record state transitions and alarms and is intended to become the source for the operator event-history panel.
+The 3D view is deliberately driven by machine commands rather than a separate animation timeline, preventing visual state from drifting away from controller state.
+
+## Event and alarm journal
+
+`client/src/components/ProcessEventTimeline.tsx` derives a control-room journal from controller state transitions and alarms. It records stage transitions, safety warnings and faults with elapsed process time. This is a UI event history for the current simulation run; a persistent database-backed audit journal is a future layer.
 
 ## Important fidelity rule
 
-A UI progress percentage must never be the authority for a physical transition. A transition must be caused by sensor conditions or an explicit operator acknowledgement. Actuator commands must influence subsequent sensor frames.
+A UI progress percentage must never be the authority for a physical transition. A transition must be caused by sensor conditions or an explicit operator acknowledgement. Actuator commands must influence subsequent sensor frames. The 3D scene must consume those actuator states rather than independently deciding what the machine is doing.
 
 ## Next engineering layers
 
-- connect PID outputs directly to `MachineDynamicsEngine` actuator power inputs;
 - calibrated pump curves and valve coefficients;
 - sensor noise, lag and calibration offsets;
-- explicit valve states and chamber isolation in the main process state;
+- explicit valve states and chamber isolation;
+- PID-like control loops;
 - material-bed moisture and temperature gradients;
 - vapor/condensate inventory;
 - abnormal-event injection and recovery procedures;
-- persist the event journal with each experiment;
-- 3D machine visualization driven by actuator state rather than animation progress;
-- calibration mode comparing simulator telemetry with real machine logs.
+- persistent event journal with experiment IDs;
+- calibration mode comparing simulator telemetry with real machine logs;
+- hardware-in-the-loop adapter only after safety review.
 
 This remains a simulation model, not a safety-certified industrial control system. Parameters must be validated against measured machine data before being used for operational decisions.
