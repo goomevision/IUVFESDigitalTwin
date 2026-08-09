@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildCoupledThermalModel } from './thermalHardwareCoupling';
+import { buildCoupledThermalModel, toMachineDynamicsThermalConfig } from './thermalHardwareCoupling';
 
 describe('thermal hardware coupling', () => {
   const material = {
@@ -33,5 +33,18 @@ describe('thermal hardware coupling', () => {
     });
 
     expect(insulated.estimatedHeatLossCoefficientKWPerC).toBeLessThan(bare.estimatedHeatLossCoefficientKWPerC);
+  });
+
+  it('maps derived thermal values to MachineDynamics config', () => {
+    const result = buildCoupledThermalModel({
+      geometry: { innerDiameterM: 0.6, cylindricalLengthM: 0.884, wallThicknessM: 0.01 },
+      material,
+    });
+    const config = toMachineDynamicsThermalConfig(result, { heatingPowerKW: 12, coolingPowerKW: 4 });
+
+    expect(config.thermalMassKJPerC).toBe(result.effectiveThermalMassKJPerC);
+    expect(config.effectiveHeatLossKWPerC).toBe(result.estimatedHeatLossCoefficientKWPerC);
+    expect(config.heatingPowerKW).toBe(12);
+    expect(config.coolingPowerKW).toBe(4);
   });
 });
