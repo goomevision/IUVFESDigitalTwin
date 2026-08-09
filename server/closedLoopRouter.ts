@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { ClosedLoopSimulationEngine } from "./closedLoopSimulation";
 import { recordClosedLoopRun } from "./scientificEventJournal";
+import { persistSimulationDataset } from "./scientificDatasetPersistence";
 
 const inputSchema = z.object({
   experimentId: z.string().min(1),
@@ -38,9 +39,26 @@ export const closedLoopRouter = router({
     const isComplete = result.status === "COMPLETE";
     const isFault = result.status === "FAULT";
 
-    // Persist the causal chain before publishing the result. A scientific run
-    // without its event journal is not considered auditable.
+    // The causal journal is persisted before the result is published.
+    // A run without its journal is not considered auditable.
     const events = await recordClosedLoopRun(input.experimentId, result);
+
+    // Build a content-addressed scientific dataset manifest. Simulation data
+    // remains RAW until calibrated/validated against laboratory measurements.
+    const dataset = await persistSimulationDataset({
+      experimentId: input.experimentId,
+      parameters: {
+        materialWeightKg: input.materialWeight,
+        waterContentPercent: input.waterContent,
+        oilContentPercent: input.oilContent,
+        targetPressureMbar: input.targetPressure,
+        targetTemperatureC: input.targetTemperature,
+        dtSeconds: input.dtSeconds,
+        maxSteps: input.maxSteps,
+      },
+      result,
+      events,
+    });
 
     const resultId = await db.createSimulationResult({
       experimentId: input.experimentId,
@@ -69,6 +87,10 @@ export const closedLoopRouter = router({
       status: result.status,
       eventCount: events.length,
       lastEventHash: events.at(-1)?.eventHash ?? null,
+      datasetId: dataset.datasetId,
+      datasetSha256: dataset.sha256,
+      provenanceId: dataset.provenanceId,
+      datasetQualityStatus: dataset.qualityStatus,
       frames: result.frames,
       finalSensors: result.finalSensors,
     };
