@@ -10,6 +10,17 @@ import type { MachineCommand, MachineSensors } from './processStateEngine';
 import { stepThermalModel } from './thermalEngineering';
 
 export interface VirtualHardwareDynamicsConfig {
+  /** Static engineering specification retained with the session snapshot. */
+  reactorInternalDiameterMm?: number;
+  reactorShellLengthMm?: number;
+  reactorWallThicknessMm?: number;
+  reactorHeadThicknessMm?: number;
+  reactorMaterial?: string;
+  designExternalPressureBar?: number;
+  designTemperatureC?: number;
+  ultrasonicFrequencyKHz?: number;
+  ultrasonicMaxPowerKW?: number;
+  coldTrapTemperaturesC?: [number, number, number, number];
   /** Connected reactor/vacuum volume in litres. */
   chamberVolumeL?: number;
   /** Pump nominal capacity in cubic metres per hour. */
@@ -58,6 +69,16 @@ export class MachineDynamicsEngine {
       condenserCoolingFactor: 0.05,
       extractionYieldRatePerSecond: 0.00035,
       actuatorLag: 0.35,
+      reactorInternalDiameterMm: 1000,
+      reactorShellLengthMm: 1500,
+      reactorWallThicknessMm: 10,
+      reactorHeadThicknessMm: 10,
+      reactorMaterial: 'SS316L',
+      designExternalPressureBar: 0,
+      designTemperatureC: 100,
+      ultrasonicFrequencyKHz: 30,
+      ultrasonicMaxPowerKW: 6,
+      coldTrapTemperaturesC: [0, -20, -40, -80],
       chamberVolumeL: 250,
       pumpCapacityM3h: 200,
       thermalMassKJPerC: 250,
