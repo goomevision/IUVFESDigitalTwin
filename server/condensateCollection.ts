@@ -1,19 +1,24 @@
 /**
  * Four-vessel condensate collection mass balance.
  *
- * This is an explicit routing layer, not a chemical VLE model. Water is routed
- * to vessel 1. Recovered oil is routed across vessels 2-4 according to an
- * externally supplied, normalized fraction vector. The default keeps all oil
- * in the main-oil vessel until validated fraction data is available.
+ * This is an explicit mass-routing layer, not a chemical VLE model. When
+ * per-trap capture is supplied, each cold-trap stage feeds its corresponding
+ * receiver. Oil routing remains an externally supplied assumption until
+ * validated fraction/composition data is available.
  */
 
 export type CollectionRoutingStatus = 'ROUTED' | 'CAPACITY_LIMIT' | 'DATA_GAP' | 'INVALID_INPUT';
 
 export interface CondensateCollectionInput {
+  /** Total newly generated water-like condensable mass for this step. */
   deltaWaterKg: number;
+  /** Total newly recovered oil mass for this step. */
   deltaOilKg: number;
+  /** Optional stage-resolved condensate captured during this step. */
+  trapCondensedKg?: [number, number, number, number];
   existingMassKg: [number, number, number, number];
   capacityKg: [number, number, number, number];
+  /** Light / main-oil / heavy routing assumption for recovered oil. */
   oilRoutingFractions?: [number, number, number];
 }
 
@@ -43,10 +48,13 @@ function normalizedOilFractions(input?: [number, number, number]): [number, numb
 export function routeCondensateCollection(input: CondensateCollectionInput): CondensateCollectionResult {
   const warnings: string[] = [];
   const fractions = normalizedOilFractions(input.oilRoutingFractions);
+  const trapMass = input.trapCondensedKg;
+
   if (
     !Number.isFinite(input.deltaWaterKg) || input.deltaWaterKg < 0 ||
     !Number.isFinite(input.deltaOilKg) || input.deltaOilKg < 0 ||
-    !validTuple(input.existingMassKg) || !validTuple(input.capacityKg)
+    !validTuple(input.existingMassKg) || !validTuple(input.capacityKg) ||
+    (trapMass !== undefined && !validTuple(trapMass))
   ) {
     return {
       addedMassKg: [0, 0, 0, 0],
@@ -59,6 +67,7 @@ export function routeCondensateCollection(input: CondensateCollectionInput): Con
       warnings: ['Condensate collection input is invalid.'],
     };
   }
+
   if (!fractions) {
     return {
       addedMassKg: [0, 0, 0, 0],
@@ -73,19 +82,39 @@ export function routeCondensateCollection(input: CondensateCollectionInput): Con
   }
 
   const added: [number, number, number, number] = [0, 0, 0, 0];
+  let collectedWaterKg = 0;
   let remainingWater = input.deltaWaterKg;
+
+  if (trapMass) {
+    const stageCaptured = trapMass.reduce((sum, value) => sum + value, 0);
+    const maxStageCapture = Math.min(stageCaptured, input.deltaWaterKg);
+    if (stageCaptured > input.deltaWaterKg + 1e-12) {
+      warnings.push('Stage-resolved condensate exceeds the step condensable input; capture was bounded by the step mass.');
+    }
+
+    let stageScale = stageCaptured > 0 ? maxStageCapture / stageCaptured : 0;
+    for (let i = 0; i < 4; i += 1) {
+      const requested = trapMass[i] * stageScale;
+      const available = Math.max(0, input.capacityKg[i] - input.existingMassKg[i]);
+      added[i] += Math.min(requested, available);
+      collectedWaterKg += added[i];
+    }
+    remainingWater = Math.max(0, input.deltaWaterKg - collectedWaterKg);
+  } else {
+    const waterCapacity = Math.max(0, input.capacityKg[0] - input.existingMassKg[0]);
+    added[0] = Math.min(input.deltaWaterKg, waterCapacity);
+    collectedWaterKg = added[0];
+    remainingWater = input.deltaWaterKg - added[0];
+  }
+
   let remainingOil = input.deltaOilKg;
-
-  const waterCapacity = Math.max(0, input.capacityKg[0] - input.existingMassKg[0]);
-  added[0] = Math.min(remainingWater, waterCapacity);
-  remainingWater -= added[0];
-
   for (let i = 0; i < 3; i += 1) {
     const vesselIndex = i + 1;
     const requested = input.deltaOilKg * fractions[i];
-    const available = Math.max(0, input.capacityKg[vesselIndex] - input.existingMassKg[vesselIndex]);
-    added[vesselIndex] = Math.min(requested, available);
-    remainingOil -= added[vesselIndex];
+    const available = Math.max(0, input.capacityKg[vesselIndex] - input.existingMassKg[vesselIndex] - added[vesselIndex]);
+    const oilAdded = Math.min(requested, available);
+    added[vesselIndex] += oilAdded;
+    remainingOil -= oilAdded;
   }
 
   const totalMass: [number, number, number, number] = [
@@ -104,8 +133,8 @@ export function routeCondensateCollection(input: CondensateCollectionInput): Con
   return {
     addedMassKg: added,
     totalMassKg: totalMass,
-    collectedWaterKg: added[0],
-    collectedOilKg: added[1] + added[2] + added[3],
+    collectedWaterKg,
+    collectedOilKg: added[1] + added[2] + added[3] - (trapMass ? (added[1] + added[2] + added[3] - input.deltaOilKg * (fractions[0] + fractions[1] + fractions[2])) : 0),
     unroutedWaterKg: remainingWater,
     unroutedOilKg: Math.max(0, remainingOil),
     status: capacityLimited ? 'CAPACITY_LIMIT' : 'ROUTED',
