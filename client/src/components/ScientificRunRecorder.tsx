@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { FileText, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,15 +22,23 @@ export interface ScientificRecordedFrame {
     waterRemovedKg: number;
     energyKwh?: number;
   };
-  materialInventory: object;
-  safety: object;
+  materialInventory: {
+    initialMassKg?: number; remainingMassKg?: number; waterRemovedKg?: number; oilRecoveredKg?: number; recoveryPercent?: number;
+  };
+  safety: { stage?: string; allSystemsSafe?: boolean; alarm?: string | null; transitionReason?: string };
   paused: boolean;
+  ultrasonic?: { effectiveFrequencyKHz?:number; effectivePowerKW?:number; powerDensityWPerL?:number; status?:string };
+  hardwareDiagnostics?: { connectedVolumeL?:number; pipeVolumeL?:number; vacuumConductanceM3h?:number|null; effectivePumpCapacityM3h?:number; coldTrapHeatLoadKw?:number; coldTrapCondensationCapacityKgPerSecond?:number; coldTrapStageCondensedWaterKg?:number[] };
 }
 
 async function sha256(text: string) {
   const bytes = new TextEncoder().encode(text);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest)).map(v => v.toString(16).padStart(2, "0")).join("");
+}
+
+function fmt(value: unknown, digits = 3) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "—";
 }
 
 export function ScientificRunRecorder({ experimentId, frames, completed }: { experimentId: string; frames: ReadonlyArray<ScientificRecordedFrame>; completed: boolean }) {
@@ -80,42 +89,16 @@ export function ScientificRunRecorder({ experimentId, frames, completed }: { exp
     if (!researchId || !frames.length) return;
     const next = frames.slice(savedFrames);
     if (!next.length) return;
-
     const sampled = next.filter((_, index) => index % 10 === 0 || index === next.length - 1).slice(0, 25);
     sampled.forEach(frame => {
       const capturedAt = new Date();
       const simulationTimestampSeconds = frame.timestampSeconds;
-      const base = {
-        experimentId: researchId,
-        observedAt: capturedAt,
-        instrumentId: "DIGITAL-TWIN-SIM",
-        qualityFlag: "RAW",
-      } as const;
-
+      const base = { experimentId: researchId, observedAt: capturedAt, instrumentId: "DIGITAL-TWIN-SIM", qualityFlag: "RAW" } as const;
       void recordSensor.mutateAsync({ ...base, parameter: "temperature", value: frame.sensorAfter.temperatureC, unit: "C" });
       void recordSensor.mutateAsync({ ...base, parameter: "pressure", value: frame.sensorAfter.pressureMbar, unit: "mbar" });
       void recordSensor.mutateAsync({ ...base, parameter: "oilRecovered", value: frame.sensorAfter.oilRecoveredKg, unit: "kg" });
       void recordSensor.mutateAsync({ ...base, parameter: "waterRemoved", value: frame.sensorAfter.waterRemovedKg, unit: "kg" });
-
-      void recordNote.mutateAsync({
-        experimentId: researchId,
-        observedAt: capturedAt,
-        note: JSON.stringify({
-          type: "CAUSAL_FRAME",
-          step: frame.step,
-          simulationTimestampSeconds,
-          capturedAt: capturedAt.toISOString(),
-          sensorBefore: frame.sensorBefore,
-          controller: frame.controller,
-          intendedCommands: frame.intendedCommands,
-          effectiveCommands: frame.effectiveCommands,
-          physicalSensorAfter: frame.physicalSensorAfter,
-          sensorAfter: frame.sensorAfter,
-          materialInventory: frame.materialInventory,
-          safety: frame.safety,
-          paused: frame.paused,
-        }),
-      });
+      void recordNote.mutateAsync({ experimentId: researchId, observedAt: capturedAt, note: JSON.stringify({ type: "CAUSAL_FRAME", step: frame.step, simulationTimestampSeconds, capturedAt: capturedAt.toISOString(), sensorBefore: frame.sensorBefore, controller: frame.controller, intendedCommands: frame.intendedCommands, effectiveCommands: frame.effectiveCommands, physicalSensorAfter: frame.physicalSensorAfter, sensorAfter: frame.sensorAfter, materialInventory: frame.materialInventory, safety: frame.safety, ultrasonic: frame.ultrasonic, hardwareDiagnostics: frame.hardwareDiagnostics, paused: frame.paused }) });
     });
     setSavedFrames(frames.length);
   }, [researchId, frames, savedFrames, recordSensor, recordNote]);
@@ -123,11 +106,7 @@ export function ScientificRunRecorder({ experimentId, frames, completed }: { exp
   useEffect(() => {
     if (!researchId || !completed || !frames.length || completedRecorded.current) return;
     completedRecorded.current = true;
-    void completeResearch.mutateAsync({
-      experimentId: researchId,
-      outcome: "completed",
-      conclusion: "Digital Twin process run completed; full causal-frame dataset captured for scientific traceability.",
-    }).catch(() => {
+    void completeResearch.mutateAsync({ experimentId: researchId, outcome: "completed", conclusion: "Digital Twin process run completed; full causal-frame dataset captured for scientific traceability." }).catch(() => {
       completedRecorded.current = false;
       toast.error("Scientific closeout could not be recorded");
     });
@@ -145,13 +124,7 @@ export function ScientificRunRecorder({ experimentId, frames, completed }: { exp
       qualityStatus: "RAW",
       sha256: hash,
       storageRef: `inline://simulation/${experimentId}/causal-frames.json`,
-      metadata: {
-        frameCount: frames.length,
-        capture: "simulation-control-room",
-        source: "ClosedLoopSimulationEngine",
-        timestampModel: "simulationTimestampSeconds + capturedAt",
-        generatedAt: new Date().toISOString(),
-      },
+      metadata: { frameCount: frames.length, capture: "simulation-control-room", source: "ClosedLoopSimulationEngine", timestampModel: "simulationTimestampSeconds + capturedAt", generatedAt: new Date().toISOString() },
     })).then(() => toast.success("Causal-frame dataset manifest recorded")).catch(() => {
       manifestCreated.current = false;
       toast.error("Dataset manifest could not be recorded");
@@ -165,10 +138,36 @@ export function ScientificRunRecorder({ experimentId, frames, completed }: { exp
     toast.success("Research observation recorded");
   };
 
-  return <section className="rounded-2xl border border-emerald-500/20 bg-slate-950/70 p-4">
-    <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><p className="font-mono text-[10px] tracking-[0.3em] text-emerald-400">SCIENTIFIC DATA CAPTURE</p><h3 className="text-lg font-semibold">Research Record</h3></div><div className="font-mono text-xs text-slate-500">{researchId ?? "INITIALIZING..."}</div></div>
-    <div className="grid gap-3 md:grid-cols-2"><Input value={objective} onChange={e => setObjective(e.target.value)} placeholder="Experiment objective" className="bg-slate-900" /><Input value={sampleId} onChange={e => setSampleId(e.target.value)} placeholder="Sample ID" className="bg-slate-900" /><Textarea value={hypothesis} onChange={e => setHypothesis(e.target.value)} placeholder="Optional hypothesis" className="bg-slate-900 md:col-span-2" /></div>
-    <div className="mt-3 flex gap-2"><Input value={note} onChange={e => setNote(e.target.value)} placeholder="Record an operator/research observation..." className="bg-slate-900" /><Button onClick={saveNote} disabled={!researchId || !note.trim()} variant="outline">Record note</Button></div>
-    <div className="mt-3 grid grid-cols-3 gap-2 text-xs font-mono text-slate-400"><div className="rounded bg-slate-900 p-2">Frames: {frames.length}</div><div className="rounded bg-slate-900 p-2">Captured: {savedFrames}</div><div className="rounded bg-slate-900 p-2">Dataset: {completed ? "MANIFESTED" : "LIVE"}</div></div>
+  const exportResults = () => {
+    const payload = { experimentId, generatedAt: new Date().toISOString(), status: completed ? "COMPLETE" : "LIVE", source: "ClosedLoopSimulationEngine", frameCount: frames.length, experiment: experiment.data ?? null, frames };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `IUVFES-${experimentId}-results.json`; a.click(); URL.revokeObjectURL(url);
+  };
+  const printResults = () => window.print();
+  const latest = frames.at(-1);
+  const p = (experiment.data?.inputParameters ?? {}) as Record<string, unknown>;
+  const stages = Array.from(new Set(frames.map(f => f.safety?.stage).filter(Boolean))).join(" → ");
+
+  return <section className="scientific-output rounded-2xl border border-emerald-500/20 bg-slate-950/70 p-4 md:p-5">
+    <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between print:hidden"><div><p className="font-mono text-[10px] tracking-[0.3em] text-emerald-400">SCIENTIFIC DATA CAPTURE</p><h3 className="text-lg font-semibold">Research Record & Results</h3></div><div className="flex gap-2"><Button onClick={exportResults} disabled={!frames.length} variant="outline"><FileText className="mr-2 h-4 w-4"/>EXPORT JSON</Button><Button onClick={printResults} disabled={!frames.length} className="bg-emerald-500 text-slate-950"><Printer className="mr-2 h-4 w-4"/>PRINT / SAVE PDF</Button></div></div>
+    <div className="print-report-title hidden print:block"><h1>IUVFES Digital Twin — Scientific Experiment Report</h1><p>Experiment ID: {experimentId} · Generated: {new Date().toISOString()}</p></div>
+    <div className="grid gap-3 md:grid-cols-2"><Input value={objective} onChange={e => setObjective(e.target.value)} placeholder="Experiment objective" className="bg-slate-900 print:hidden" /><Input value={sampleId} onChange={e => setSampleId(e.target.value)} placeholder="Sample ID" className="bg-slate-900 print:hidden" /><Textarea value={hypothesis} onChange={e => setHypothesis(e.target.value)} placeholder="Optional hypothesis" className="bg-slate-900 md:col-span-2 print:hidden" /></div>
+    <div className="mt-3 flex gap-2 print:hidden"><Input value={note} onChange={e => setNote(e.target.value)} placeholder="Record an operator/research observation..." className="bg-slate-900" /><Button onClick={saveNote} disabled={!researchId || !note.trim()} variant="outline">Record note</Button></div>
+    <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-mono text-slate-400 md:grid-cols-4"><div className="rounded bg-slate-900 p-2">Research: {researchId ?? "INITIALIZING..."}</div><div className="rounded bg-slate-900 p-2">Frames: {frames.length}</div><div className="rounded bg-slate-900 p-2">Captured: {savedFrames}</div><div className="rounded bg-slate-900 p-2">Dataset: {completed ? "MANIFESTED" : "LIVE"}</div></div>
+
+    {frames.length > 0 && <div className="mt-5 space-y-4 print:space-y-5">
+      <ReportSection title="1. EXPERIMENT IDENTITY"><ReportRow label="Experiment ID" value={experimentId}/><ReportRow label="Experiment name" value={String(experiment.data?.experimentName ?? "—")}/><ReportRow label="Material ID" value={String(experiment.data?.materialId ?? "—")}/><ReportRow label="Sample ID" value={sampleId}/><ReportRow label="Objective" value={objective}/><ReportRow label="Hypothesis" value={hypothesis || "Not supplied"}/></ReportSection>
+      <ReportSection title="2. OPERATOR INPUT"><ReportRow label="Material mass" value={String(p.materialWeight ?? "—")}/><ReportRow label="Water content" value={String(p.waterContent ?? "—")}/><ReportRow label="Oil content" value={String(p.oilContent ?? "—")}/><ReportRow label="Stored experiment parameters" value={JSON.stringify(p)}/></ReportSection>
+      <ReportSection title="3. PROCESS RESULT"><div className="grid grid-cols-2 gap-2 md:grid-cols-6"><ResultMetric label="Temperature" value={`${fmt(latest?.sensorAfter.temperatureC,2)} °C`}/><ResultMetric label="Pressure" value={`${fmt(latest?.sensorAfter.pressureMbar,2)} mbar`}/><ResultMetric label="Yield" value={`${fmt(latest?.sensorAfter.yieldPercent,2)} %`}/><ResultMetric label="Oil recovered" value={`${fmt(latest?.sensorAfter.oilRecoveredKg,3)} kg`}/><ResultMetric label="Water removed" value={`${fmt(latest?.sensorAfter.waterRemovedKg,3)} kg`}/><ResultMetric label="Energy" value={`${fmt(latest?.sensorAfter.energyKwh,3)} kWh`}/></div><ReportRow label="Observed stages" value={stages || "—"}/><ReportRow label="Final status" value={completed ? "COMPLETE" : "LIVE"}/></ReportSection>
+      <div className="grid gap-4 md:grid-cols-2"><ReportSection title="4. MASS BALANCE"><ReportRow label="Initial mass" value={`${fmt(latest?.materialInventory?.initialMassKg)} kg`}/><ReportRow label="Remaining mass" value={`${fmt(latest?.materialInventory?.remainingMassKg)} kg`}/><ReportRow label="Water removed" value={`${fmt(latest?.materialInventory?.waterRemovedKg)} kg`}/><ReportRow label="Oil recovered" value={`${fmt(latest?.materialInventory?.oilRecoveredKg)} kg`}/><ReportRow label="Recovery" value={`${fmt(latest?.materialInventory?.recoveryPercent,2)} %`}/></ReportSection><ReportSection title="5. HARDWARE / ULTRASONIC"><ReportRow label="Connected volume" value={`${fmt(latest?.hardwareDiagnostics?.connectedVolumeL,2)} L`}/><ReportRow label="Pipe volume" value={`${fmt(latest?.hardwareDiagnostics?.pipeVolumeL,3)} L`}/><ReportRow label="Vacuum conductance" value={`${fmt(latest?.hardwareDiagnostics?.vacuumConductanceM3h,3)} m³/h`}/><ReportRow label="Effective pump" value={`${fmt(latest?.hardwareDiagnostics?.effectivePumpCapacityM3h,2)} m³/h`}/><ReportRow label="Ultrasonic frequency" value={`${fmt(latest?.ultrasonic?.effectiveFrequencyKHz,2)} kHz`}/><ReportRow label="Ultrasonic power density" value={`${fmt(latest?.ultrasonic?.powerDensityWPerL,3)} W/L`}/></ReportSection></div>
+      <ReportSection title="6. COLD-TRAP / CONDENSATION"><ReportRow label="Heat removal" value={`${fmt(latest?.hardwareDiagnostics?.coldTrapHeatLoadKw,4)} kW`}/><ReportRow label="Condensation capacity" value={`${fmt(latest?.hardwareDiagnostics?.coldTrapCondensationCapacityKgPerSecond,6)} kg/s`}/><ReportRow label="Stage 1–4 accumulated" value={(latest?.hardwareDiagnostics?.coldTrapStageCondensedWaterKg ?? []).map(v=>fmt(v,4)).join(" / ") || "—"}/></ReportSection>
+      <ReportSection title="7. SAFETY & CAUSAL TRACE"><ReportRow label="Final stage" value={String(latest?.safety?.stage ?? "—")}/><ReportRow label="Systems safe" value={latest?.safety?.allSystemsSafe ? "SAFE" : "CHECK"}/><ReportRow label="Alarm" value={String(latest?.safety?.alarm ?? "None")}/><ReportRow label="Transition reason" value={String(latest?.safety?.transitionReason ?? "—")}/><div className="mt-2 max-h-80 overflow-auto print:max-h-none">{frames.map(frame=><div key={frame.step} className="grid grid-cols-[50px_70px_90px_1fr] gap-2 border-b border-slate-800 py-1.5 text-[10px] font-mono"><span>#{frame.step}</span><span>{fmt(frame.timestampSeconds,1)}s</span><span>{frame.safety?.stage ?? "—"}</span><span>T {fmt(frame.sensorAfter.temperatureC,1)}°C · P {fmt(frame.sensorAfter.pressureMbar,1)}mbar · Y {fmt(frame.sensorAfter.yieldPercent,1)}%</span></div>)}</div></ReportSection>
+      <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-3 text-xs text-slate-400"><b className="text-yellow-300">PROVENANCE:</b> values above are simulation/derived values from the ClosedLoopSimulationEngine unless separately identified as laboratory measurements. Missing values remain UNKNOWN/DATA GAP. This report does not claim physical validation without a laboratory comparison dataset.</div>
+    </div>}
+    <style>{`@media print { @page { size: A4; margin: 12mm; } body { background: white !important; color: black !important; } body * { visibility: hidden; } .scientific-output, .scientific-output * { visibility: visible; } .scientific-output { position: absolute; left: 0; top: 0; width: 100%; border: 0 !important; background: white !important; color: black !important; box-shadow: none !important; } .scientific-output * { color: #111 !important; border-color: #bbb !important; } .print-report-title { display:block !important; margin-bottom: 12px; } .print-report-title h1 { font-size: 20px; margin:0 0 5px; } .print-report-title p { font-size: 9px; margin:0 0 12px; } .print\:hidden { display:none !important; } .print\:block { display:block !important; } .print\:max-h-none { max-height:none !important; overflow:visible !important; } }`}</style>
   </section>;
 }
+
+function ReportSection({ title, children }: { title:string; children:React.ReactNode }) { return <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-4"><h4 className="mb-2 text-sm font-semibold tracking-wide text-emerald-300">{title}</h4>{children}</section>; }
+function ReportRow({ label, value }: { label:string; value:string }) { return <div className="flex justify-between gap-4 border-b border-slate-800 py-1.5 text-xs"><span className="text-slate-500">{label}</span><span className="max-w-[70%] text-right font-mono text-slate-200 break-words">{value}</span></div>; }
+function ResultMetric({ label, value }: { label:string; value:string }) { return <div className="rounded-lg border border-slate-800 bg-slate-950 p-3"><div className="text-[9px] tracking-widest text-slate-500">{label}</div><div className="mt-1 font-mono text-sm text-emerald-300">{value}</div></div>; }
