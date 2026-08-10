@@ -3,6 +3,7 @@ import { protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { ClosedLoopSimulationEngine, type ClosedLoopSimulationConfig } from "./closedLoopSimulation";
+import { describeClosedLoopEngineContract } from "./closedLoopInputContract";
 import { recordClosedLoopRun } from "./scientificEventJournal";
 import { persistSimulationDataset } from "./scientificDatasetPersistence";
 import {
@@ -60,6 +61,7 @@ function sessionView(sessionId: string) {
     startedAt: session.startedAt ?? null,
     updatedAt: session.updatedAt,
     configuration: session.configuration,
+    dataSource: describeClosedLoopEngineContract(),
     currentStep: snapshot.stepNumber,
     elapsedSeconds: snapshot.elapsedSeconds,
     currentFrame: snapshot.frames.at(-1) ?? null,
@@ -123,7 +125,7 @@ export const closedLoopRouter = router({
   frames: protectedProcedure.input(z.string().min(1)).query(async ({ ctx, input }) => {
     const session = getRuntimeSession(input);
     await assertExperimentAccess(ctx, session.experimentId);
-    return { sessionId: input, frames: getRuntimeFrames(input) };
+    return { sessionId: input, frames: getRuntimeFrames(input), dataSource: describeClosedLoopEngineContract() };
   }),
   snapshot: protectedProcedure.input(z.string().min(1)).query(async ({ ctx, input }) => {
     const session = getRuntimeSession(input);
@@ -178,6 +180,7 @@ export const closedLoopRouter = router({
       datasetSha256: dataset.sha256,
       provenanceId: dataset.provenanceId,
       datasetQualityStatus: dataset.qualityStatus,
+      dataSource: describeClosedLoopEngineContract(),
       frames: result.frames,
       finalSensors: result.finalSensors,
     };
