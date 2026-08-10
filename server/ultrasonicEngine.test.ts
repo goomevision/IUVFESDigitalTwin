@@ -35,7 +35,6 @@ describe('ultrasonic physics kernel', () => {
       electricalPowerW: 100,
       transducerEfficiency: 0.6,
       activeAreaM2: 0.01,
-      provenance: 'MEASURED',
     });
     const state = engine.evaluate(50);
 
@@ -44,7 +43,7 @@ describe('ultrasonic physics kernel', () => {
     expect(state.acousticIntensityWm2).toBeCloseTo(6_000, 6);
     expect(state.acousticPressureAmplitudePa).toBeGreaterThan(0);
     expect(state.peakNegativePressurePa).toBeGreaterThan(state.staticPressurePa - state.vaporPressurePa);
-    expect(state.modelStatus).toBe('REDUCED_ORDER_SCREENING');
+    expect(state.modelStatus).toBe('DATA_GAP');
   });
 
   it('couples vacuum pressure to cavitation drive instead of treating ultrasound as a UI-only value', () => {
@@ -53,7 +52,6 @@ describe('ultrasonic physics kernel', () => {
       electricalPowerW: 100,
       transducerEfficiency: 0.6,
       activeAreaM2: 0.01,
-      provenance: 'MEASURED',
     });
 
     const atmospheric = engine.evaluate(1013.25);
@@ -71,7 +69,6 @@ describe('ultrasonic physics kernel', () => {
         electricalPowerW: 100,
         transducerEfficiency: 0.6,
         activeAreaM2: 0.01,
-        provenance: 'MEASURED',
       },
     });
 
@@ -90,7 +87,6 @@ describe('ultrasonic physics kernel', () => {
       transducerEfficiency: 0.6,
       activeAreaM2: 0.01,
       dutyCycle: 1,
-      provenance: 'MEASURED',
     }).evaluate(50);
     const pulsed = new UltrasonicEngine({
       frequencyHz: 40_000,
@@ -98,7 +94,6 @@ describe('ultrasonic physics kernel', () => {
       transducerEfficiency: 0.6,
       activeAreaM2: 0.01,
       dutyCycle: 0.5,
-      provenance: 'MEASURED',
     }).evaluate(50);
 
     expect(pulsed.acousticPowerW).toBeCloseTo(continuous.acousticPowerW * 0.5, 8);
