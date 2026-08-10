@@ -265,7 +265,28 @@ export class ClosedLoopSimulationEngine {
     const snapshotHardware = snapshot.config.hardware ?? {};
     const currentHardware = this.config.hardware ?? {};
     const hardwareKeys: Array<keyof VirtualHardwareDynamicsConfig> = [
+      'reactorInternalDiameterMm',
+      'reactorShellLengthMm',
+      'reactorWallThicknessMm',
+      'reactorHeadThicknessMm',
+      'reactorMaterial',
+      'designExternalPressureBar',
+      'designTemperatureC',
+      'ultrasonicFrequencyKHz',
+      'ultrasonicMaxPowerKW',
+      'ultrasonicOperatingFrequencyKHz',
+      'ultrasonicRequestedPowerKW',
+      'coldTrapTemperaturesC',
+      'coldTrapHeatTransferCoefficientWPerM2K',
+      'coldTrapHeatTransferAreasM2',
+      'coldTrapVolumesL',
+      'coldTrapCondensateCapacityKg',
       'chamberVolumeL',
+      'vacuumPipeDiameterMm',
+      'vacuumPipeLengthM',
+      'vacuumPipeEffectiveLengthFactor',
+      'vacuumGasViscosityPaS',
+      'vacuumPumpOutletPressureMbar',
       'pumpCapacityM3h',
       'thermalMassKJPerC',
       'heatingPowerKW',
@@ -274,7 +295,7 @@ export class ClosedLoopSimulationEngine {
       'effectiveHeatLossKWPerC',
     ];
     for (const key of hardwareKeys) {
-      if (snapshotHardware[key] !== currentHardware[key]) {
+      if (JSON.stringify(snapshotHardware[key]) !== JSON.stringify(currentHardware[key])) {
         throw new Error('Snapshot hardware profile does not match simulation configuration');
       }
     }
