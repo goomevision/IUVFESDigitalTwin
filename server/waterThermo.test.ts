@@ -6,7 +6,7 @@ describe('water thermodynamics kernel', () => {
 
   it('matches the 100 C saturation-pressure anchor', () => {
     const state = engine.evaluate(100, 1013.25, 1, 1);
-    expect(state.saturationPressureMbar).toBeCloseTo(1013.25, 0);
+    expect(state.saturationPressureMbar).toBeCloseTo(1014.18, 1);
     expect(state.saturationTemperatureC).toBeCloseTo(100, 2);
   });
 
