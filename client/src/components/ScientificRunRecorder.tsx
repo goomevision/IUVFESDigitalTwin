@@ -38,6 +38,11 @@ export function ScientificRunRecorder({ experimentId, frames, completed }: { exp
   const captureProgress = frames.length ? Math.min(100, savedFrames / frames.length * 100) : 0;
   const datasetStatus = completed ? "MANIFESTED" : frames.length ? "LIVE CAPTURE" : "READY";
   const statusClass = completed ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : frames.length ? "border-cyan-500/30 bg-cyan-500/10 text-cyan-300" : "border-slate-700 bg-slate-900 text-slate-500";
+  const captureStats = [
+    { label: "CAUSAL FRAMES", value: `${frames.length}`, Icon: Database },
+    { label: "CAPTURED", value: `${savedFrames}`, Icon: Radio },
+    { label: "DATASET", value: datasetStatus, Icon: FileCheck2 },
+  ];
 
   return <section className="overflow-hidden rounded-3xl border border-emerald-500/20 bg-slate-950/70 shadow-xl shadow-emerald-950/10">
     <div className="border-b border-slate-800/80 p-4 md:p-5">
@@ -55,7 +60,7 @@ export function ScientificRunRecorder({ experimentId, frames, completed }: { exp
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        {[["CAUSAL FRAMES", `${frames.length}`, Database], ["CAPTURED", `${savedFrames}`, Radio], ["DATASET", datasetStatus, FileCheck2]].map(([label, value, Icon]) => <div key={label as string} className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/45 p-3"><Icon className="h-4 w-4 text-emerald-400" /><div><div className="font-mono text-[9px] tracking-[0.15em] text-slate-600">{label}</div><div className="mt-1 font-mono text-sm text-slate-300">{value as string}</div></div></div>)}
+        {captureStats.map(({ label, value, Icon }) => <div key={label} className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/45 p-3"><Icon className="h-4 w-4 text-emerald-400" /><div><div className="font-mono text-[9px] tracking-[0.15em] text-slate-600">{label}</div><div className="mt-1 font-mono text-sm text-slate-300">{value}</div></div></div>)}
       </div>
 
       <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-900/35 p-4"><div className="mb-2 flex items-center justify-between gap-3"><span className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-600">Capture progress</span><span className="font-mono text-[10px] text-emerald-300">{Math.round(captureProgress)}%</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-emerald-400 transition-all duration-300" style={{ width: `${captureProgress}%` }} /></div></div>
