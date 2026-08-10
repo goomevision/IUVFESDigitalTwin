@@ -33,24 +33,20 @@ const vacuumCommand = {
 describe('MachineDynamics virtual hardware coupling', () => {
   it('changes vacuum response when connected volume and pump capacity change', () => {
     const smallFast = new MachineDynamicsEngine(initial, {
-      hardware: {
-        connectedVolumeL: 100,
-        pumpCapacityM3PerHour: 300,
-        thermalMassKjPerK: 100,
-        heatingPowerKw: 8,
-        coolingPowerKw: 4,
-        leakRateMbarPerSecond: 0,
-      },
+      chamberVolumeL: 100,
+      pumpCapacityM3h: 300,
+      thermalMassKJPerC: 100,
+      heatingPowerKW: 8,
+      coolingPowerKW: 4,
+      leakRateMbarPerSecond: 0,
     });
     const largeSlow = new MachineDynamicsEngine(initial, {
-      hardware: {
-        connectedVolumeL: 500,
-        pumpCapacityM3PerHour: 100,
-        thermalMassKjPerK: 100,
-        heatingPowerKw: 8,
-        coolingPowerKw: 4,
-        leakRateMbarPerSecond: 0,
-      },
+      chamberVolumeL: 500,
+      pumpCapacityM3h: 100,
+      thermalMassKJPerC: 100,
+      heatingPowerKW: 8,
+      coolingPowerKW: 4,
+      leakRateMbarPerSecond: 0,
     });
 
     const fast = smallFast.step(target, vacuumCommand, 1);
@@ -61,24 +57,20 @@ describe('MachineDynamics virtual hardware coupling', () => {
 
   it('models leak/load as a pressure rise rather than silently ignoring it', () => {
     const sealed = new MachineDynamicsEngine(initial, {
-      hardware: {
-        connectedVolumeL: 250,
-        pumpCapacityM3PerHour: 200,
-        thermalMassKjPerK: 100,
-        heatingPowerKw: 8,
-        coolingPowerKw: 4,
-        leakRateMbarPerSecond: 0,
-      },
+      chamberVolumeL: 250,
+      pumpCapacityM3h: 200,
+      thermalMassKJPerC: 100,
+      heatingPowerKW: 8,
+      coolingPowerKW: 4,
+      leakRateMbarPerSecond: 0,
     });
     const leaking = new MachineDynamicsEngine(initial, {
-      hardware: {
-        connectedVolumeL: 250,
-        pumpCapacityM3PerHour: 200,
-        thermalMassKjPerK: 100,
-        heatingPowerKw: 8,
-        coolingPowerKw: 4,
-        leakRateMbarPerSecond: 20,
-      },
+      chamberVolumeL: 250,
+      pumpCapacityM3h: 200,
+      thermalMassKJPerC: 100,
+      heatingPowerKW: 8,
+      coolingPowerKW: 4,
+      leakRateMbarPerSecond: 20,
     });
 
     const sealedFrame = sealed.step(target, vacuumCommand, 1);
@@ -89,24 +81,20 @@ describe('MachineDynamics virtual hardware coupling', () => {
 
   it('changes thermal response when thermal mass and heater power change', () => {
     const lowMass = new MachineDynamicsEngine(initial, {
-      hardware: {
-        connectedVolumeL: 250,
-        pumpCapacityM3PerHour: 200,
-        thermalMassKjPerK: 50,
-        heatingPowerKw: 12,
-        coolingPowerKw: 4,
-        leakRateMbarPerSecond: 0,
-      },
+      chamberVolumeL: 250,
+      pumpCapacityM3h: 200,
+      thermalMassKJPerC: 50,
+      heatingPowerKW: 12,
+      coolingPowerKW: 4,
+      leakRateMbarPerSecond: 0,
     });
     const highMass = new MachineDynamicsEngine(initial, {
-      hardware: {
-        connectedVolumeL: 250,
-        pumpCapacityM3PerHour: 200,
-        thermalMassKjPerK: 300,
-        heatingPowerKw: 6,
-        coolingPowerKw: 4,
-        leakRateMbarPerSecond: 0,
-      },
+      chamberVolumeL: 250,
+      pumpCapacityM3h: 200,
+      thermalMassKJPerC: 300,
+      heatingPowerKW: 6,
+      coolingPowerKW: 4,
+      leakRateMbarPerSecond: 0,
     });
 
     const command = { ...vacuumCommand, vacuumPump: false, heater: true };
