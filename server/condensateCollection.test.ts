@@ -16,6 +16,21 @@ describe('condensate collection routing', () => {
     expect(result.unroutedOilKg).toBe(0);
   });
 
+  it('routes stage-resolved condensate to the matching cold-trap receivers', () => {
+    const result = routeCondensateCollection({
+      deltaWaterKg: 0.4,
+      deltaOilKg: 0,
+      trapCondensedKg: [0.1, 0.1, 0.1, 0.1],
+      existingMassKg: [0, 0, 0, 0],
+      capacityKg: [2, 2, 2, 2],
+    });
+
+    expect(result.addedMassKg).toEqual([0.1, 0.1, 0.1, 0.1]);
+    expect(result.collectedWaterKg).toBeCloseTo(0.4);
+    expect(result.unroutedWaterKg).toBeCloseTo(0);
+    expect(result.status).toBe('ROUTED');
+  });
+
   it('respects receiver capacity and exposes the remaining mass', () => {
     const result = routeCondensateCollection({
       deltaWaterKg: 3,
