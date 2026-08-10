@@ -55,7 +55,6 @@ export function ProcessMachine3D({ machine }: Props) {
     const condenser = new THREE.Group(); condenser.position.set(2.6, 2.8, -1.8); scene.add(condenser);
     const condenserBody = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 2.8, 32), new THREE.MeshStandardMaterial({ color: 0x18263c, metalness: 0.75, roughness: 0.25 })); condenser.add(condenserBody);
 
-    // Explicit process connections: these are visualized from the same effective actuator state as the engine frame.
     const vacuumLineMaterial = new THREE.MeshBasicMaterial({ color: 0x164e63 });
     const vaporLineMaterial = new THREE.MeshBasicMaterial({ color: 0x155e75 });
     const coolingLineMaterial = new THREE.MeshBasicMaterial({ color: 0x1e3a5f });
@@ -142,7 +141,6 @@ export function ProcessMachine3D({ machine }: Props) {
       pumpRotor.material.color.setHex(vacuum ? 0x22d3ee : 0x334155);
       condenserBody.material.emissive.setHex(condensing ? 0x082f49 : 0x061522);
 
-      // Connection status follows effective commands; no visual cable is presented as active unless its actuator is active.
       vacuumLineMaterial.color.setHex(vacuum ? 0x22d3ee : 0x164e63);
       vaporLineMaterial.color.setHex(extracting || condensing ? 0x38bdf8 : 0x155e75);
       coolingLineMaterial.color.setHex(cooling ? 0x60a5fa : 0x1e3a5f);
@@ -183,21 +181,45 @@ export function ProcessMachine3D({ machine }: Props) {
   const stage = machine?.stage ?? "PRE_FLIGHT";
   const fault = machine?.interlocks.overTemperature;
   const commands = machine?.commands;
-  return <div className="relative h-[460px] overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-950/80">
+  const hasEngineFrame = Boolean(machine);
+  return <div className="relative h-[500px] overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-950/90 shadow-2xl shadow-cyan-950/20">
     <div ref={mountRef} className="absolute inset-0" />
-    <div className="pointer-events-none absolute left-4 top-4 font-mono text-[10px] tracking-[0.25em] text-cyan-400">3D MACHINE DIGITAL TWIN</div>
-    <div className="pointer-events-none absolute right-4 top-4 rounded border border-cyan-500/20 bg-slate-950/85 px-3 py-2 font-mono text-[9px] text-slate-400">VISUAL LINK: EFFECTIVE COMMANDS</div>
-    <div className="pointer-events-none absolute left-4 top-11 grid gap-1 font-mono text-[9px] text-slate-500">
-      <span>VACUUM LINE {commands?.vacuumPump ? "● ACTIVE" : "○ STANDBY"}</span>
-      <span>VAPOR LINE {commands?.extractor || commands?.condenser ? "● ACTIVE" : "○ STANDBY"}</span>
-      <span>COOLING LINE {commands?.cooling ? "● ACTIVE" : "○ STANDBY"}</span>
+
+    <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between bg-gradient-to-b from-slate-950/95 via-slate-950/65 to-transparent p-4">
+      <div>
+        <div className="flex items-center gap-2 font-mono text-[10px] font-semibold tracking-[0.25em] text-cyan-300">
+          <span className={`h-2 w-2 rounded-full ${fault ? "bg-red-400" : hasEngineFrame ? "bg-emerald-400" : "bg-slate-500"}`} />
+          3D MACHINE DIGITAL TWIN
+        </div>
+        <div className="mt-1 text-[10px] text-slate-500">ENGINE STATE → EFFECTIVE ACTUATION → VISUAL MODEL</div>
+      </div>
+      <div className={`rounded-lg border px-3 py-2 font-mono text-[9px] ${fault ? "border-red-500/30 bg-red-500/10 text-red-300" : hasEngineFrame ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300" : "border-slate-700 bg-slate-950/80 text-slate-500"}`}>
+        {fault ? "SAFETY TRIP" : hasEngineFrame ? "LIVE ENGINE FRAME" : "WAITING FOR ENGINE FRAME"}
+      </div>
     </div>
-    <div className="pointer-events-none absolute bottom-4 left-4 right-4 flex flex-wrap gap-2 font-mono text-[10px]">
-      <span className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-slate-400">STAGE: {stage}</span>
+
+    <div className="pointer-events-none absolute left-4 top-20 space-y-1.5 font-mono text-[9px]">
+      <div className="rounded bg-slate-950/70 px-2 py-1 text-slate-400">REACTOR CHAMBER</div>
+      <div className="rounded bg-slate-950/70 px-2 py-1 text-slate-400">VACUUM PUMP</div>
+      <div className="rounded bg-slate-950/70 px-2 py-1 text-slate-400">CONDENSER</div>
+    </div>
+
+    <div className="pointer-events-none absolute right-4 top-20 rounded-xl border border-white/10 bg-slate-950/80 p-3 font-mono text-[9px] shadow-xl backdrop-blur">
+      <div className="mb-2 text-[8px] tracking-[0.2em] text-slate-500">CONNECTIONS</div>
+      <div className="space-y-1.5 text-slate-400">
+        <div><span className={commands?.vacuumPump ? "text-cyan-300" : "text-slate-600"}>●</span> VACUUM LINE</div>
+        <div><span className={commands?.extractor || commands?.condenser ? "text-sky-300" : "text-slate-600"}>●</span> VAPOR LINE</div>
+        <div><span className={commands?.cooling ? "text-blue-300" : "text-slate-600"}>●</span> COOLING LINE</div>
+        <div><span className={commands && Object.values(commands).some(Boolean) ? "text-amber-300" : "text-slate-600"}>●</span> POWER / CONTROL</div>
+      </div>
+    </div>
+
+    <div className="pointer-events-none absolute bottom-4 left-4 right-4 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-slate-950/90 p-3 font-mono text-[9px] backdrop-blur">
+      <span className="rounded border border-slate-700 px-2 py-1 text-slate-400">STAGE {stage}</span>
       <span className={`rounded border px-2 py-1 ${fault ? "border-red-500/50 text-red-300" : "border-emerald-500/30 text-emerald-300"}`}>{fault ? "SAFETY TRIP" : "INTERLOCKS OK"}</span>
-      <span className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-slate-400">P {machine?.sensors.pressureMbar.toFixed(1) ?? "—"} mbar</span>
-      <span className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-slate-400">T {machine?.sensors.temperatureC.toFixed(1) ?? "—"} °C</span>
-      <span className="rounded border border-cyan-500/20 bg-slate-950/80 px-2 py-1 text-cyan-300">ENGINE → VISUAL</span>
+      <span className="rounded border border-slate-700 px-2 py-1 text-slate-400">P {machine?.sensors.pressureMbar.toFixed(1) ?? "—"} mbar</span>
+      <span className="rounded border border-slate-700 px-2 py-1 text-slate-400">T {machine?.sensors.temperatureC.toFixed(1) ?? "—"} °C</span>
+      <span className="ml-auto rounded border border-cyan-500/20 bg-cyan-500/5 px-2 py-1 text-cyan-300">EFFECTIVE COMMANDS</span>
     </div>
   </div>;
 }
