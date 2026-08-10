@@ -10,17 +10,11 @@ import { UltrasonicEngine, type UltrasonicConfig, type UltrasonicState } from '.
 import type { MachineCommand, MachineSensors } from './processStateEngine';
 
 export interface VirtualHardwareDynamicsConfig {
-  /** Connected vacuum volume, including chamber + piping, in litres. */
   connectedVolumeL: number;
-  /** Pump nominal capacity at the current operating condition, m3/h. */
   pumpCapacityM3PerHour: number;
-  /** Effective reactor thermal mass, kJ/K. */
   thermalMassKjPerK: number;
-  /** Effective heating power delivered to the process, kW. */
   heatingPowerKw: number;
-  /** Effective cooling power removed from the process, kW. */
   coolingPowerKw: number;
-  /** Leak/load expressed as pressure rise in mbar/s at the current condition. */
   leakRateMbarPerSecond: number;
 }
 
@@ -34,35 +28,34 @@ export interface DynamicMachineConfig {
   condenserCoolingFactor?: number;
   extractionYieldRatePerSecond?: number;
   actuatorLag?: number;
-  /** Optional physical hardware model. Omit to retain legacy simulation behavior. */
   hardware?: VirtualHardwareDynamicsConfig;
-  /** Optional in-situ power-ultrasound model. Omit to preserve the legacy process baseline. */
   ultrasonic?: UltrasonicConfig;
 }
 
 export interface MachineDynamicsSnapshot { state: MachineSensors; }
 
+type ResolvedDynamicsConfig = Required<Omit<DynamicMachineConfig, 'hardware' | 'ultrasonic'>> & {
+  hardware?: VirtualHardwareDynamicsConfig;
+  ultrasonic?: UltrasonicEngine;
+};
+
 export class MachineDynamicsEngine {
-  private readonly c: Required<Omit<DynamicMachineConfig, 'hardware' | 'ultrasonic'>> & {
-    hardware?: VirtualHardwareDynamicsConfig;
-    ultrasonic?: UltrasonicEngine;
-  };
+  private readonly c: ResolvedDynamicsConfig;
   private state: MachineSensors;
 
   constructor(initial: MachineSensors, config: DynamicMachineConfig = {}) {
     this.c = {
-      ambientPressureMbar: 1013.25,
-      ambientTemperatureC: 25,
-      vacuumRateMbarPerSecond: 7,
-      heaterRateCPerSecond: 0.18,
-      passiveHeatLossCPerSecond: 0.035,
-      coolingRateCPerSecond: 0.12,
-      condenserCoolingFactor: 0.05,
-      extractionYieldRatePerSecond: 0.00035,
-      actuatorLag: 0.35,
+      ambientPressureMbar: config.ambientPressureMbar ?? 1013.25,
+      ambientTemperatureC: config.ambientTemperatureC ?? 25,
+      vacuumRateMbarPerSecond: config.vacuumRateMbarPerSecond ?? 7,
+      heaterRateCPerSecond: config.heaterRateCPerSecond ?? 0.18,
+      passiveHeatLossCPerSecond: config.passiveHeatLossCPerSecond ?? 0.035,
+      coolingRateCPerSecond: config.coolingRateCPerSecond ?? 0.12,
+      condenserCoolingFactor: config.condenserCoolingFactor ?? 0.05,
+      extractionYieldRatePerSecond: config.extractionYieldRatePerSecond ?? 0.00035,
+      actuatorLag: config.actuatorLag ?? 0.35,
       hardware: config.hardware,
       ultrasonic: config.ultrasonic ? new UltrasonicEngine(config.ultrasonic) : undefined,
-      ...config,
     };
     this.state = { ...initial };
   }
@@ -73,10 +66,6 @@ export class MachineDynamicsEngine {
     const hardware = this.c.hardware;
     const ultrasonic = this.c.ultrasonic?.evaluate(this.state.pressureMbar);
 
-    // When a virtual hardware profile is supplied, pressure dynamics depend on
-    // connected volume, pump capacity and leak/load. This deliberately remains
-    // a reduced-order engineering model; vendor pump curves and vessel analysis
-    // are still required before treating it as a physical prediction.
     const hardwarePumpRate = hardware
       ? Math.max(0.001, hardware.pumpCapacityM3PerHour * 1000 / 60 / Math.max(hardware.connectedVolumeL, 0.001))
       : this.c.vacuumRateMbarPerSecond;
