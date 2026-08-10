@@ -42,9 +42,10 @@ export class MachineDynamicsEngine {
     this.state = { ...initial };
   }
 
-  public step(target: MachineSensors, commands: MachineCommand, dtSeconds: number): MachineSensors {
+  public step(target: MachineSensors, commands: MachineCommand, dtSeconds: number, massTransferMultiplier = 1): MachineSensors {
     const dt = Math.max(0.05, dtSeconds);
     const lag = Math.max(0.05, Math.min(1, this.c.actuatorLag));
+    const multiplier = Math.max(0, Math.min(3, massTransferMultiplier));
     const pressureDemand = commands.vacuumPump
       ? Math.max(1, this.state.pressureMbar - this.c.vacuumRateMbarPerSecond * dt)
       : this.state.pressureMbar + (this.c.ambientPressureMbar - this.state.pressureMbar) * 0.03 * dt;
@@ -60,7 +61,7 @@ export class MachineDynamicsEngine {
 
     const thermalFactor = Math.max(0, Math.min(1, (temperature - 25) / 100));
     const vacuumFactor = Math.max(0, Math.min(1, 1 - pressure / this.c.ambientPressureMbar));
-    const extractionDrive = commands.extractor ? vacuumFactor * (0.35 + thermalFactor * 0.65) : 0;
+    const extractionDrive = commands.extractor ? vacuumFactor * (0.35 + thermalFactor * 0.65) * multiplier : 0;
     const yieldIncrease = this.c.extractionYieldRatePerSecond * extractionDrive * dt * 100;
     const yieldPercent = Math.min(target.yieldPercent, this.state.yieldPercent + yieldIncrease);
     const yieldRatio = yieldPercent / Math.max(target.yieldPercent, 0.001);
