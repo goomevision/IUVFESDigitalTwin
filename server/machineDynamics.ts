@@ -6,6 +6,7 @@
  * parameterized and not presented as a validated industrial control model.
  */
 
+import { UltrasonicEngine, type UltrasonicConfig, type UltrasonicState } from './ultrasonicEngine';
 import type { MachineCommand, MachineSensors } from './processStateEngine';
 
 export interface VirtualHardwareDynamicsConfig {
@@ -35,12 +36,17 @@ export interface DynamicMachineConfig {
   actuatorLag?: number;
   /** Optional physical hardware model. Omit to retain legacy simulation behavior. */
   hardware?: VirtualHardwareDynamicsConfig;
+  /** Optional in-situ power-ultrasound model. Omit to preserve the legacy process baseline. */
+  ultrasonic?: UltrasonicConfig;
 }
 
 export interface MachineDynamicsSnapshot { state: MachineSensors; }
 
 export class MachineDynamicsEngine {
-  private readonly c: Required<Omit<DynamicMachineConfig, 'hardware'>> & { hardware?: VirtualHardwareDynamicsConfig };
+  private readonly c: Required<Omit<DynamicMachineConfig, 'hardware' | 'ultrasonic'>> & {
+    hardware?: VirtualHardwareDynamicsConfig;
+    ultrasonic?: UltrasonicEngine;
+  };
   private state: MachineSensors;
 
   constructor(initial: MachineSensors, config: DynamicMachineConfig = {}) {
@@ -54,6 +60,8 @@ export class MachineDynamicsEngine {
       condenserCoolingFactor: 0.05,
       extractionYieldRatePerSecond: 0.00035,
       actuatorLag: 0.35,
+      hardware: config.hardware,
+      ultrasonic: config.ultrasonic ? new UltrasonicEngine(config.ultrasonic) : undefined,
       ...config,
     };
     this.state = { ...initial };
@@ -63,6 +71,7 @@ export class MachineDynamicsEngine {
     const dt = Math.max(0.05, dtSeconds);
     const lag = Math.max(0.05, Math.min(1, this.c.actuatorLag));
     const hardware = this.c.hardware;
+    const ultrasonic = this.c.ultrasonic?.evaluate(this.state.pressureMbar);
 
     // When a virtual hardware profile is supplied, pressure dynamics depend on
     // connected volume, pump capacity and leak/load. This deliberately remains
@@ -79,14 +88,16 @@ export class MachineDynamicsEngine {
     const pressure = this.blend(this.state.pressureMbar, Math.max(1, Math.min(this.c.ambientPressureMbar, pressureDemand)), lag);
 
     let temperature = this.state.temperatureC;
+    const ultrasonicHeatingKw = (ultrasonic?.acousticHeatingW ?? 0) / 1000;
+    const thermalMassKjPerK = Math.max(0.001, hardware?.thermalMassKjPerK ?? 250);
     if (hardware) {
-      const thermalMass = Math.max(0.001, hardware.thermalMassKjPerK);
-      if (commands.heater) temperature += (hardware.heatingPowerKw * dt) / thermalMass;
-      else temperature -= this.c.passiveHeatLossCPerSecond * dt;
-      if (commands.cooling) temperature -= (hardware.coolingPowerKw * dt) / thermalMass;
+      if (commands.heater) temperature += ((hardware.heatingPowerKw + ultrasonicHeatingKw) * dt) / thermalMassKjPerK;
+      else temperature += (ultrasonicHeatingKw * dt) / thermalMassKjPerK - this.c.passiveHeatLossCPerSecond * dt;
+      if (commands.cooling) temperature -= (hardware.coolingPowerKw * dt) / thermalMassKjPerK;
     } else {
       if (commands.heater) temperature += this.c.heaterRateCPerSecond * dt;
       else temperature -= this.c.passiveHeatLossCPerSecond * dt;
+      if (ultrasonicHeatingKw > 0) temperature += (ultrasonicHeatingKw * dt) / thermalMassKjPerK;
       if (commands.cooling) temperature -= this.c.coolingRateCPerSecond * dt;
     }
     if (commands.condenser) temperature -= this.c.condenserCoolingFactor * dt;
@@ -95,15 +106,22 @@ export class MachineDynamicsEngine {
 
     const thermalFactor = Math.max(0, Math.min(1, (temperature - 25) / 100));
     const vacuumFactor = Math.max(0, Math.min(1, 1 - pressure / this.c.ambientPressureMbar));
-    const extractionDrive = commands.extractor ? vacuumFactor * (0.35 + thermalFactor * 0.65) : 0;
+    const ultrasonicMassTransfer = ultrasonic?.massTransferMultiplier ?? 1;
+    const extractionDrive = commands.extractor
+      ? vacuumFactor * (0.35 + thermalFactor * 0.65) * ultrasonicMassTransfer
+      : 0;
     const yieldIncrease = this.c.extractionYieldRatePerSecond * extractionDrive * dt * 100;
     const yieldPercentage = Math.min(target.yieldPercent, this.state.yieldPercent + yieldIncrease);
     const oilRecoveredKg = Math.max(this.state.oilRecoveredKg, target.oilRecoveredKg * (yieldPercentage / Math.max(target.yieldPercent, 0.001)));
     const waterRemovedKg = Math.max(this.state.waterRemovedKg, target.waterRemovedKg * (yieldPercentage / Math.max(target.yieldPercent, 0.001)));
+    const ultrasonicEnergyRateKwhPerSecond = ultrasonic
+      ? (ultrasonic.electricalPowerW * ultrasonic.dutyCycle) / 1000 / 3600
+      : 0;
     const energyRate = (commands.heater ? (hardware?.heatingPowerKw ?? 4) / 1000 : 0)
       + (commands.vacuumPump ? 0.0015 : 0)
       + (commands.extractor ? 0.001 : 0)
-      + (commands.cooling ? (hardware?.coolingPowerKw ?? 1) / 1000 : 0);
+      + (commands.cooling ? (hardware?.coolingPowerKw ?? 1) / 1000 : 0)
+      + ultrasonicEnergyRateKwhPerSecond;
     const energyConsumed = this.state.energyKwh + energyRate * dt;
 
     this.state = {
@@ -116,6 +134,10 @@ export class MachineDynamicsEngine {
       energyKwh: Math.max(0, energyConsumed),
     };
     return { ...this.state };
+  }
+
+  public getUltrasonicState(staticPressureMbar = this.state.pressureMbar): UltrasonicState | null {
+    return this.c.ultrasonic?.evaluate(staticPressureMbar) ?? null;
   }
 
   public snapshot(): MachineDynamicsSnapshot { return { state: { ...this.state } }; }
