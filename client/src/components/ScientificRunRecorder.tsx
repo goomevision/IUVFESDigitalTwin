@@ -8,11 +8,11 @@ import { toast } from "sonner";
 export interface ScientificRecordedFrame {
   step: number;
   timestampSeconds: number;
-  sensorBefore: Record<string, unknown>;
-  controller: Record<string, unknown>;
-  intendedCommands: Record<string, unknown>;
-  effectiveCommands: Record<string, unknown>;
-  physicalSensorAfter: Record<string, unknown>;
+  sensorBefore: object;
+  controller: object;
+  intendedCommands: object;
+  effectiveCommands: object;
+  physicalSensorAfter: object;
   sensorAfter: {
     pressureMbar: number;
     temperatureC: number;
@@ -21,8 +21,8 @@ export interface ScientificRecordedFrame {
     waterRemovedKg: number;
     energyKwh?: number;
   };
-  materialInventory: Record<string, unknown>;
-  safety: Record<string, unknown>;
+  materialInventory: object;
+  safety: object;
   paused: boolean;
 }
 
@@ -97,8 +97,6 @@ export function ScientificRunRecorder({ experimentId, frames, completed }: { exp
       void recordSensor.mutateAsync({ ...base, parameter: "oilRecovered", value: frame.sensorAfter.oilRecoveredKg, unit: "kg" });
       void recordSensor.mutateAsync({ ...base, parameter: "waterRemoved", value: frame.sensorAfter.waterRemovedKg, unit: "kg" });
 
-      // Keep the complete causal frame as the canonical dataset payload. The
-      // scalar sensor records above are only an indexed convenience view.
       void recordNote.mutateAsync({
         experimentId: researchId,
         observedAt: capturedAt,
@@ -138,11 +136,7 @@ export function ScientificRunRecorder({ experimentId, frames, completed }: { exp
   useEffect(() => {
     if (!researchId || !completed || !frames.length || manifestCreated.current) return;
     manifestCreated.current = true;
-    const payload = JSON.stringify({
-      experimentId,
-      frameCount: frames.length,
-      frames,
-    });
+    const payload = JSON.stringify({ experimentId, frameCount: frames.length, frames });
     void sha256(payload).then(hash => createManifest.mutateAsync({
       id: `IUVFES-DS-${experimentId.slice(0, 12)}`,
       experimentId: researchId,
