@@ -22,11 +22,12 @@ describe("unified water steam state engine", () => {
   });
 
   it("does not invent two-phase mixture properties", () => {
-    const state = resolveWaterSteamState(373.15, 0.101325);
+    const saturationPressureMPa = 0.1014179779;
+    const state = resolveWaterSteamState(373.15, saturationPressureMPa);
     expect(state.region).toBe(4);
     expect(state.phase).toBe("TWO_PHASE");
     expect(state.status).toBe("DATA_GAP");
-    expect(state.properties.saturationPressureMPa).toBeCloseTo(0.1014179779, 8);
+    expect(state.properties.saturationPressureMPa).toBeCloseTo(saturationPressureMPa, 8);
   });
 
   it("does not expose Region 3 as a fake property solution", () => {
