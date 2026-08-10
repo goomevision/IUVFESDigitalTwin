@@ -22,6 +22,9 @@ export interface MachineSensors {
   coldTrapHeatLoadKW?: number;
   coldTrapCondensationCapacityKgPerSecond?: number;
   coldTrapCondensedWaterKg?: number;
+  collectionVesselMassKg?: [number, number, number, number];
+  unroutedCondensateKg?: number;
+  collectionRoutingStatus?: 'ROUTED' | 'CAPACITY_LIMIT' | 'DATA_GAP' | 'INVALID_INPUT';
 }
 export interface InterlockState {
   chamberSealed: boolean;
@@ -121,10 +124,10 @@ export class ProcessStateEngine {
       allSystemsSafe: sensors.chamberSealed && safety.severity !== 'CRITICAL' && !safety.pressureTransient && !safety.temperatureTransient,
       pressureTransient: safety.pressureTransient,
       temperatureTransient: safety.temperatureTransient,
-      overPressure: safety.overPressure,
-      underPressure: safety.underPressure,
       pressureRateMbarPerSecond: safety.pressureRateMbarPerSecond,
       temperatureRateCPerSecond: safety.temperatureRateCPerSecond,
+      overPressure: safety.overPressure,
+      underPressure: safety.underPressure,
     };
   }
 
