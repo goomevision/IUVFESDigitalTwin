@@ -1,0 +1,67 @@
+/**
+ * Installed ultrasonic hardware limit model.
+ *
+ * This layer enforces equipment limits and reports derived power density.
+ * It does not claim a validated cavitation or extraction correlation.
+ */
+
+export interface UltrasonicHardwareLimitInput {
+  installedFrequencyMinKHz: number;
+  installedFrequencyMaxKHz: number;
+  installedMaxPowerKW: number;
+  operatingFrequencyKHz: number;
+  requestedPowerKW: number;
+  workingVolumeL: number;
+}
+
+export interface UltrasonicHardwareLimitResult {
+  effectiveFrequencyKHz: number;
+  effectivePowerKW: number;
+  powerDensityWPerL: number;
+  powerLimited: boolean;
+  frequencyLimited: boolean;
+  status: 'WITHIN_INSTALLED_LIMITS' | 'POWER_LIMITED' | 'FREQUENCY_OUT_OF_RANGE' | 'INVALID_INPUT';
+  warnings: string[];
+}
+
+export function enforceUltrasonicHardwareLimits(
+  input: UltrasonicHardwareLimitInput,
+): UltrasonicHardwareLimitResult {
+  const values = [
+    input.installedFrequencyMinKHz,
+    input.installedFrequencyMaxKHz,
+    input.installedMaxPowerKW,
+    input.operatingFrequencyKHz,
+    input.requestedPowerKW,
+    input.workingVolumeL,
+  ];
+  if (!values.every(Number.isFinite) || input.installedFrequencyMinKHz <= 0 || input.installedFrequencyMaxKHz < input.installedFrequencyMinKHz || input.installedMaxPowerKW < 0 || input.requestedPowerKW < 0 || input.workingVolumeL <= 0) {
+    return {
+      effectiveFrequencyKHz: 0,
+      effectivePowerKW: 0,
+      powerDensityWPerL: 0,
+      powerLimited: false,
+      frequencyLimited: false,
+      status: 'INVALID_INPUT',
+      warnings: ['Ultrasonic hardware limit input is invalid.'],
+    };
+  }
+
+  const frequencyLimited = input.operatingFrequencyKHz < input.installedFrequencyMinKHz || input.operatingFrequencyKHz > input.installedFrequencyMaxKHz;
+  const effectiveFrequencyKHz = Math.min(input.installedFrequencyMaxKHz, Math.max(input.installedFrequencyMinKHz, input.operatingFrequencyKHz));
+  const effectivePowerKW = Math.min(input.requestedPowerKW, input.installedMaxPowerKW);
+  const powerLimited = input.requestedPowerKW > input.installedMaxPowerKW;
+  const warnings: string[] = [];
+  if (frequencyLimited) warnings.push('Requested ultrasonic frequency is outside the installed transducer range; value was clamped to the nearest limit.');
+  if (powerLimited) warnings.push('Requested ultrasonic power exceeds installed maximum power; effective power was clamped.');
+
+  return {
+    effectiveFrequencyKHz,
+    effectivePowerKW,
+    powerDensityWPerL: (effectivePowerKW * 1000) / input.workingVolumeL,
+    powerLimited,
+    frequencyLimited,
+    status: frequencyLimited ? 'FREQUENCY_OUT_OF_RANGE' : powerLimited ? 'POWER_LIMITED' : 'WITHIN_INSTALLED_LIMITS',
+    warnings,
+  };
+}
