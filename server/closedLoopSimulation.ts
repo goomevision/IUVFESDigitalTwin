@@ -9,17 +9,14 @@
  * before scientific or engineering claims are made from its outputs.
  */
 
-import { ProcessControlLoop } from './controlLoop';
+import { ProcessControlLoop, type ControlOutput } from './controlLoop';
 import { MachineDynamicsEngine } from './machineDynamics';
-import {
-  ProcessStateEngine,
-  type MachineSensors,
-  type ProcessState,
-} from './processStateEngine';
+import { ProcessStateEngine, type MachineSensors, type ProcessState } from './processStateEngine';
 
 export interface ClosedLoopSimulationConfig {
   targetPressureMbar: number;
   targetTemperatureC: number;
+  coolingTemperatureC?: number;
   materialWeightKg: number;
   waterContentPercent: number;
   oilContentPercent: number;
@@ -32,6 +29,7 @@ export interface CausalFrame {
   timestampSeconds: number;
   sensorBefore: MachineSensors;
   controller: ProcessState;
+  controlOutput: ControlOutput;
   sensorAfter: MachineSensors;
   paused: boolean;
 }
@@ -69,109 +67,44 @@ export class ClosedLoopSimulationEngine {
       oilRecoveredKg: Math.max(0, config.materialWeightKg * config.oilContentPercent / 100),
       energyKwh: 0,
     };
-    this.sensors = {
-      chamberSealed: true,
-      pressureMbar: 1013.25,
-      temperatureC: 25,
-      yieldPercent: 0,
-      waterRemovedKg: 0,
-      oilRecoveredKg: 0,
-      energyKwh: 0,
-    };
-    this.state = new ProcessStateEngine(
-      { targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC },
-      this.sensors,
-    );
-    this.dynamics = new MachineDynamicsEngine(this.sensors, {
-      ambientPressureMbar: 1013.25,
-      ambientTemperatureC: 25,
-      vacuumRateMbarPerSecond: 7,
-      heaterRateCPerSecond: 0.18,
-      passiveHeatLossCPerSecond: 0.035,
-      coolingRateCPerSecond: 0.12,
-      condenserCoolingFactor: 0.05,
-      extractionYieldRatePerSecond: 0.00035,
-      actuatorLag: 0.35,
-    });
+    this.sensors = { chamberSealed: true, pressureMbar: 1013.25, temperatureC: 25, yieldPercent: 0, waterRemovedKg: 0, oilRecoveredKg: 0, energyKwh: 0 };
+    this.state = new ProcessStateEngine({ targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC, coolingTemperatureC: config.coolingTemperatureC }, this.sensors);
+    this.dynamics = new MachineDynamicsEngine(this.sensors, { ambientPressureMbar: 1013.25, ambientTemperatureC: 25, vacuumRateMbarPerSecond: 7, heaterRateCPerSecond: 0.18, passiveHeatLossCPerSecond: 0.035, coolingRateCPerSecond: 0.12, condenserCoolingFactor: 0.05, extractionYieldRatePerSecond: 0.00035, actuatorLag: 0.35 });
     this.control = new ProcessControlLoop();
   }
 
   public isPaused(): boolean { return this.paused; }
-
   public pause(): void { this.paused = true; }
-
   public resume(): void { this.paused = false; }
 
-  /** Change operator setpoints while the live simulation is running. */
-  public setTargets(next: { targetPressureMbar?: number; targetTemperatureC?: number }): void {
+  public setTargets(next: { targetPressureMbar?: number; targetTemperatureC?: number; coolingTemperatureC?: number }): void {
     if (next.targetPressureMbar !== undefined) this.target.pressureMbar = Math.max(1, Math.min(1000, next.targetPressureMbar));
     if (next.targetTemperatureC !== undefined) this.target.temperatureC = Math.max(25, Math.min(150, next.targetTemperatureC));
-    this.state.setTargets({ targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC });
+    this.state.setTargets({ targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC, coolingTemperatureC: next.coolingTemperatureC });
   }
 
-  public getTargets(): { targetPressureMbar: number; targetTemperatureC: number } {
-    return { targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC };
+  public getTargets(): { targetPressureMbar: number; targetTemperatureC: number; coolingTemperatureC: number } {
+    const stateTargets = this.state.getTargets();
+    return { targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC, coolingTemperatureC: stateTargets.coolingTemperatureC };
   }
 
   public reset(): void {
-    this.paused = false;
-    this.elapsedSeconds = 0;
-    this.stepNumber = 0;
-    this.frames.length = 0;
-    this.pausedSteps.length = 0;
-    this.sensors = {
-      chamberSealed: true,
-      pressureMbar: 1013.25,
-      temperatureC: 25,
-      yieldPercent: 0,
-      waterRemovedKg: 0,
-      oilRecoveredKg: 0,
-      energyKwh: 0,
-    };
-    this.state.reset(this.sensors);
-    this.control.reset();
+    this.paused = false; this.elapsedSeconds = 0; this.stepNumber = 0; this.frames.length = 0; this.pausedSteps.length = 0;
+    this.sensors = { chamberSealed: true, pressureMbar: 1013.25, temperatureC: 25, yieldPercent: 0, waterRemovedKg: 0, oilRecoveredKg: 0, energyKwh: 0 };
+    this.state.reset(this.sensors); this.control.reset();
   }
 
-  /** Advance exactly one causal timestep. Pause means no state evolution. */
   public step(): CausalFrame | null {
-    if (this.paused) {
-      this.pausedSteps.push(this.stepNumber);
-      return null;
-    }
+    if (this.paused) { this.pausedSteps.push(this.stepNumber); return null; }
     if (this.stepNumber >= this.maxSteps) return null;
-
     const sensorBefore = { ...this.sensors };
     const controllerBeforeActuation = this.state.tick(this.sensors, this.elapsedSeconds);
-    const controlOutput = this.control.update({
-      targetTemperatureC: this.target.temperatureC,
-      targetPressureMbar: this.target.pressureMbar,
-      temperatureC: this.sensors.temperatureC,
-      pressureMbar: this.sensors.pressureMbar,
-      stage: controllerBeforeActuation.stage,
-      dtSeconds: this.dtSeconds,
-    });
-
-    const commands = {
-      ...controllerBeforeActuation.commands,
-      heater: controlOutput.heaterPower > 0.01,
-      vacuumPump: controlOutput.vacuumPumpPower > 0.01,
-      condenser: controlOutput.valve.vaporToCondenser > 0.01,
-      cooling: controlOutput.valve.coolingWater > 0.01,
-    };
+    const controlOutput = this.control.update({ targetTemperatureC: this.target.temperatureC, targetPressureMbar: this.target.pressureMbar, temperatureC: this.sensors.temperatureC, pressureMbar: this.sensors.pressureMbar, stage: controllerBeforeActuation.stage, dtSeconds: this.dtSeconds });
+    const commands = { ...controllerBeforeActuation.commands, heater: controlOutput.heaterPower > 0.01, vacuumPump: controlOutput.vacuumPumpPower > 0.01, condenser: controlOutput.valve.vaporToCondenser > 0.01, cooling: controlOutput.valve.coolingWater > 0.01 };
     const controller = { ...controllerBeforeActuation, commands };
     const sensorAfter = this.dynamics.step(this.target, commands, this.dtSeconds);
-    this.elapsedSeconds += this.dtSeconds;
-    this.stepNumber += 1;
-    this.sensors = sensorAfter;
-
-    const frame: CausalFrame = {
-      step: this.stepNumber,
-      timestampSeconds: this.elapsedSeconds,
-      sensorBefore,
-      controller,
-      sensorAfter: { ...sensorAfter },
-      paused: false,
-    };
+    this.elapsedSeconds += this.dtSeconds; this.stepNumber += 1; this.sensors = sensorAfter;
+    const frame: CausalFrame = { step: this.stepNumber, timestampSeconds: this.elapsedSeconds, sensorBefore, controller, controlOutput, sensorAfter: { ...sensorAfter }, paused: false };
     this.frames.push(frame);
     return frame;
   }
@@ -183,12 +116,7 @@ export class ClosedLoopSimulationEngine {
       if (this.step() === null) break;
     }
     const finalState = this.state.tick(this.sensors, this.elapsedSeconds);
-    return {
-      status: finalState.stage,
-      frames: [...this.frames],
-      finalSensors: { ...this.sensors },
-      pausedSteps: [...this.pausedSteps],
-    };
+    return { status: finalState.stage, frames: [...this.frames], finalSensors: { ...this.sensors }, pausedSteps: [...this.pausedSteps] };
   }
 
   public getFrames(): CausalFrame[] { return [...this.frames]; }
