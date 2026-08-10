@@ -22,6 +22,8 @@ const hardwareSchema = z.object({
   coldTrapHeatTransferAreasM2: z.tuple([z.number().nonnegative(), z.number().nonnegative(), z.number().nonnegative(), z.number().nonnegative()]),
   coldTrapVolumesL: z.tuple([z.number().nonnegative(), z.number().nonnegative(), z.number().nonnegative(), z.number().nonnegative()]),
   coldTrapCondensateCapacityKg: z.tuple([z.number().nonnegative(), z.number().nonnegative(), z.number().nonnegative(), z.number().nonnegative()]),
+  collectionVesselCapacityKg: z.tuple([z.number().nonnegative(), z.number().nonnegative(), z.number().nonnegative(), z.number().nonnegative()]).optional(),
+  oilCollectionRoutingFractions: z.tuple([z.number().nonnegative(), z.number().nonnegative(), z.number().nonnegative()]).optional(),
   chamberVolumeL: z.number().positive().max(100000),
   vacuumPipeDiameterMm: z.number().positive().max(10000),
   vacuumPipeLengthM: z.number().positive().max(100000),
@@ -159,7 +161,12 @@ async function finalizeResult(experimentId: string, snapshot: any) {
     efficiency: null as any,
     wasteComposition: null as any,
     realTimeData: snapshot.frames,
-    massBalance: { waterRemovedKg: snapshot.sensors.waterRemovedKg, oilRecoveredKg: snapshot.sensors.oilRecoveredKg },
+    massBalance: {
+      waterRemovedKg: snapshot.sensors.waterRemovedKg,
+      oilRecoveredKg: snapshot.sensors.oilRecoveredKg,
+      collectionVesselMassKg: snapshot.sensors.collectionVesselMassKg ?? [0, 0, 0, 0],
+      unroutedCondensateKg: snapshot.sensors.unroutedCondensateKg ?? 0,
+    },
     energyBalance: { energyKwh: snapshot.sensors.energyKwh, terminalStage: state.stage },
   });
   await db.updateExperimentStatus(experimentId, state.stage === "FAULT" ? "failed" : "completed");
