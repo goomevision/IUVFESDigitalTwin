@@ -103,6 +103,10 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: ProcessSi
     const p = experimentQuery.data.inputParameters as Record<string, unknown>;
     try {
       setAlarm(null); setCompleted(false); setFrames([]); setRunning(false); setPaused(false);
+      const durationHours = Number(p.duration);
+      const dtSeconds = 1;
+      const durationSeconds = Number.isFinite(durationHours) && durationHours > 0 ? durationHours * 3600 : 300;
+      const maxSteps = Math.max(1, Math.min(100000, Math.ceil(durationSeconds / dtSeconds)));
       const created = await createSession.mutateAsync({
         experimentId,
         materialWeight: Number(p.materialWeight),
@@ -110,14 +114,14 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: ProcessSi
         oilContent: Number(p.oilContent),
         targetPressure: Number(p.targetPressure),
         targetTemperature: Number(p.targetTemperature),
-        dtSeconds: 1,
-        maxSteps: Math.max(1, Math.ceil(Number(p.duration) || 300)),
+        dtSeconds,
+        maxSteps,
       });
       await startSession.mutateAsync(created.sessionId);
       setSessionId(created.sessionId);
       setRunning(true);
       await stepOnce(created.sessionId);
-      toast.success("Live closed-loop physics session started");
+      toast.success(`Live closed-loop physics session started — ${durationHours} h / ${maxSteps} steps`);
     } catch (error) {
       console.error(error); clearTimer(); setRunning(false); setAlarm("SIMULATION ENGINE ERROR — PROCESS NOT STARTED"); toast.error("Closed-loop simulation failed");
     }
