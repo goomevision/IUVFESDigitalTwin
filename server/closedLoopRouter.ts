@@ -6,6 +6,16 @@ import { ClosedLoopSimulationEngine } from "./closedLoopSimulation";
 import { getClosedLoopSession, saveClosedLoopSession } from "./closedLoopSessionStore";
 
 const hardwareSchema = z.object({
+  reactorInternalDiameterMm: z.number().positive().max(100000),
+  reactorShellLengthMm: z.number().positive().max(100000),
+  reactorWallThicknessMm: z.number().positive().max(10000),
+  reactorHeadThicknessMm: z.number().positive().max(10000),
+  reactorMaterial: z.string().min(1).max(100),
+  designExternalPressureBar: z.number().min(-100).max(1000),
+  designTemperatureC: z.number().min(-100).max(1000),
+  ultrasonicFrequencyKHz: z.number().positive().max(1000),
+  ultrasonicMaxPowerKW: z.number().nonnegative().max(100000),
+  coldTrapTemperaturesC: z.tuple([z.number(), z.number(), z.number(), z.number()]),
   chamberVolumeL: z.number().positive().max(100000),
   pumpCapacityM3h: z.number().nonnegative().max(100000),
   thermalMassKJPerC: z.number().positive().max(1000000),
@@ -48,14 +58,14 @@ export const closedLoopRouter = router({
     await authorize(input.experimentId, ctx.user);
     const existing = await getClosedLoopSession(input.experimentId);
     if (existing && ["running", "paused"].includes(existing.status)) {
-      return { success: true, status: existing.status, step: existing.lastStep, frames: existing.snapshot.frames, sensors: existing.snapshot.sensors, state: existing.snapshot.state };
+      return { success: true, status: existing.status, step: existing.lastStep, frames: existing.snapshot.frames, sensors: existing.snapshot.sensors, state: existing.snapshot.state, hardware: existing.snapshot.config.hardware ?? null };
     }
     const engine = new ClosedLoopSimulationEngine(input);
     const snapshot = engine.snapshot();
     await saveClosedLoopSession(input.experimentId, "running", snapshot);
     await db.updateExperimentStatus(input.experimentId, "running");
     await db.logControlAction({ experimentId: input.experimentId, action: "start", operatorNotes: `Closed-loop simulation session started in ${input.realTime ? "REAL_TIME" : "ACCELERATED/BATCH"} mode.` });
-    return { success: true, status: "running" as const, step: snapshot.stepNumber, frames: snapshot.frames, sensors: snapshot.sensors, state: snapshot.state };
+    return { success: true, status: "running" as const, step: snapshot.stepNumber, frames: snapshot.frames, sensors: snapshot.sensors, state: snapshot.state, hardware: snapshot.config.hardware ?? null };
   }),
 
   step: protectedProcedure.input(experimentIdSchema).mutation(async ({ ctx, input }) => {
@@ -125,7 +135,7 @@ export const closedLoopRouter = router({
     await authorize(input.experimentId, ctx.user);
     const session = await getClosedLoopSession(input.experimentId);
     if (!session) return { exists: false };
-    return { exists: true, status: session.status, step: session.lastStep, frameCount: session.frameCount, sensors: session.snapshot.sensors, state: session.snapshot.state };
+    return { exists: true, status: session.status, step: session.lastStep, frameCount: session.frameCount, sensors: session.snapshot.sensors, state: session.snapshot.state, hardware: session.snapshot.config.hardware ?? null };
   }),
 });
 
