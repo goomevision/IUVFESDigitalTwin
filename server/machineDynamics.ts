@@ -8,6 +8,9 @@
 
 import type { MachineCommand, MachineSensors } from './processStateEngine';
 import { stepThermalModel } from './thermalEngineering';
+import { deriveVacuumConductance, combinePumpAndConductance } from './vacuumConductance';
+import { calculateColdTrapLoad } from './coldTrapEngineering';
+import { enforceUltrasonicHardwareLimits } from './ultrasonicHardwareCoupling';
 
 export interface VirtualHardwareDynamicsConfig {
   /** Static engineering specification retained with the session snapshot. */
@@ -23,6 +26,24 @@ export interface VirtualHardwareDynamicsConfig {
   coldTrapTemperaturesC?: [number, number, number, number];
   /** Connected reactor/vacuum volume in litres. */
   chamberVolumeL?: number;
+  /** Main vacuum pipe inside diameter. */
+  vacuumPipeDiameterMm?: number;
+  /** Main vacuum pipe axial length. */
+  vacuumPipeLengthM?: number;
+  /** Effective-length multiplier for bends/fittings. */
+  vacuumPipeEffectiveLengthFactor?: number;
+  /** Gas viscosity used by the laminar conductance screening model. */
+  vacuumGasViscosityPaS?: number;
+  /** Pump-side pressure used for the conductance screening model. */
+  vacuumPumpOutletPressureMbar?: number;
+  /** Installed cold-trap overall heat-transfer coefficient. */
+  coldTrapHeatTransferCoefficientWPerM2K?: number;
+  coldTrapHeatTransferAreasM2?: [number, number, number, number];
+  coldTrapVolumesL?: [number, number, number, number];
+  coldTrapCondensateCapacityKg?: [number, number, number, number];
+  /** Dynamic ultrasonic request; static hardware max remains immutable. */
+  ultrasonicOperatingFrequencyKHz?: number;
+  ultrasonicRequestedPowerKW?: number;
   /** Pump nominal capacity in cubic metres per hour. */
   pumpCapacityM3h?: number;
   /** Effective thermal mass of the heated process system in kJ/K. */
@@ -80,6 +101,17 @@ export class MachineDynamicsEngine {
       ultrasonicMaxPowerKW: 6,
       coldTrapTemperaturesC: [0, -20, -40, -80],
       chamberVolumeL: 250,
+      vacuumPipeDiameterMm: 0,
+      vacuumPipeLengthM: 0,
+      vacuumPipeEffectiveLengthFactor: 1,
+      vacuumGasViscosityPaS: 1.81e-5,
+      vacuumPumpOutletPressureMbar: 1,
+      coldTrapHeatTransferCoefficientWPerM2K: 0,
+      coldTrapHeatTransferAreasM2: [0, 0, 0, 0],
+      coldTrapVolumesL: [0, 0, 0, 0],
+      coldTrapCondensateCapacityKg: [0, 0, 0, 0],
+      ultrasonicOperatingFrequencyKHz: 30,
+      ultrasonicRequestedPowerKW: 0,
       pumpCapacityM3h: 200,
       thermalMassKJPerC: 250,
       heatingPowerKW: 9,
@@ -95,11 +127,29 @@ export class MachineDynamicsEngine {
     const dt = Math.max(0.05, dtSeconds);
     const lag = Math.max(0.05, Math.min(1, this.c.actuatorLag));
 
-    // Vacuum response scales with pump capacity and inversely with connected
-    // volume. The legacy vacuum rate remains the nominal reference for a
-    // 250 L chamber and 200 m³/h pump.
-    const volumeFactor = 250 / Math.max(this.c.chamberVolumeL, 1);
-    const pumpFactor = this.c.pumpCapacityM3h / 200;
+    const geometricRadiusM = this.c.reactorInternalDiameterMm / 2000;
+    const geometricVolumeL = Math.PI * geometricRadiusM ** 2 * (this.c.reactorShellLengthMm / 1000) * 1000;
+    const pipeConfigured = this.c.vacuumPipeDiameterMm > 0 && this.c.vacuumPipeLengthM > 0;
+    const pipe = pipeConfigured
+      ? deriveVacuumConductance({
+          pipeDiameterM: this.c.vacuumPipeDiameterMm / 1000,
+          pipeLengthM: this.c.vacuumPipeLengthM,
+          upstreamPressureMbar: Math.max(this.state.pressureMbar, this.c.vacuumPumpOutletPressureMbar),
+          downstreamPressureMbar: this.c.vacuumPumpOutletPressureMbar,
+          gasViscosityPaS: this.c.vacuumGasViscosityPaS,
+          effectiveLengthFactor: this.c.vacuumPipeEffectiveLengthFactor,
+        })
+      : null;
+    const pipeVolumeL = pipe?.pipeVolumeM3 ? pipe.pipeVolumeM3 * 1000 : 0;
+    const connectedVolumeL = Math.max(1, this.c.chamberVolumeL + pipeVolumeL);
+    const effectivePumpCapacityM3h = pipe
+      ? combinePumpAndConductance(this.c.pumpCapacityM3h, pipe.conductanceM3PerHour)
+      : this.c.pumpCapacityM3h;
+
+    // Vacuum response keeps the original 250 L / 200 m³/h reference model,
+    // while connected volume and effective pump speed now come from hardware.
+    const volumeFactor = 250 / connectedVolumeL;
+    const pumpFactor = effectivePumpCapacityM3h / 200;
     const hardwareVacuumRate = this.c.vacuumRateMbarPerSecond * volumeFactor * pumpFactor;
     const vacuumRate = Math.max(0, hardwareVacuumRate);
     const leakRise = Math.max(0, this.c.leakRateMbarPerSecond) * dt;
@@ -129,6 +179,15 @@ export class MachineDynamicsEngine {
     temperature = Math.max(this.c.ambientTemperatureC, Math.min(200, temperature));
     temperature = this.blend(this.state.temperatureC, temperature, lag);
 
+    const ultrasonic = enforceUltrasonicHardwareLimits({
+      installedFrequencyMinKHz: Math.max(0.001, this.c.ultrasonicFrequencyKHz),
+      installedFrequencyMaxKHz: Math.max(0.001, this.c.ultrasonicFrequencyKHz),
+      installedMaxPowerKW: Math.max(0, this.c.ultrasonicMaxPowerKW),
+      operatingFrequencyKHz: this.c.ultrasonicOperatingFrequencyKHz,
+      requestedPowerKW: commands.extractor ? this.c.ultrasonicRequestedPowerKW : 0,
+      workingVolumeL: connectedVolumeL,
+    });
+
     const thermalFactor = Math.max(0, Math.min(1, (temperature - 25) / 100));
     const vacuumFactor = Math.max(0, Math.min(1, 1 - pressure / this.c.ambientPressureMbar));
     const extractionDrive = commands.extractor ? vacuumFactor * (0.35 + thermalFactor * 0.65) : 0;
@@ -142,11 +201,44 @@ export class MachineDynamicsEngine {
       this.state.waterRemovedKg,
       target.waterRemovedKg * (yieldPercentage / Math.max(target.yieldPercent, 0.001)),
     );
+
+    const previousWater = this.state.waterRemovedKg;
+    const incomingCondensableKg = Math.max(0, waterRemovedKg - previousWater);
+    let remainingCondensableKg = incomingCondensableKg;
+    let coldTrapHeatLoadKW = 0;
+    let coldTrapCondensationCapacityKgPerSecond = 0;
+    let coldTrapCondensedWaterKg = this.state.coldTrapCondensedWaterKg ?? 0;
+    const trapTemps = this.c.coldTrapTemperaturesC;
+    const areas = this.c.coldTrapHeatTransferAreasM2;
+    const volumes = this.c.coldTrapVolumesL;
+    const capacities = this.c.coldTrapCondensateCapacityKg;
+    for (let i = 0; i < 4 && remainingCondensableKg > 0; i += 1) {
+      const trap = calculateColdTrapLoad(
+        {
+          temperatureC: trapTemps[i],
+          volumeL: volumes[i],
+          heatTransferAreaM2: areas[i],
+          condensateCapacityKg: Math.max(0, capacities[i] - coldTrapCondensedWaterKg),
+        },
+        {
+          streamTemperatureC: temperature,
+          dtSeconds: dt,
+          incomingCondensableKg: remainingCondensableKg,
+          overallHeatTransferCoefficientWPerM2K: this.c.coldTrapHeatTransferCoefficientWPerM2K,
+        },
+      );
+      coldTrapHeatLoadKW += trap.heatRemovalKW;
+      coldTrapCondensationCapacityKgPerSecond += trap.thermalCapacityKgPerSecond;
+      coldTrapCondensedWaterKg += trap.condensedKg;
+      remainingCondensableKg = trap.remainingIncomingKg;
+    }
+
     const energyRate =
       (commands.heater ? Math.max(0, this.c.heatingPowerKW) / 2250 : 0) +
       (commands.vacuumPump ? 0.0015 : 0) +
       (commands.extractor ? 0.001 : 0) +
-      (commands.cooling ? Math.max(0, this.c.coolingPowerKW) / 3000 : 0);
+      (commands.cooling ? Math.max(0, this.c.coolingPowerKW) / 3000 : 0) +
+      (ultrasonic.effectivePowerKW > 0 ? ultrasonic.effectivePowerKW / 3600 : 0);
     const energyConsumed = this.state.energyKwh + energyRate * dt;
 
     this.state = {
@@ -157,6 +249,15 @@ export class MachineDynamicsEngine {
       waterRemovedKg: Math.min(target.waterRemovedKg, waterRemovedKg),
       oilRecoveredKg: Math.min(target.oilRecoveredKg, oilRecoveredKg),
       energyKwh: Math.max(0, energyConsumed),
+      connectedVolumeL,
+      pipeVolumeL,
+      vacuumConductanceM3h: pipe?.conductanceM3PerHour,
+      effectivePumpCapacityM3h,
+      ultrasonicEffectivePowerKW: ultrasonic.effectivePowerKW,
+      ultrasonicPowerDensityWPerL: ultrasonic.powerDensityWPerL,
+      coldTrapHeatLoadKW,
+      coldTrapCondensationCapacityKgPerSecond,
+      coldTrapCondensedWaterKg,
     };
     return { ...this.state };
   }
