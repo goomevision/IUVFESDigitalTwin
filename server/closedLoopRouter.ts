@@ -15,12 +15,16 @@ const controlSchema = z.object({ sessionId: z.string().min(1), targetPressureMba
 function toEngineConfig(input: z.infer<typeof inputSchema>): ClosedLoopSimulationConfig { return mapExperimentInputsToEngine(input); }
 function withStoredInputs(input: z.infer<typeof inputSchema>, experiment: { inputParameters?: unknown }): z.infer<typeof inputSchema> {
   const stored = (experiment.inputParameters ?? {}) as Record<string, unknown>;
+  const storedNumber = (key: string): number | undefined => {
+    const value = Number(stored[key]);
+    return Number.isFinite(value) ? value : undefined;
+  };
   return {
     ...input,
-    ultrasonicFrequency: input.ultrasonicFrequency ?? Number(stored.ultrasonicFrequency ?? NaN),
-    ultrasonicPowerW: input.ultrasonicPowerW ?? Number(stored.ultrasonicPower ?? NaN),
-    ultrasonicDutyCyclePercent: input.ultrasonicDutyCyclePercent ?? Number(stored.ultrasonicDuty ?? NaN),
-    ultrasonicMaxPowerW: input.ultrasonicMaxPowerW ?? Number(stored.ultrasonicMaxPowerW ?? NaN),
+    ultrasonicFrequency: input.ultrasonicFrequency ?? storedNumber("ultrasonicFrequency"),
+    ultrasonicPowerW: input.ultrasonicPowerW ?? storedNumber("ultrasonicPowerW") ?? storedNumber("ultrasonicPower"),
+    ultrasonicDutyCyclePercent: input.ultrasonicDutyCyclePercent ?? storedNumber("ultrasonicDutyCyclePercent") ?? storedNumber("ultrasonicDuty"),
+    ultrasonicMaxPowerW: input.ultrasonicMaxPowerW ?? storedNumber("ultrasonicMaxPowerW"),
   };
 }
 async function assertExperimentAccess(ctx: { user?: { id: number; role: string } | null }, experimentId: string) { if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" }); const experiment = await db.getExperiment(experimentId); if (!experiment) throw new TRPCError({ code: "NOT_FOUND" }); if (experiment.userId !== ctx.user.id && ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" }); return experiment; }
