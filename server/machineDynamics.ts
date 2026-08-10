@@ -127,8 +127,6 @@ export class MachineDynamicsEngine {
     const dt = Math.max(0.05, dtSeconds);
     const lag = Math.max(0.05, Math.min(1, this.c.actuatorLag));
 
-    const geometricRadiusM = this.c.reactorInternalDiameterMm / 2000;
-    const geometricVolumeL = Math.PI * geometricRadiusM ** 2 * (this.c.reactorShellLengthMm / 1000) * 1000;
     const pipeConfigured = this.c.vacuumPipeDiameterMm > 0 && this.c.vacuumPipeLengthM > 0;
     const pipe = pipeConfigured
       ? deriveVacuumConductance({
@@ -208,17 +206,19 @@ export class MachineDynamicsEngine {
     let coldTrapHeatLoadKW = 0;
     let coldTrapCondensationCapacityKgPerSecond = 0;
     let coldTrapCondensedWaterKg = this.state.coldTrapCondensedWaterKg ?? 0;
+    let aggregateCapacityRemainingKg = Math.max(0, this.c.coldTrapCondensateCapacityKg.reduce((sum, value) => sum + value, 0) - coldTrapCondensedWaterKg);
     const trapTemps = this.c.coldTrapTemperaturesC;
     const areas = this.c.coldTrapHeatTransferAreasM2;
     const volumes = this.c.coldTrapVolumesL;
     const capacities = this.c.coldTrapCondensateCapacityKg;
-    for (let i = 0; i < 4 && remainingCondensableKg > 0; i += 1) {
+    for (let i = 0; i < 4 && remainingCondensableKg > 0 && aggregateCapacityRemainingKg > 0; i += 1) {
+      const stageCapacity = Math.min(capacities[i], aggregateCapacityRemainingKg);
       const trap = calculateColdTrapLoad(
         {
           temperatureC: trapTemps[i],
           volumeL: volumes[i],
           heatTransferAreaM2: areas[i],
-          condensateCapacityKg: Math.max(0, capacities[i] - coldTrapCondensedWaterKg),
+          condensateCapacityKg: Math.max(0, stageCapacity),
         },
         {
           streamTemperatureC: temperature,
@@ -230,6 +230,7 @@ export class MachineDynamicsEngine {
       coldTrapHeatLoadKW += trap.heatRemovalKW;
       coldTrapCondensationCapacityKgPerSecond += trap.thermalCapacityKgPerSecond;
       coldTrapCondensedWaterKg += trap.condensedKg;
+      aggregateCapacityRemainingKg = Math.max(0, aggregateCapacityRemainingKg - trap.condensedKg);
       remainingCondensableKg = trap.remainingIncomingKg;
     }
 
