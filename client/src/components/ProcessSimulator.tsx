@@ -54,7 +54,6 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: ProcessSi
   const [completed, setCompleted] = useState(false);
   const timerRef = useRef<number | null>(null);
 
-  // Canonical UI rule: every live value comes from the latest server-produced CausalFrame.
   const latestFrame = frames.length ? frames[frames.length - 1] : null;
   const current = latestFrame?.sensorAfter ?? INITIAL;
   const machine = latestFrame?.controller;
@@ -64,6 +63,18 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: ProcessSi
   const stageIndex = STAGES.findIndex(s => s.id === activeStage);
   const recentFrames = useMemo(() => frames.slice(Math.max(0, frames.length - 80)), [frames]);
   const timeline = useMemo(() => frames.map(frame => ({ ...frame.controller, elapsedSeconds: frame.timestampSeconds })), [frames]);
+
+  // The 3D twin is deliberately fed by EFFECTIVE commands: the commands that survived the
+  // controller/interlock/actuation path and were actually applied to the simulated machine.
+  const machineVisual = latestFrame ? {
+    stage: latestFrame.safety.stage,
+    commands: latestFrame.effectiveCommands,
+    sensors: latestFrame.sensorAfter,
+    interlocks: {
+      vacuumAchieved: latestFrame.safety.vacuumAchieved,
+      overTemperature: latestFrame.safety.overTemperature,
+    },
+  } : undefined;
 
   const clearTimer = () => { if (timerRef.current !== null) { window.clearInterval(timerRef.current); timerRef.current = null; } };
   useEffect(() => () => clearTimer(), []);
@@ -144,10 +155,10 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: ProcessSi
 
     <section className="rounded-2xl border border-emerald-500/20 bg-slate-950/60 p-3"><div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[10px]"><span className="tracking-[0.2em] text-emerald-400">DATA SOURCE: CLOSED-LOOP CAUSAL FRAME</span><span className="text-slate-500">{latestFrame ? `FRAME ${latestFrame.step} • ENGINE OUTPUT • T+${latestFrame.timestampSeconds.toFixed(2)}s` : "WAITING FOR ENGINE FRAME"}</span></div></section>
 
-    <ProcessMachine3D machine={machine} />
+    <ProcessMachine3D machine={machineVisual} />
 
     <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]"><section className="rounded-2xl border border-cyan-500/20 bg-slate-950/60 p-4"><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold tracking-wider text-cyan-300">LIVE PROCESS TREND</h3><span className="font-mono text-xs text-slate-500">T: {(latestFrame?.timestampSeconds ?? 0).toFixed(1)}s • {frames.length} FRAMES</span></div><div className="relative h-64 overflow-hidden rounded-xl border border-slate-800 bg-slate-950"><div className="absolute inset-0 opacity-20" style={{ backgroundImage: "linear-gradient(rgba(34,211,238,.25) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,.25) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />{chartPoints && <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full p-5"><polyline points={chartPoints} fill="none" stroke="rgb(34 211 238)" strokeWidth="1.2" vectorEffect="non-scaling-stroke" /></svg>}<div className="absolute bottom-3 left-3 font-mono text-[10px] text-slate-600">TEMPERATURE / SIMULATION TIME</div></div></section>
-      <section className="rounded-2xl border border-cyan-500/20 bg-slate-950/60 p-4"><h3 className="mb-4 font-semibold tracking-wider text-cyan-300">MACHINE STATE</h3><div className="space-y-3 font-mono text-xs">{[["VACUUM PUMP", machineLabel(latestFrame?.effectiveCommands.vacuumPump ?? false)],["HEATER", machineLabel(latestFrame?.effectiveCommands.heater ?? false)],["EXTRACTOR", machineLabel(latestFrame?.effectiveCommands.extractor ?? false)],["CONDENSER", machineLabel(latestFrame?.effectiveCommands.condenser ?? false)],["COOLING", machineLabel(latestFrame?.effectiveCommands.cooling ?? false)],["VACUUM INTERLOCK", safety?.vacuumAchieved ? "PASS" : "WAITING"],["THERMAL INTERLOCK", safety?.overTemperature ? "TRIPPED" : "SAFE"],["MASS BALANCE", material ? `${material.oilRecoveredKg.toFixed(3)} kg oil / ${material.waterRemovedKg.toFixed(3)} kg water` : "—"]].map(([label, value]) => <div key={label} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/50 p-3"><span className="text-slate-500">{label}</span><span className={value === "ACTIVE" || value === "PASS" || value === "SAFE" ? "text-emerald-300" : value === "TRIPPED" ? "text-red-300" : "text-cyan-300"}>{value}</span></div>)}</div></section></div>
+      <section className="rounded-2xl border border-cyan-500/20 bg-slate-950/60 p-4"><div className="mb-4 flex items-center justify-between"><h3 className="font-semibold tracking-wider text-cyan-300">MACHINE STATE</h3><span className="font-mono text-[9px] text-slate-600">EFFECTIVE / ACTUAL</span></div><div className="space-y-3 font-mono text-xs">{[["VACUUM PUMP", machineLabel(latestFrame?.effectiveCommands.vacuumPump ?? false)],["HEATER", machineLabel(latestFrame?.effectiveCommands.heater ?? false)],["EXTRACTOR", machineLabel(latestFrame?.effectiveCommands.extractor ?? false)],["CONDENSER", machineLabel(latestFrame?.effectiveCommands.condenser ?? false)],["COOLING", machineLabel(latestFrame?.effectiveCommands.cooling ?? false)],["VACUUM INTERLOCK", safety?.vacuumAchieved ? "PASS" : "WAITING"],["THERMAL INTERLOCK", safety?.overTemperature ? "TRIPPED" : "SAFE"],["MASS BALANCE", material ? `${material.oilRecoveredKg.toFixed(3)} kg oil / ${material.waterRemovedKg.toFixed(3)} kg water` : "—"]].map(([label, value]) => <div key={label} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/50 p-3"><span className="text-slate-500">{label}</span><span className={value === "ACTIVE" || value === "PASS" || value === "SAFE" ? "text-emerald-300" : value === "TRIPPED" ? "text-red-300" : "text-cyan-300"}>{value}</span></div>)}</div></section></div>
 
     <ProcessEventTimeline timeline={timeline} />
     <ScientificRunRecorder experimentId={experimentId} frames={frames} completed={completed} />
