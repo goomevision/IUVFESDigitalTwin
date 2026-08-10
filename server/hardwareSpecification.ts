@@ -67,12 +67,25 @@ export interface VacuumPumpHardwareSpecification {
   note: string;
 }
 
+export interface VacuumPipingHardwareSpecification {
+  id: string;
+  type: 'VACUUM_PIPING';
+  internalDiameter: HardwareParameter<number>;
+  length: HardwareParameter<number>;
+  effectiveLengthFactor: HardwareParameter<number>;
+  outletPressure: HardwareParameter<number>;
+  gasViscosity: HardwareParameter<number>;
+  material: HardwareParameter<string>;
+  note: string;
+}
+
 export interface ColdTrapHardwareSpecification {
   id: string;
   type: 'COLD_TRAP';
   temperature: HardwareParameter<number>;
   volume: HardwareParameter<number>;
   heatTransferArea: HardwareParameter<number>;
+  overallHeatTransferCoefficient: HardwareParameter<number>;
   condensateCapacity: HardwareParameter<number>;
   note: string;
 }
@@ -105,6 +118,7 @@ export interface IuvfesHardwareSpecification {
   heating: HeatingHardwareSpecification;
   ultrasonic: UltrasonicHardwareSpecification;
   vacuumPump: VacuumPumpHardwareSpecification;
+  vacuumPiping: VacuumPipingHardwareSpecification;
   coldTraps: ColdTrapHardwareSpecification[];
   sensors: SensorHardwareSpecification[];
   valves: ValveHardwareSpecification[];
@@ -169,11 +183,22 @@ export const IUVFES_VMMES_BASELINE: IuvfesHardwareSpecification = {
     liquidCarryoverProtection: baseline(true),
     note: 'Evacuation dynamics depend on pump curve, chamber volume, piping, valves, vapor load and leak rate.',
   },
+  vacuumPiping: {
+    id: 'PS-001',
+    type: 'VACUUM_PIPING',
+    internalDiameter: required(0, 'mm', 'P&ID/isometric drawing required.'),
+    length: required(0, 'm', 'Piping isometric required.'),
+    effectiveLengthFactor: baseline(1, '×', 'Increase for bends/fittings only after engineering review.'),
+    outletPressure: required(0, 'mbar_abs', 'Pump operating inlet/outlet condition required.'),
+    gasViscosity: baseline(1.81e-5, 'Pa·s', 'Air-like screening value at approximately room temperature.'),
+    material: required('', undefined, 'Piping material/datasheet required.'),
+    note: 'Conductance is regime-dependent; this simulator uses a reduced-order laminar screening relation when piping geometry is supplied.',
+  },
   coldTraps: [
-    { id: 'CT-001', type: 'COLD_TRAP', temperature: baseline(0, '°C'), volume: required(0, 'L'), heatTransferArea: required(0, 'm²'), condensateCapacity: required(0, 'kg'), note: 'Stage 1 nominal +5 to 0 °C.' },
-    { id: 'CT-002', type: 'COLD_TRAP', temperature: baseline(-20, '°C'), volume: required(0, 'L'), heatTransferArea: required(0, 'm²'), condensateCapacity: required(0, 'kg'), note: 'Stage 2 nominal −20 °C.' },
-    { id: 'CT-003', type: 'COLD_TRAP', temperature: baseline(-40, '°C'), volume: required(0, 'L'), heatTransferArea: required(0, 'm²'), condensateCapacity: required(0, 'kg'), note: 'Stage 3 nominal −40 °C.' },
-    { id: 'CT-004', type: 'COLD_TRAP', temperature: baseline(-80, '°C'), volume: required(0, 'L'), heatTransferArea: required(0, 'm²'), condensateCapacity: required(0, 'kg'), note: 'Stage 4 nominal −70 to −80 °C.' },
+    { id: 'CT-001', type: 'COLD_TRAP', temperature: baseline(0, '°C'), volume: required(0, 'L'), heatTransferArea: required(0, 'm²'), overallHeatTransferCoefficient: required(0, 'W/m²/K'), condensateCapacity: required(0, 'kg'), note: 'Stage 1 nominal +5 to 0 °C.' },
+    { id: 'CT-002', type: 'COLD_TRAP', temperature: baseline(-20, '°C'), volume: required(0, 'L'), heatTransferArea: required(0, 'm²'), overallHeatTransferCoefficient: required(0, 'W/m²/K'), condensateCapacity: required(0, 'kg'), note: 'Stage 2 nominal −20 °C.' },
+    { id: 'CT-003', type: 'COLD_TRAP', temperature: baseline(-40, '°C'), volume: required(0, 'L'), heatTransferArea: required(0, 'm²'), overallHeatTransferCoefficient: required(0, 'W/m²/K'), condensateCapacity: required(0, 'kg'), note: 'Stage 3 nominal −40 °C.' },
+    { id: 'CT-004', type: 'COLD_TRAP', temperature: baseline(-80, '°C'), volume: required(0, 'L'), heatTransferArea: required(0, 'm²'), overallHeatTransferCoefficient: required(0, 'W/m²/K'), condensateCapacity: required(0, 'kg'), note: 'Stage 4 nominal −70 to −80 °C.' },
   ],
   sensors: [
     { id: 'PT-001', type: 'PRESSURE', range: required({ min: 0, max: 0 }, 'mbar_abs'), accuracy: required(0, '%FS'), responseTime: required(0, 's'), calibrationId: required(''), location: baseline('Reactor') },
