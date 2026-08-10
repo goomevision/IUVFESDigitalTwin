@@ -9,116 +9,45 @@
  * before scientific or engineering claims are made from its outputs.
  */
 
-import { ProcessControlLoop, type ControlOutput } from './controlLoop';
+import { ProcessControlLoop, type ControlOutput, type OperatorActuatorLimits } from './controlLoop';
 import { MachineDynamicsEngine } from './machineDynamics';
 import { ProcessStateEngine, type MachineSensors, type ProcessState } from './processStateEngine';
 
-export interface ClosedLoopSimulationConfig {
-  targetPressureMbar: number;
-  targetTemperatureC: number;
-  coolingTemperatureC?: number;
-  materialWeightKg: number;
-  waterContentPercent: number;
-  oilContentPercent: number;
-  dtSeconds?: number;
-  maxSteps?: number;
-}
-
-export interface CausalFrame {
-  step: number;
-  timestampSeconds: number;
-  sensorBefore: MachineSensors;
-  controller: ProcessState;
-  controlOutput: ControlOutput;
-  sensorAfter: MachineSensors;
-  paused: boolean;
-}
-
-export interface ClosedLoopResult {
-  status: ProcessState['stage'];
-  frames: CausalFrame[];
-  finalSensors: MachineSensors;
-  pausedSteps: number[];
-}
+export interface ClosedLoopSimulationConfig { targetPressureMbar: number; targetTemperatureC: number; coolingTemperatureC?: number; materialWeightKg: number; waterContentPercent: number; oilContentPercent: number; dtSeconds?: number; maxSteps?: number; }
+export interface CausalFrame { step: number; timestampSeconds: number; sensorBefore: MachineSensors; controller: ProcessState; controlOutput: ControlOutput; operatorLimits: OperatorActuatorLimits; sensorAfter: MachineSensors; paused: boolean; }
+export interface ClosedLoopResult { status: ProcessState['stage']; frames: CausalFrame[]; finalSensors: MachineSensors; pausedSteps: number[]; }
+const DEFAULT_LIMITS: OperatorActuatorLimits = { heaterMax: 1, vacuumPumpMax: 1, condenserMax: 1, coolingMax: 1 };
 
 export class ClosedLoopSimulationEngine {
-  private readonly dtSeconds: number;
-  private readonly maxSteps: number;
-  private readonly state: ProcessStateEngine;
-  private readonly dynamics: MachineDynamicsEngine;
-  private readonly control: ProcessControlLoop;
-  private readonly target: MachineSensors;
-  private sensors: MachineSensors;
-  private elapsedSeconds = 0;
-  private stepNumber = 0;
-  private paused = false;
-  private readonly frames: CausalFrame[] = [];
-  private readonly pausedSteps: number[] = [];
-
+  private readonly dtSeconds: number; private readonly maxSteps: number; private readonly state: ProcessStateEngine; private readonly dynamics: MachineDynamicsEngine; private readonly control: ProcessControlLoop; private readonly target: MachineSensors; private readonly operatorLimits: OperatorActuatorLimits;
+  private sensors: MachineSensors; private elapsedSeconds = 0; private stepNumber = 0; private paused = false; private readonly frames: CausalFrame[] = []; private readonly pausedSteps: number[] = [];
   constructor(config: ClosedLoopSimulationConfig) {
-    this.dtSeconds = Math.max(0.1, config.dtSeconds ?? 1);
-    this.maxSteps = Math.max(1, config.maxSteps ?? Math.ceil(24 * 3600 / this.dtSeconds));
-    this.target = {
-      chamberSealed: true,
-      pressureMbar: Math.max(1, config.targetPressureMbar),
-      temperatureC: Math.max(25, config.targetTemperatureC),
-      yieldPercent: 100,
-      waterRemovedKg: Math.max(0, config.materialWeightKg * config.waterContentPercent / 100),
-      oilRecoveredKg: Math.max(0, config.materialWeightKg * config.oilContentPercent / 100),
-      energyKwh: 0,
-    };
+    this.dtSeconds = Math.max(0.1, config.dtSeconds ?? 1); this.maxSteps = Math.max(1, config.maxSteps ?? Math.ceil(24 * 3600 / this.dtSeconds));
+    this.target = { chamberSealed: true, pressureMbar: Math.max(1, config.targetPressureMbar), temperatureC: Math.max(25, config.targetTemperatureC), yieldPercent: 100, waterRemovedKg: Math.max(0, config.materialWeightKg * config.waterContentPercent / 100), oilRecoveredKg: Math.max(0, config.materialWeightKg * config.oilContentPercent / 100), energyKwh: 0 };
+    this.operatorLimits = { ...DEFAULT_LIMITS };
     this.sensors = { chamberSealed: true, pressureMbar: 1013.25, temperatureC: 25, yieldPercent: 0, waterRemovedKg: 0, oilRecoveredKg: 0, energyKwh: 0 };
     this.state = new ProcessStateEngine({ targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC, coolingTemperatureC: config.coolingTemperatureC }, this.sensors);
     this.dynamics = new MachineDynamicsEngine(this.sensors, { ambientPressureMbar: 1013.25, ambientTemperatureC: 25, vacuumRateMbarPerSecond: 7, heaterRateCPerSecond: 0.18, passiveHeatLossCPerSecond: 0.035, coolingRateCPerSecond: 0.12, condenserCoolingFactor: 0.05, extractionYieldRatePerSecond: 0.00035, actuatorLag: 0.35 });
     this.control = new ProcessControlLoop();
   }
-
   public isPaused(): boolean { return this.paused; }
   public pause(): void { this.paused = true; }
   public resume(): void { this.paused = false; }
-
-  public setTargets(next: { targetPressureMbar?: number; targetTemperatureC?: number; coolingTemperatureC?: number }): void {
-    if (next.targetPressureMbar !== undefined) this.target.pressureMbar = Math.max(1, Math.min(1000, next.targetPressureMbar));
-    if (next.targetTemperatureC !== undefined) this.target.temperatureC = Math.max(25, Math.min(150, next.targetTemperatureC));
-    this.state.setTargets({ targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC, coolingTemperatureC: next.coolingTemperatureC });
-  }
-
-  public getTargets(): { targetPressureMbar: number; targetTemperatureC: number; coolingTemperatureC: number } {
-    const stateTargets = this.state.getTargets();
-    return { targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC, coolingTemperatureC: stateTargets.coolingTemperatureC };
-  }
-
-  public reset(): void {
-    this.paused = false; this.elapsedSeconds = 0; this.stepNumber = 0; this.frames.length = 0; this.pausedSteps.length = 0;
-    this.sensors = { chamberSealed: true, pressureMbar: 1013.25, temperatureC: 25, yieldPercent: 0, waterRemovedKg: 0, oilRecoveredKg: 0, energyKwh: 0 };
-    this.state.reset(this.sensors); this.control.reset();
-  }
-
+  public setTargets(next: { targetPressureMbar?: number; targetTemperatureC?: number; coolingTemperatureC?: number }): void { if (next.targetPressureMbar !== undefined) this.target.pressureMbar = Math.max(1, Math.min(1000, next.targetPressureMbar)); if (next.targetTemperatureC !== undefined) this.target.temperatureC = Math.max(25, Math.min(150, next.targetTemperatureC)); this.state.setTargets({ targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC, coolingTemperatureC: next.coolingTemperatureC }); }
+  public getTargets(): { targetPressureMbar: number; targetTemperatureC: number; coolingTemperatureC: number } { const stateTargets = this.state.getTargets(); return { targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC, coolingTemperatureC: stateTargets.coolingTemperatureC }; }
+  public setOperatorLimits(next: Partial<OperatorActuatorLimits>): void { for (const key of Object.keys(DEFAULT_LIMITS) as Array<keyof OperatorActuatorLimits>) { const value = next[key]; if (value !== undefined) this.operatorLimits[key] = Math.max(0, Math.min(1, value)); } }
+  public getOperatorLimits(): OperatorActuatorLimits { return { ...this.operatorLimits }; }
+  public reset(): void { this.paused = false; this.elapsedSeconds = 0; this.stepNumber = 0; this.frames.length = 0; this.pausedSteps.length = 0; this.sensors = { chamberSealed: true, pressureMbar: 1013.25, temperatureC: 25, yieldPercent: 0, waterRemovedKg: 0, oilRecoveredKg: 0, energyKwh: 0 }; this.state.reset(this.sensors); this.control.reset(); }
   public step(): CausalFrame | null {
-    if (this.paused) { this.pausedSteps.push(this.stepNumber); return null; }
-    if (this.stepNumber >= this.maxSteps) return null;
-    const sensorBefore = { ...this.sensors };
-    const controllerBeforeActuation = this.state.tick(this.sensors, this.elapsedSeconds);
-    const controlOutput = this.control.update({ targetTemperatureC: this.target.temperatureC, targetPressureMbar: this.target.pressureMbar, temperatureC: this.sensors.temperatureC, pressureMbar: this.sensors.pressureMbar, stage: controllerBeforeActuation.stage, dtSeconds: this.dtSeconds });
+    if (this.paused) { this.pausedSteps.push(this.stepNumber); return null; } if (this.stepNumber >= this.maxSteps) return null;
+    const sensorBefore = { ...this.sensors }; const controllerBeforeActuation = this.state.tick(this.sensors, this.elapsedSeconds);
+    const controlOutput = this.control.update({ targetTemperatureC: this.target.temperatureC, targetPressureMbar: this.target.pressureMbar, temperatureC: this.sensors.temperatureC, pressureMbar: this.sensors.pressureMbar, stage: controllerBeforeActuation.stage, dtSeconds: this.dtSeconds }, this.operatorLimits);
     const commands = { ...controllerBeforeActuation.commands, heater: controlOutput.heaterPower > 0.01, vacuumPump: controlOutput.vacuumPumpPower > 0.01, condenser: controlOutput.valve.vaporToCondenser > 0.01, cooling: controlOutput.valve.coolingWater > 0.01 };
-    const controller = { ...controllerBeforeActuation, commands };
-    const sensorAfter = this.dynamics.step(this.target, commands, this.dtSeconds);
+    const controller = { ...controllerBeforeActuation, commands }; const sensorAfter = this.dynamics.step(this.target, commands, this.dtSeconds);
     this.elapsedSeconds += this.dtSeconds; this.stepNumber += 1; this.sensors = sensorAfter;
-    const frame: CausalFrame = { step: this.stepNumber, timestampSeconds: this.elapsedSeconds, sensorBefore, controller, controlOutput, sensorAfter: { ...sensorAfter }, paused: false };
-    this.frames.push(frame);
-    return frame;
+    const frame: CausalFrame = { step: this.stepNumber, timestampSeconds: this.elapsedSeconds, sensorBefore, controller, controlOutput, operatorLimits: this.getOperatorLimits(), sensorAfter: { ...sensorAfter }, paused: false }; this.frames.push(frame); return frame;
   }
-
-  public runToCompletion(): ClosedLoopResult {
-    while (this.stepNumber < this.maxSteps) {
-      const currentState = this.state.tick(this.sensors, this.elapsedSeconds);
-      if (currentState.stage === 'COMPLETE' || currentState.stage === 'FAULT') break;
-      if (this.step() === null) break;
-    }
-    const finalState = this.state.tick(this.sensors, this.elapsedSeconds);
-    return { status: finalState.stage, frames: [...this.frames], finalSensors: { ...this.sensors }, pausedSteps: [...this.pausedSteps] };
-  }
-
+  public runToCompletion(): ClosedLoopResult { while (this.stepNumber < this.maxSteps) { const currentState = this.state.tick(this.sensors, this.elapsedSeconds); if (currentState.stage === 'COMPLETE' || currentState.stage === 'FAULT') break; if (this.step() === null) break; } const finalState = this.state.tick(this.sensors, this.elapsedSeconds); return { status: finalState.stage, frames: [...this.frames], finalSensors: { ...this.sensors }, pausedSteps: [...this.pausedSteps] }; }
   public getFrames(): CausalFrame[] { return [...this.frames]; }
   public getSensors(): MachineSensors { return { ...this.sensors }; }
   public getState(): ProcessState { return this.state.tick(this.sensors, this.elapsedSeconds); }
