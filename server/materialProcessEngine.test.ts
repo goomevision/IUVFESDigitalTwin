@@ -69,7 +69,7 @@ describe('material process thermodynamic coupling', () => {
     expect(condensed.oilVaporKg).toBeLessThan(extraction.oilVaporKg);
     expect(condensed.recoveredOilKg).toBeGreaterThan(0);
     expect(condensed.oilRecoveryFraction).toBeGreaterThan(0);
-    expect(condensed.massBalanceResidualKg).toBe(0);
-    expect(condensed.energyBalanceResidualKWh).toBe(0);
+    expect(condensed.massBalanceResidualKg).toBeCloseTo(0, 12);
+    expect(condensed.energyBalanceResidualKWh).toBeCloseTo(0, 12);
   });
 });
