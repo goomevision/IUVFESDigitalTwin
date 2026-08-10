@@ -4,7 +4,25 @@ import { evaluateSafety, type SafetyLimits } from './safetyKernel';
 
 export type ProcessStage = 'PRE_FLIGHT' | 'CHARGE' | 'VACUUM' | 'HEAT_UP' | 'EXTRACTION' | 'CONDENSATION' | 'COOL_DOWN' | 'COMPLETE' | 'FAULT';
 export interface MachineCommand { vacuumPump: boolean; heater: boolean; extractor: boolean; condenser: boolean; cooling: boolean; }
-export interface MachineSensors { chamberSealed: boolean; pressureMbar: number; temperatureC: number; yieldPercent: number; waterRemovedKg: number; oilRecoveredKg: number; energyKwh: number; }
+export interface MachineSensors {
+  chamberSealed: boolean;
+  pressureMbar: number;
+  temperatureC: number;
+  yieldPercent: number;
+  waterRemovedKg: number;
+  oilRecoveredKg: number;
+  energyKwh: number;
+  /** Hardware-derived diagnostics; optional so legacy snapshots remain readable. */
+  connectedVolumeL?: number;
+  pipeVolumeL?: number;
+  vacuumConductanceM3h?: number;
+  effectivePumpCapacityM3h?: number;
+  ultrasonicEffectivePowerKW?: number;
+  ultrasonicPowerDensityWPerL?: number;
+  coldTrapHeatLoadKW?: number;
+  coldTrapCondensationCapacityKgPerSecond?: number;
+  coldTrapCondensedWaterKg?: number;
+}
 export interface InterlockState {
   chamberSealed: boolean;
   pressureSafeForHeating: boolean;
