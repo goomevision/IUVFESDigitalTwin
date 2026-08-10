@@ -33,7 +33,7 @@ describe("ClosedLoopSimulationEngine actuator wiring", () => {
     expect(heaterFrame!.sensorAfter.energyKwh).toBeGreaterThan(heaterFrame!.sensorBefore.energyKwh);
   });
 
-  it("keeps effective commands distinct from intended commands on a safety trip", () => {
+  it("preserves intended/effective command provenance during normal operation", () => {
     const engine = new ClosedLoopSimulationEngine({
       targetPressureMbar: 100,
       targetTemperatureC: 60,
@@ -44,13 +44,9 @@ describe("ClosedLoopSimulationEngine actuator wiring", () => {
       maxSteps: 10,
     });
 
-    const first = engine.step();
-    expect(first).toBeDefined();
-    expect(first!.intendedCommands).toEqual(first!.effectiveCommands);
-
-    engine.reset();
-    const normalFrame = engine.step();
-    expect(normalFrame).toBeDefined();
-    expect(normalFrame!.safety.overTemperature).toBe(false);
+    const frame = engine.step();
+    expect(frame).toBeDefined();
+    expect(frame!.safety.overTemperature).toBe(false);
+    expect(frame!.intendedCommands).toEqual(frame!.effectiveCommands);
   });
 });
