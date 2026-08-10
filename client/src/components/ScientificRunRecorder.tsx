@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
-interface Frame {
+export interface ScientificRecordedFrame {
   step: number;
   timestampSeconds: number;
   sensorAfter: {
@@ -22,7 +22,7 @@ async function sha256(text: string) {
   return Array.from(new Uint8Array(digest)).map(v => v.toString(16).padStart(2, "0")).join("");
 }
 
-export function ScientificRunRecorder({ experimentId, frames, completed }: { experimentId: string; frames: Frame[]; completed: boolean }) {
+export function ScientificRunRecorder({ experimentId, frames, completed }: { experimentId: string; frames: ReadonlyArray<ScientificRecordedFrame>; completed: boolean }) {
   const [researchId, setResearchId] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [objective, setObjective] = useState("Capture a traceable digital-twin process run.");
@@ -45,26 +45,11 @@ export function ScientificRunRecorder({ experimentId, frames, completed }: { exp
     if (!experiment.data || created.current) return;
     const p = experiment.data.inputParameters as Record<string, unknown>;
     created.current = true;
-    createResearch.mutateAsync({
-      title: experiment.data.experimentName,
-      objective,
-      hypothesis: hypothesis || undefined,
-      materialId: experiment.data.materialId,
-      sampleId,
-      massKg: Number(p.materialWeight),
-      procedure: ["Digital experiment setup", "Physics simulation", "Machine-state evaluation", "Dataset capture"],
-      inputParameters: p,
-    }).then(result => setResearchId(result.researchId)).catch(() => {
-      created.current = false;
-      toast.error("Scientific record could not be initialized");
-    });
+    createResearch.mutateAsync({ title: experiment.data.experimentName, objective, hypothesis: hypothesis || undefined, materialId: experiment.data.materialId, sampleId, massKg: Number(p.materialWeight), procedure: ["Digital experiment setup", "Physics simulation", "Machine-state evaluation", "Dataset capture"], inputParameters: p })
+      .then(result => setResearchId(result.researchId)).catch(() => { created.current = false; toast.error("Scientific record could not be initialized"); });
   }, [experiment.data, objective, hypothesis, sampleId, createResearch]);
 
-  useEffect(() => {
-    if (!researchId || started.current) return;
-    started.current = true;
-    void startResearch.mutate(researchId);
-  }, [researchId, startResearch]);
+  useEffect(() => { if (!researchId || started.current) return; started.current = true; void startResearch.mutate(researchId); }, [researchId, startResearch]);
 
   useEffect(() => {
     if (!researchId || !frames.length) return;
@@ -83,29 +68,14 @@ export function ScientificRunRecorder({ experimentId, frames, completed }: { exp
   useEffect(() => {
     if (!researchId || !completed || !frames.length || completedRecorded.current) return;
     completedRecorded.current = true;
-    void completeResearch.mutateAsync({ experimentId: researchId, outcome: "completed", conclusion: "Digital Twin process run completed; output dataset captured for scientific traceability." }).catch(() => {
-      completedRecorded.current = false;
-      toast.error("Scientific closeout could not be recorded");
-    });
+    void completeResearch.mutateAsync({ experimentId: researchId, outcome: "completed", conclusion: "Digital Twin process run completed; output dataset captured for scientific traceability." }).catch(() => { completedRecorded.current = false; toast.error("Scientific closeout could not be recorded"); });
   }, [researchId, completed, frames.length, completeResearch]);
 
   useEffect(() => {
     if (!researchId || !completed || !frames.length || manifestCreated.current) return;
     manifestCreated.current = true;
     const payload = JSON.stringify({ experimentId, frames });
-    void sha256(payload).then(hash => createManifest.mutateAsync({
-      id: `IUVFES-DS-${experimentId.slice(0, 12)}`,
-      experimentId: researchId,
-      version: "1.0.0",
-      origin: "SIMULATION",
-      qualityStatus: "RAW",
-      sha256: hash,
-      storageRef: `inline://simulation/${experimentId}/frames.json`,
-      metadata: { frameCount: frames.length, capture: "simulation-control-room", generatedAt: new Date().toISOString() },
-    })).then(() => toast.success("Simulation dataset manifest recorded")).catch(() => {
-      manifestCreated.current = false;
-      toast.error("Dataset manifest could not be recorded");
-    });
+    void sha256(payload).then(hash => createManifest.mutateAsync({ id: `IUVFES-DS-${experimentId.slice(0, 12)}`, experimentId: researchId, version: "1.0.0", origin: "SIMULATION", qualityStatus: "RAW", sha256: hash, storageRef: `inline://simulation/${experimentId}/frames.json`, metadata: { frameCount: frames.length, capture: "simulation-control-room", generatedAt: new Date().toISOString() } })).then(() => toast.success("Simulation dataset manifest recorded")).catch(() => { manifestCreated.current = false; toast.error("Dataset manifest could not be recorded"); });
   }, [researchId, completed, frames, experimentId, createManifest]);
 
   const saveNote = async () => {
