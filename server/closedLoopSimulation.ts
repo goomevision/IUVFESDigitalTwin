@@ -79,7 +79,7 @@ export class ClosedLoopSimulationEngine {
       energyKwh: 0,
     };
     this.state = new ProcessStateEngine(
-      { targetPressureMbar: config.targetPressureMbar, targetTemperatureC: config.targetTemperatureC },
+      { targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC },
       this.sensors,
     );
     this.dynamics = new MachineDynamicsEngine(this.sensors, {
@@ -101,6 +101,17 @@ export class ClosedLoopSimulationEngine {
   public pause(): void { this.paused = true; }
 
   public resume(): void { this.paused = false; }
+
+  /** Change operator setpoints while the live simulation is running. */
+  public setTargets(next: { targetPressureMbar?: number; targetTemperatureC?: number }): void {
+    if (next.targetPressureMbar !== undefined) this.target.pressureMbar = Math.max(1, Math.min(1000, next.targetPressureMbar));
+    if (next.targetTemperatureC !== undefined) this.target.temperatureC = Math.max(25, Math.min(150, next.targetTemperatureC));
+    this.state.setTargets({ targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC });
+  }
+
+  public getTargets(): { targetPressureMbar: number; targetTemperatureC: number } {
+    return { targetPressureMbar: this.target.pressureMbar, targetTemperatureC: this.target.temperatureC };
+  }
 
   public reset(): void {
     this.paused = false;
