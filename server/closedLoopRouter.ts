@@ -3,7 +3,7 @@ import { protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { ClosedLoopSimulationEngine } from "./closedLoopSimulation";
-import { createSession, deleteSession, getSession } from "./closedLoopSessionStore";
+import { createSession, getSession } from "./closedLoopSessionStore";
 
 const inputSchema = z.object({
   experimentId: z.string().min(1),
@@ -27,32 +27,10 @@ export const closedLoopRouter = router({
   run: protectedProcedure.input(inputSchema).mutation(async ({ ctx, input }) => {
     if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
     await authorize(input.experimentId, ctx.user.id, ctx.user.role);
-    const engine = new ClosedLoopSimulationEngine({
-      targetPressureMbar: input.targetPressure,
-      targetTemperatureC: input.targetTemperature,
-      materialWeightKg: input.materialWeight,
-      waterContentPercent: input.waterContent,
-      oilContentPercent: input.oilContent,
-      dtSeconds: input.dtSeconds,
-      maxSteps: input.maxSteps,
-    });
+    const engine = new ClosedLoopSimulationEngine({ targetPressureMbar: input.targetPressure, targetTemperatureC: input.targetTemperature, materialWeightKg: input.materialWeight, waterContentPercent: input.waterContent, oilContentPercent: input.oilContent, dtSeconds: input.dtSeconds, maxSteps: input.maxSteps });
     await db.updateExperimentStatus(input.experimentId, "running");
     const result = engine.runToCompletion();
-    const resultId = await db.createSimulationResult({
-      experimentId: input.experimentId,
-      finalYield: result.finalSensors.yieldPercent,
-      oilComposition: null,
-      energyConsumed: result.finalSensors.energyKwh,
-      efficiency: null,
-      wasteComposition: null,
-      realTimeData: result.frames,
-      massBalance: {
-        materialWeightKg: input.materialWeight,
-        waterRemovedKg: result.finalSensors.waterRemovedKg,
-        oilRecoveredKg: result.finalSensors.oilRecoveredKg,
-      },
-      energyBalance: { energyKwh: result.finalSensors.energyKwh },
-    });
+    const resultId = await db.createSimulationResult({ experimentId: input.experimentId, finalYield: result.finalSensors.yieldPercent, oilComposition: {}, energyConsumed: result.finalSensors.energyKwh, efficiency: 0, wasteComposition: {}, realTimeData: result.frames, massBalance: { materialWeightKg: input.materialWeight, waterRemovedKg: result.finalSensors.waterRemovedKg, oilRecoveredKg: result.finalSensors.oilRecoveredKg }, energyBalance: { energyKwh: result.finalSensors.energyKwh } });
     await db.updateExperimentStatus(input.experimentId, result.status === "FAULT" ? "failed" : "completed");
     return { success: result.status !== "FAULT", resultId, status: result.status, frames: result.frames, finalSensors: result.finalSensors };
   }),
@@ -60,16 +38,9 @@ export const closedLoopRouter = router({
   start: protectedProcedure.input(inputSchema).mutation(async ({ ctx, input }) => {
     if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
     await authorize(input.experimentId, ctx.user.id, ctx.user.role);
-    const session = createSession(input.experimentId, ctx.user.id, {
-      targetPressureMbar: input.targetPressure,
-      targetTemperatureC: input.targetTemperature,
-      materialWeightKg: input.materialWeight,
-      waterContentPercent: input.waterContent,
-      oilContentPercent: input.oilContent,
-      dtSeconds: input.dtSeconds,
-      maxSteps: input.maxSteps,
-    });
+    const session = createSession(input.experimentId, ctx.user.id, { targetPressureMbar: input.targetPressure, targetTemperatureC: input.targetTemperature, materialWeightKg: input.materialWeight, waterContentPercent: input.waterContent, oilContentPercent: input.oilContent, dtSeconds: input.dtSeconds, maxSteps: input.maxSteps });
     await db.updateExperimentStatus(input.experimentId, "running");
+    await db.logControlAction({ experimentId: input.experimentId, action: "start", operatorNotes: "Live closed-loop session started." });
     return { success: true, status: session.engine.getState().stage, sensors: session.engine.getSensors(), targets: session.engine.getTargets(), frames: session.engine.getFrames() };
   }),
 
@@ -93,8 +64,8 @@ export const closedLoopRouter = router({
     const before = session.engine.getTargets();
     session.engine.setTargets(input);
     const after = session.engine.getTargets();
-    if (before.targetPressureMbar !== after.targetPressureMbar) await db.createControlLog({ experimentId: input.experimentId, action: "parameter_change", parameterName: "targetPressureMbar", oldValue: String(before.targetPressureMbar), newValue: String(after.targetPressureMbar), operatorNotes: input.operatorNotes });
-    if (before.targetTemperatureC !== after.targetTemperatureC) await db.createControlLog({ experimentId: input.experimentId, action: "parameter_change", parameterName: "targetTemperatureC", oldValue: String(before.targetTemperatureC), newValue: String(after.targetTemperatureC), operatorNotes: input.operatorNotes });
+    if (before.targetPressureMbar !== after.targetPressureMbar) await db.logControlAction({ experimentId: input.experimentId, action: "parameter_change", parameterName: "targetPressureMbar", oldValue: String(before.targetPressureMbar), newValue: String(after.targetPressureMbar), operatorNotes: input.operatorNotes });
+    if (before.targetTemperatureC !== after.targetTemperatureC) await db.logControlAction({ experimentId: input.experimentId, action: "parameter_change", parameterName: "targetTemperatureC", oldValue: String(before.targetTemperatureC), newValue: String(after.targetTemperatureC), operatorNotes: input.operatorNotes });
     return { success: true, before, targets: after };
   }),
 
@@ -105,7 +76,7 @@ export const closedLoopRouter = router({
     if (!session) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No active closed-loop session." });
     session.engine.pause();
     await db.updateExperimentStatus(input, "paused");
-    await db.createControlLog({ experimentId: input, action: "pause", operatorNotes: "Live closed-loop session paused." });
+    await db.logControlAction({ experimentId: input, action: "pause", operatorNotes: "Live closed-loop session paused." });
     return { success: true, paused: true };
   }),
 
@@ -116,7 +87,7 @@ export const closedLoopRouter = router({
     if (!session) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No active closed-loop session." });
     session.engine.resume();
     await db.updateExperimentStatus(input, "running");
-    await db.createControlLog({ experimentId: input, action: "resume", operatorNotes: "Live closed-loop session resumed." });
+    await db.logControlAction({ experimentId: input, action: "resume", operatorNotes: "Live closed-loop session resumed." });
     return { success: true, paused: false };
   }),
 
@@ -127,7 +98,7 @@ export const closedLoopRouter = router({
     if (!session) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No active closed-loop session." });
     session.engine.pause();
     await db.updateExperimentStatus(input, "paused");
-    await db.createControlLog({ experimentId: input, action: "stop", operatorNotes: "Live closed-loop session stopped by operator." });
+    await db.logControlAction({ experimentId: input, action: "stop", operatorNotes: "Live closed-loop session stopped by operator." });
     return { success: true, stopped: true, sensors: session.engine.getSensors(), frames: session.engine.getFrames() };
   }),
 
