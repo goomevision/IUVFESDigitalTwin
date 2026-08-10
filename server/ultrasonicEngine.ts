@@ -9,7 +9,7 @@
  *   lambda = c / f
  *   I = P_acoustic / A
  *   p_A = sqrt(2 * rho * c * I)
- *   f_0 = (1 / (2*pi*R_0)) * sqrt((3*kappa/rho) * (P_0 + 2*sigma/R_0) - 2*sigma/(rho*R_0^2))
+ *   f_0 = (1 / (2*pi*R_0)) * sqrt((3*kappa*(P_0 + 2*sigma/R_0) - 2*sigma/R_0) / (rho*R_0^2))
  *   R*R'' + 1.5*R'^2 = [P_g + P_v - 2*sigma/R - 4*mu*R'/R - P_inf(t)] / rho
  *
  * Rayleigh-Plesset is used here as a single-bubble screening calculation. It
@@ -164,8 +164,10 @@ export class UltrasonicEngine {
     const sigma = this.c.surfaceTensionNPerM;
     const rho = this.c.fluidDensityKgM3;
     const kappa = this.c.polytropicExponent;
-    const term = (3 * kappa / rho) * (staticPressurePa + 2 * sigma / r) - 2 * sigma / (rho * r * r);
-    return term > 0 ? Math.sqrt(term) / (2 * Math.PI * r) : 0;
+    const numerator = 3 * kappa * (staticPressurePa + 2 * sigma / r) - 2 * sigma / r;
+    const denominator = rho * r * r;
+    const term = numerator / denominator;
+    return term > 0 ? Math.sqrt(term) / (2 * Math.PI) : 0;
   }
 
   private cavitationActivity(marginPa: number, pressureAmplitudePa: number, staticPressurePa: number): number {
