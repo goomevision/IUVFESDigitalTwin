@@ -11,6 +11,10 @@ interface MachineState3D {
 
 interface Props { machine?: MachineState3D; }
 
+function tubeBetween(curve: THREE.Curve<THREE.Vector3>, radius: number, material: THREE.MeshBasicMaterial) {
+  return new THREE.Mesh(new THREE.TubeGeometry(curve, 24, radius, 10, false), material);
+}
+
 export function ProcessMachine3D({ machine }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const stateRef = useRef(machine);
@@ -51,9 +55,59 @@ export function ProcessMachine3D({ machine }: Props) {
     const condenser = new THREE.Group(); condenser.position.set(2.6, 2.8, -1.8); scene.add(condenser);
     const condenserBody = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 2.8, 32), new THREE.MeshStandardMaterial({ color: 0x18263c, metalness: 0.75, roughness: 0.25 })); condenser.add(condenserBody);
 
-    const pipeMaterial = new THREE.MeshBasicMaterial({ color: 0x1e3a50 });
-    const pipe1 = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4.1, 16), pipeMaterial); pipe1.rotation.z = Math.PI / 2; pipe1.position.set(-0.2, 0.3, 0.7); scene.add(pipe1);
-    const pipe2 = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3.2, 16), pipeMaterial); pipe2.rotation.x = Math.PI / 2; pipe2.position.set(1.1, 2.1, -0.8); scene.add(pipe2);
+    // Explicit process connections: these are visualized from the same effective actuator state as the engine frame.
+    const vacuumLineMaterial = new THREE.MeshBasicMaterial({ color: 0x164e63 });
+    const vaporLineMaterial = new THREE.MeshBasicMaterial({ color: 0x155e75 });
+    const coolingLineMaterial = new THREE.MeshBasicMaterial({ color: 0x1e3a5f });
+    const powerCableMaterial = new THREE.MeshBasicMaterial({ color: 0x334155 });
+
+    const vacuumCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-1.15, 0.35, 0.7),
+      new THREE.Vector3(0.0, 0.35, 0.7),
+      new THREE.Vector3(1.2, 0.1, 1.05),
+      new THREE.Vector3(1.25, -0.1, 1.3),
+    ]);
+    const vaporCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-1.05, 2.4, 0.1),
+      new THREE.Vector3(-0.1, 2.4, 0.1),
+      new THREE.Vector3(1.2, 2.5, -0.8),
+      new THREE.Vector3(2.45, 2.45, -1.55),
+    ]);
+    const coolingCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(2.35, 1.6, -1.55),
+      new THREE.Vector3(1.55, 1.6, -2.3),
+      new THREE.Vector3(0.2, 1.4, -2.3),
+      new THREE.Vector3(-1.2, 1.25, -0.95),
+    ]);
+    const powerCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(5.0, -1.1, 2.2),
+      new THREE.Vector3(3.8, -0.8, 2.2),
+      new THREE.Vector3(2.2, 0.2, 1.8),
+      new THREE.Vector3(0.0, 0.0, 0.8),
+      new THREE.Vector3(-1.8, 0.4, 0.0),
+    ]);
+
+    const vacuumLine = tubeBetween(vacuumCurve, 0.09, vacuumLineMaterial);
+    const vaporLine = tubeBetween(vaporCurve, 0.085, vaporLineMaterial);
+    const coolingLine = tubeBetween(coolingCurve, 0.07, coolingLineMaterial);
+    const powerCable = tubeBetween(powerCurve, 0.035, powerCableMaterial);
+    scene.add(vacuumLine, vaporLine, coolingLine, powerCable);
+
+    const connectionNodes = [
+      [-1.15, 0.35, 0.7], [1.25, -0.1, 1.3],
+      [-1.05, 2.4, 0.1], [2.45, 2.45, -1.55],
+      [2.35, 1.6, -1.55], [-1.2, 1.25, -0.95],
+    ];
+    connectionNodes.forEach(([x, y, z]) => {
+      const node = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 16), new THREE.MeshBasicMaterial({ color: 0x334155 }));
+      node.position.set(x, y, z); node.userData.connection = true; scene.add(node);
+    });
+
+    const flowParticles = new THREE.Group(); scene.add(flowParticles);
+    for (let i = 0; i < 12; i++) {
+      const particle = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), new THREE.MeshBasicMaterial({ color: 0x67e8f9 }));
+      particle.userData.offset = i / 12; flowParticles.add(particle);
+    }
 
     const particles = new THREE.Group(); scene.add(particles);
     const particleMaterial = new THREE.MeshBasicMaterial({ color: 0x67e8f9 });
@@ -74,7 +128,9 @@ export function ProcessMachine3D({ machine }: Props) {
       const pressure = state?.sensors.pressureMbar ?? 1013;
       const hot = commands?.heater ?? false;
       const vacuum = commands?.vacuumPump ?? false;
+      const extracting = commands?.extractor ?? false;
       const condensing = commands?.condenser ?? false;
+      const cooling = commands?.cooling ?? false;
       const fault = state?.interlocks.overTemperature ?? false;
       const time = frame++ / 60;
 
@@ -86,14 +142,34 @@ export function ProcessMachine3D({ machine }: Props) {
       pumpRotor.material.color.setHex(vacuum ? 0x22d3ee : 0x334155);
       condenserBody.material.emissive.setHex(condensing ? 0x082f49 : 0x061522);
 
+      // Connection status follows effective commands; no visual cable is presented as active unless its actuator is active.
+      vacuumLineMaterial.color.setHex(vacuum ? 0x22d3ee : 0x164e63);
+      vaporLineMaterial.color.setHex(extracting || condensing ? 0x38bdf8 : 0x155e75);
+      coolingLineMaterial.color.setHex(cooling ? 0x60a5fa : 0x1e3a5f);
+      powerCableMaterial.color.setHex(hot || vacuum || extracting || condensing || cooling ? 0xf59e0b : 0x334155);
+
       reactor.rotation.y = Math.sin(time * 0.35) * 0.025;
       const vacuumLevel = Math.max(0, Math.min(1, 1 - pressure / 1013.25));
       const thermal = Math.max(0, Math.min(1, (temperature - 25) / 125));
+
+      flowParticles.children.forEach((particle, i) => {
+        const offset = particle.userData.offset as number;
+        const active = vacuum || extracting || condensing || cooling;
+        const travel = (time * (active ? 0.18 : 0.0) + offset) % 1;
+        const point = active ? (vacuum ? vacuumCurve : extracting || condensing ? vaporCurve : coolingCurve).getPointAt(travel) : new THREE.Vector3(0, -10, 0);
+        particle.position.copy(point);
+        particle.visible = active;
+        particle.scale.setScalar(active ? 0.8 + thermal * 0.6 : 0);
+        const material = particle.material as THREE.MeshBasicMaterial;
+        material.color.setHex(vacuum ? 0x22d3ee : cooling ? 0x60a5fa : 0xfbbf24);
+        if (i % 2 === 0 && condensing) particle.scale.multiplyScalar(0.8);
+      });
+
       particles.children.forEach((p, i) => {
-        const offset = (p.userData.offset as number);
-        const travel = (time * (vacuum ? 0.16 : 0.03) + offset) % 1;
+        const offset = p.userData.offset as number;
+        const travel = (time * (vacuum ? 0.16 : extracting ? 0.08 : 0.03) + offset) % 1;
         p.position.set(-1.1 + travel * 5.2, 1.1 + Math.sin(i * 1.7 + time) * 0.18, 0.5 + Math.cos(i * 1.2) * 0.55);
-        p.visible = vacuum || condensing;
+        p.visible = vacuum || extracting || condensing;
         p.scale.setScalar(0.5 + vacuumLevel * 1.5 + thermal * 0.8);
       });
 
@@ -106,14 +182,22 @@ export function ProcessMachine3D({ machine }: Props) {
 
   const stage = machine?.stage ?? "PRE_FLIGHT";
   const fault = machine?.interlocks.overTemperature;
-  return <div className="relative h-[420px] overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-950/80">
+  const commands = machine?.commands;
+  return <div className="relative h-[460px] overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-950/80">
     <div ref={mountRef} className="absolute inset-0" />
     <div className="pointer-events-none absolute left-4 top-4 font-mono text-[10px] tracking-[0.25em] text-cyan-400">3D MACHINE DIGITAL TWIN</div>
+    <div className="pointer-events-none absolute right-4 top-4 rounded border border-cyan-500/20 bg-slate-950/85 px-3 py-2 font-mono text-[9px] text-slate-400">VISUAL LINK: EFFECTIVE COMMANDS</div>
+    <div className="pointer-events-none absolute left-4 top-11 grid gap-1 font-mono text-[9px] text-slate-500">
+      <span>VACUUM LINE {commands?.vacuumPump ? "● ACTIVE" : "○ STANDBY"}</span>
+      <span>VAPOR LINE {commands?.extractor || commands?.condenser ? "● ACTIVE" : "○ STANDBY"}</span>
+      <span>COOLING LINE {commands?.cooling ? "● ACTIVE" : "○ STANDBY"}</span>
+    </div>
     <div className="pointer-events-none absolute bottom-4 left-4 right-4 flex flex-wrap gap-2 font-mono text-[10px]">
       <span className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-slate-400">STAGE: {stage}</span>
       <span className={`rounded border px-2 py-1 ${fault ? "border-red-500/50 text-red-300" : "border-emerald-500/30 text-emerald-300"}`}>{fault ? "SAFETY TRIP" : "INTERLOCKS OK"}</span>
-      <span className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-slate-400">P {machine?.sensors.pressureMbar.toFixed(1) ?? "1013.3"} mbar</span>
-      <span className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-slate-400">T {machine?.sensors.temperatureC.toFixed(1) ?? "25.0"} °C</span>
+      <span className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-slate-400">P {machine?.sensors.pressureMbar.toFixed(1) ?? "—"} mbar</span>
+      <span className="rounded border border-slate-700 bg-slate-950/80 px-2 py-1 text-slate-400">T {machine?.sensors.temperatureC.toFixed(1) ?? "—"} °C</span>
+      <span className="rounded border border-cyan-500/20 bg-slate-950/80 px-2 py-1 text-cyan-300">ENGINE → VISUAL</span>
     </div>
   </div>;
 }
