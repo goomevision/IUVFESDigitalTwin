@@ -92,12 +92,13 @@ export function routeCondensateCollection(input: CondensateCollectionInput): Con
       warnings.push('Stage-resolved condensate exceeds the step condensable input; capture was bounded by the step mass.');
     }
 
-    let stageScale = stageCaptured > 0 ? maxStageCapture / stageCaptured : 0;
+    const stageScale = stageCaptured > 0 ? maxStageCapture / stageCaptured : 0;
     for (let i = 0; i < 4; i += 1) {
       const requested = trapMass[i] * stageScale;
       const available = Math.max(0, input.capacityKg[i] - input.existingMassKg[i]);
-      added[i] += Math.min(requested, available);
-      collectedWaterKg += added[i];
+      const waterAdded = Math.min(requested, available);
+      added[i] += waterAdded;
+      collectedWaterKg += waterAdded;
     }
     remainingWater = Math.max(0, input.deltaWaterKg - collectedWaterKg);
   } else {
@@ -134,7 +135,7 @@ export function routeCondensateCollection(input: CondensateCollectionInput): Con
     addedMassKg: added,
     totalMassKg: totalMass,
     collectedWaterKg,
-    collectedOilKg: added[1] + added[2] + added[3] - (trapMass ? (added[1] + added[2] + added[3] - input.deltaOilKg * (fractions[0] + fractions[1] + fractions[2])) : 0),
+    collectedOilKg: Math.max(0, input.deltaOilKg - remainingOil),
     unroutedWaterKg: remainingWater,
     unroutedOilKg: Math.max(0, remainingOil),
     status: capacityLimited ? 'CAPACITY_LIMIT' : 'ROUTED',
