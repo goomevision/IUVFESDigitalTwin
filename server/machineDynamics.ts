@@ -7,6 +7,7 @@
  */
 
 import { UltrasonicEngine, type UltrasonicConfig, type UltrasonicState } from './ultrasonicEngine';
+import { WaterThermoEngine, type WaterThermoState } from './waterThermo';
 import type { MachineCommand, MachineSensors } from './processStateEngine';
 
 export interface VirtualHardwareDynamicsConfig {
@@ -41,6 +42,7 @@ type ResolvedDynamicsConfig = Required<Omit<DynamicMachineConfig, 'hardware' | '
 
 export class MachineDynamicsEngine {
   private readonly c: ResolvedDynamicsConfig;
+  private readonly waterThermo = new WaterThermoEngine();
   private state: MachineSensors;
 
   constructor(initial: MachineSensors, config: DynamicMachineConfig = {}) {
@@ -93,6 +95,8 @@ export class MachineDynamicsEngine {
     temperature = Math.max(this.c.ambientTemperatureC, Math.min(200, temperature));
     temperature = this.blend(this.state.temperatureC, temperature, lag);
 
+    const remainingWaterKg = Math.max(0, target.waterRemovedKg - this.state.waterRemovedKg);
+    const waterThermo = this.waterThermo.evaluate(temperature, pressure, remainingWaterKg, dt);
     const thermalFactor = Math.max(0, Math.min(1, (temperature - 25) / 100));
     const vacuumFactor = Math.max(0, Math.min(1, 1 - pressure / this.c.ambientPressureMbar));
     const ultrasonicMassTransfer = ultrasonic?.massTransferMultiplier ?? 1;
@@ -102,23 +106,33 @@ export class MachineDynamicsEngine {
     const yieldIncrease = this.c.extractionYieldRatePerSecond * extractionDrive * dt * 100;
     const yieldPercentage = Math.min(target.yieldPercent, this.state.yieldPercent + yieldIncrease);
     const oilRecoveredKg = Math.max(this.state.oilRecoveredKg, target.oilRecoveredKg * (yieldPercentage / Math.max(target.yieldPercent, 0.001)));
-    const waterRemovedKg = Math.max(this.state.waterRemovedKg, target.waterRemovedKg * (yieldPercentage / Math.max(target.yieldPercent, 0.001)));
+
+    // Water removal is constrained by both the process extraction drive and the
+    // thermodynamic vaporization drive. It remains reduced-order because actual
+    // vapor partial pressure, condenser load and non-water volatiles are not yet
+    // resolved by a full multi-component EOS.
+    const waterThermoFactor = commands.extractor ? Math.max(0.02, waterThermo.vaporDrive) : 0;
+    const waterRemovalDrive = Math.min(1, extractionDrive * (0.25 + 0.75 * waterThermoFactor));
+    const waterIncrease = target.waterRemovedKg * Math.min(1, this.c.extractionYieldRatePerSecond * 220 * waterRemovalDrive * dt);
+    const waterRemovedKg = Math.max(this.state.waterRemovedKg, Math.min(target.waterRemovedKg, this.state.waterRemovedKg + waterIncrease));
+
+    const processEnergyRateKwhPerSecond = (commands.heater ? (hardware?.heatingPowerKw ?? 4) / 3600 : 0)
+      + (commands.vacuumPump ? 0.0015 / 3600 : 0)
+      + (commands.extractor ? 0.001 / 3600 : 0)
+      + (commands.cooling ? (hardware?.coolingPowerKw ?? 1) / 3600 : 0);
     const ultrasonicEnergyRateKwhPerSecond = ultrasonic
       ? (ultrasonic.electricalPowerW * ultrasonic.dutyCycle) / 1000 / 3600
       : 0;
-    const energyRate = (commands.heater ? (hardware?.heatingPowerKw ?? 4) / 1000 : 0)
-      + (commands.vacuumPump ? 0.0015 : 0)
-      + (commands.extractor ? 0.001 : 0)
-      + (commands.cooling ? (hardware?.coolingPowerKw ?? 1) / 1000 : 0)
-      + ultrasonicEnergyRateKwhPerSecond;
-    const energyConsumed = this.state.energyKwh + energyRate * dt;
+    const vaporizationEnergyRateKwhPerSecond = waterThermo.waterMassVaporizedKg * waterThermo.latentHeatKjPerKg / 3600 / dt;
+    const energyConsumed = this.state.energyKwh
+      + (processEnergyRateKwhPerSecond + ultrasonicEnergyRateKwhPerSecond + vaporizationEnergyRateKwhPerSecond) * dt;
 
     this.state = {
       ...this.state,
       pressureMbar: pressure,
       temperatureC: temperature,
       yieldPercent: yieldPercentage,
-      waterRemovedKg: Math.min(target.waterRemovedKg, waterRemovedKg),
+      waterRemovedKg,
       oilRecoveredKg: Math.min(target.oilRecoveredKg, oilRecoveredKg),
       energyKwh: Math.max(0, energyConsumed),
     };
@@ -127,6 +141,11 @@ export class MachineDynamicsEngine {
 
   public getUltrasonicState(staticPressureMbar = this.state.pressureMbar): UltrasonicState | null {
     return this.c.ultrasonic?.evaluate(staticPressureMbar) ?? null;
+  }
+
+  public getWaterThermoState(targetWaterKg = 0, dtSeconds = 1): WaterThermoState {
+    const remaining = Math.max(0, targetWaterKg - this.state.waterRemovedKg);
+    return this.waterThermo.evaluate(this.state.temperatureC, this.state.pressureMbar, remaining, dtSeconds);
   }
 
   public snapshot(): MachineDynamicsSnapshot { return { state: { ...this.state } }; }
