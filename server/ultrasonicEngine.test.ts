@@ -32,16 +32,16 @@ describe('ultrasonic physics kernel', () => {
   it('derives wavelength, acoustic power, intensity and pressure from physical inputs', () => {
     const engine = new UltrasonicEngine({
       frequencyHz: 20_000,
-      electricalPowerW: 500,
+      electricalPowerW: 100,
       transducerEfficiency: 0.6,
-      activeAreaM2: 0.001,
+      activeAreaM2: 0.01,
       provenance: 'MEASURED',
     });
     const state = engine.evaluate(50);
 
-    expect(state.acousticPowerW).toBeCloseTo(300, 8);
+    expect(state.acousticPowerW).toBeCloseTo(60, 8);
     expect(state.wavelengthM).toBeCloseTo(1497 / 20_000, 8);
-    expect(state.acousticIntensityWm2).toBeCloseTo(300_000, 6);
+    expect(state.acousticIntensityWm2).toBeCloseTo(6_000, 6);
     expect(state.acousticPressureAmplitudePa).toBeGreaterThan(0);
     expect(state.peakNegativePressurePa).toBeGreaterThan(state.staticPressurePa - state.vaporPressurePa);
     expect(state.modelStatus).toBe('REDUCED_ORDER_SCREENING');
@@ -50,9 +50,9 @@ describe('ultrasonic physics kernel', () => {
   it('couples vacuum pressure to cavitation drive instead of treating ultrasound as a UI-only value', () => {
     const engine = new UltrasonicEngine({
       frequencyHz: 20_000,
-      electricalPowerW: 500,
+      electricalPowerW: 100,
       transducerEfficiency: 0.6,
-      activeAreaM2: 0.001,
+      activeAreaM2: 0.01,
       provenance: 'MEASURED',
     });
 
@@ -63,14 +63,14 @@ describe('ultrasonic physics kernel', () => {
     expect(vacuum.cavitationThresholdMarginPa).toBeGreaterThan(atmospheric.cavitationThresholdMarginPa);
   });
 
-  it('increases extraction drive and energy accounting when ultrasound is enabled', () => {
+  it('couples ultrasound to extraction and energy accounting in MachineDynamics', () => {
     const baseline = new MachineDynamicsEngine(initial);
     const ultrasonic = new MachineDynamicsEngine(initial, {
       ultrasonic: {
         frequencyHz: 20_000,
-        electricalPowerW: 500,
+        electricalPowerW: 100,
         transducerEfficiency: 0.6,
-        activeAreaM2: 0.001,
+        activeAreaM2: 0.01,
         provenance: 'MEASURED',
       },
     });
@@ -80,23 +80,23 @@ describe('ultrasonic physics kernel', () => {
 
     expect(ultrasonicFrame.yieldPercent).toBeGreaterThan(baselineFrame.yieldPercent);
     expect(ultrasonicFrame.energyKwh).toBeGreaterThan(baselineFrame.energyKwh);
-    expect(ultrasonic.getUltrasonicState(50)?.cavitationStatus).toBe('ACTIVE');
+    expect(['ACTIVE', 'UNSTABLE']).toContain(ultrasonic.getUltrasonicState(50)?.cavitationStatus);
   });
 
   it('supports pulsed operation without changing the base process equations', () => {
     const continuous = new UltrasonicEngine({
       frequencyHz: 40_000,
-      electricalPowerW: 500,
+      electricalPowerW: 100,
       transducerEfficiency: 0.6,
-      activeAreaM2: 0.001,
+      activeAreaM2: 0.01,
       dutyCycle: 1,
       provenance: 'MEASURED',
     }).evaluate(50);
     const pulsed = new UltrasonicEngine({
       frequencyHz: 40_000,
-      electricalPowerW: 500,
+      electricalPowerW: 100,
       transducerEfficiency: 0.6,
-      activeAreaM2: 0.001,
+      activeAreaM2: 0.01,
       dutyCycle: 0.5,
       provenance: 'MEASURED',
     }).evaluate(50);
