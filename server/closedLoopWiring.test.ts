@@ -14,6 +14,7 @@ describe("closed-loop wiring contract", () => {
       oilContent: 3.2,
       targetPressure: 85,
       targetTemperature: 62,
+      coolingTemperature: 35,
       dtSeconds: 0.5,
       maxSteps: 7200,
     });
@@ -24,6 +25,7 @@ describe("closed-loop wiring contract", () => {
       oilContentPercent: 3.2,
       targetPressureMbar: 85,
       targetTemperatureC: 62,
+      coolingTemperatureC: 35,
       dtSeconds: 0.5,
       maxSteps: 7200,
     });
