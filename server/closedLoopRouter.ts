@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import * as db from "./db";
 import { ClosedLoopSimulationEngine, type ClosedLoopSimulationConfig } from "./closedLoopSimulation";
 import { describeClosedLoopEngineContract } from "./closedLoopInputContract";
+import { mapExperimentInputsToEngine, getClosedLoopWiringReport } from "./closedLoopWiring";
 import { recordClosedLoopRun } from "./scientificEventJournal";
 import { persistSimulationDataset } from "./scientificDatasetPersistence";
 import {
@@ -31,15 +32,7 @@ const inputSchema = z.object({
 });
 
 function toEngineConfig(input: z.infer<typeof inputSchema>): ClosedLoopSimulationConfig {
-  return {
-    targetPressureMbar: input.targetPressure,
-    targetTemperatureC: input.targetTemperature,
-    materialWeightKg: input.materialWeight,
-    waterContentPercent: input.waterContent,
-    oilContentPercent: input.oilContent,
-    dtSeconds: input.dtSeconds,
-    maxSteps: input.maxSteps,
-  };
+  return mapExperimentInputsToEngine(input);
 }
 
 async function assertExperimentAccess(ctx: { user?: { id: number; role: string } | null }, experimentId: string) {
@@ -62,6 +55,7 @@ function sessionView(sessionId: string) {
     updatedAt: session.updatedAt,
     configuration: session.configuration,
     dataSource: describeClosedLoopEngineContract(),
+    wiring: getClosedLoopWiringReport(),
     currentStep: snapshot.stepNumber,
     elapsedSeconds: snapshot.elapsedSeconds,
     currentFrame: snapshot.frames.at(-1) ?? null,
@@ -125,7 +119,7 @@ export const closedLoopRouter = router({
   frames: protectedProcedure.input(z.string().min(1)).query(async ({ ctx, input }) => {
     const session = getRuntimeSession(input);
     await assertExperimentAccess(ctx, session.experimentId);
-    return { sessionId: input, frames: getRuntimeFrames(input), dataSource: describeClosedLoopEngineContract() };
+    return { sessionId: input, frames: getRuntimeFrames(input), dataSource: describeClosedLoopEngineContract(), wiring: getClosedLoopWiringReport() };
   }),
   snapshot: protectedProcedure.input(z.string().min(1)).query(async ({ ctx, input }) => {
     const session = getRuntimeSession(input);
@@ -181,6 +175,7 @@ export const closedLoopRouter = router({
       provenanceId: dataset.provenanceId,
       datasetQualityStatus: dataset.qualityStatus,
       dataSource: describeClosedLoopEngineContract(),
+      wiring: getClosedLoopWiringReport(),
       frames: result.frames,
       finalSensors: result.finalSensors,
     };
