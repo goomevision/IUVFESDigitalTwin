@@ -28,10 +28,16 @@ describe("closed-loop wiring contract", () => {
       coolingTemperatureC: 35,
       dtSeconds: 0.5,
       maxSteps: 7200,
+      ultrasonic: {
+        frequencyKHz: undefined,
+        requestedPowerW: undefined,
+        dutyCyclePercent: undefined,
+        maxElectricalPowerW: undefined,
+      },
     });
   });
 
-  it("keeps UI parameters without an implemented physics driver out of the engine contract", () => {
+  it("maps ultrasonic experiment controls into the explicit experimental engine channel", () => {
     const config = mapExperimentInputsToEngine({
       materialWeight: 10,
       waterContent: 50,
@@ -39,11 +45,19 @@ describe("closed-loop wiring contract", () => {
       targetPressure: 100,
       targetTemperature: 60,
       ultrasonicFrequency: 40,
+      ultrasonicPowerW: 1500,
+      ultrasonicDutyCyclePercent: 70,
+      ultrasonicMaxPowerW: 3000,
       materialWaterRatio: "1:1",
       processModel: "hybrid",
     });
 
-    expect(config).not.toHaveProperty("ultrasonicFrequency");
+    expect(config.ultrasonic).toEqual({
+      frequencyKHz: 40,
+      requestedPowerW: 1500,
+      dutyCyclePercent: 70,
+      maxElectricalPowerW: 3000,
+    });
     expect(config).not.toHaveProperty("materialWaterRatio");
     expect(config).not.toHaveProperty("processModel");
   });
@@ -52,5 +66,8 @@ describe("closed-loop wiring contract", () => {
     const report = getClosedLoopWiringReport();
     expect(report.engineDrivers).toEqual(CLOSED_LOOP_ENGINE_DRIVERS);
     expect(report.metadataOnly).toEqual(CLOSED_LOOP_METADATA_ONLY);
+    expect(report.engineDrivers).toContain("ultrasonicFrequency");
+    expect(report.engineDrivers).toContain("ultrasonicPowerW");
+    expect(report.engineDrivers).toContain("ultrasonicDutyCyclePercent");
   });
 });
