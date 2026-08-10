@@ -30,6 +30,12 @@ export interface ControlHardwareConfig {
   coldTrapHeatTransferAreasM2: [number, number, number, number];
   coldTrapVolumesL: [number, number, number, number];
   coldTrapCondensateCapacityKg: [number, number, number, number];
+
+  // Four receiver/collection vessel hardware capacities.
+  collectionVesselCapacityKg: [number, number, number, number];
+  // Explicit modelling assumption: light / main oil / heavy routing.
+  // Default is 100% to the main-oil vessel until validated fraction data exists.
+  oilCollectionRoutingFractions: [number, number, number];
 }
 
 export const HARDWARE_CONFIG_STORAGE_KEY = "iuvfes.hardware.static.v1";
@@ -59,6 +65,8 @@ export const DEFAULT_CONTROL_HARDWARE_CONFIG: ControlHardwareConfig = {
   coldTrapHeatTransferAreasM2: [1.2, 1.2, 1.5, 1.8],
   coldTrapVolumesL: [2, 2, 2, 2],
   coldTrapCondensateCapacityKg: [2, 2, 2, 2],
+  collectionVesselCapacityKg: [2, 2, 2, 2],
+  oilCollectionRoutingFractions: [0, 1, 0],
 };
 
 export function loadControlHardwareConfig(): ControlHardwareConfig {
@@ -71,6 +79,8 @@ export function loadControlHardwareConfig(): ControlHardwareConfig {
     const areas = Array.isArray(parsed.coldTrapHeatTransferAreasM2) ? parsed.coldTrapHeatTransferAreasM2 : DEFAULT_CONTROL_HARDWARE_CONFIG.coldTrapHeatTransferAreasM2;
     const volumes = Array.isArray(parsed.coldTrapVolumesL) ? parsed.coldTrapVolumesL : DEFAULT_CONTROL_HARDWARE_CONFIG.coldTrapVolumesL;
     const capacities = Array.isArray(parsed.coldTrapCondensateCapacityKg) ? parsed.coldTrapCondensateCapacityKg : DEFAULT_CONTROL_HARDWARE_CONFIG.coldTrapCondensateCapacityKg;
+    const collectionCapacities = Array.isArray(parsed.collectionVesselCapacityKg) ? parsed.collectionVesselCapacityKg : DEFAULT_CONTROL_HARDWARE_CONFIG.collectionVesselCapacityKg;
+    const routing = Array.isArray(parsed.oilCollectionRoutingFractions) ? parsed.oilCollectionRoutingFractions : DEFAULT_CONTROL_HARDWARE_CONFIG.oilCollectionRoutingFractions;
     return {
       ...DEFAULT_CONTROL_HARDWARE_CONFIG,
       ...parsed,
@@ -78,6 +88,8 @@ export function loadControlHardwareConfig(): ControlHardwareConfig {
       coldTrapHeatTransferAreasM2: [Number(areas[0]), Number(areas[1]), Number(areas[2]), Number(areas[3])] as [number, number, number, number],
       coldTrapVolumesL: [Number(volumes[0]), Number(volumes[1]), Number(volumes[2]), Number(volumes[3])] as [number, number, number, number],
       coldTrapCondensateCapacityKg: [Number(capacities[0]), Number(capacities[1]), Number(capacities[2]), Number(capacities[3])] as [number, number, number, number],
+      collectionVesselCapacityKg: [Number(collectionCapacities[0]), Number(collectionCapacities[1]), Number(collectionCapacities[2]), Number(collectionCapacities[3])] as [number, number, number, number],
+      oilCollectionRoutingFractions: [Number(routing[0]), Number(routing[1]), Number(routing[2])] as [number, number, number],
     };
   } catch {
     return DEFAULT_CONTROL_HARDWARE_CONFIG;
