@@ -158,7 +158,7 @@ export function ProcessMachine3D({ machine }: Props) {
         particle.position.copy(point);
         particle.visible = active;
         particle.scale.setScalar(active ? 0.8 + thermal * 0.6 : 0);
-        const material = particle.material as THREE.MeshBasicMaterial;
+        const material = (particle as THREE.Mesh).material as THREE.MeshBasicMaterial;
         material.color.setHex(vacuum ? 0x22d3ee : cooling ? 0x60a5fa : 0xfbbf24);
         if (i % 2 === 0 && condensing) particle.scale.multiplyScalar(0.8);
       });
