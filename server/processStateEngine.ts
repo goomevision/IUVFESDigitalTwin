@@ -15,6 +15,13 @@ export class ProcessStateEngine {
   private readonly config: Required<ProcessStateConfig>;
   private state: ProcessState;
   constructor(config: ProcessStateConfig, initialSensors: MachineSensors) { this.config = { ...DEFAULTS, ...config }; this.state = this.initialState(initialSensors, 'Controller initialized; waiting for pre-flight checks.'); }
+  public setTargets(targets: Pick<ProcessStateConfig, 'targetPressureMbar' | 'targetTemperatureC'>): void {
+    this.config.targetPressureMbar = Math.max(1, Math.min(1000, targets.targetPressureMbar));
+    this.config.targetTemperatureC = Math.max(25, Math.min(150, targets.targetTemperatureC));
+  }
+  public getTargets(): Pick<ProcessStateConfig, 'targetPressureMbar' | 'targetTemperatureC'> {
+    return { targetPressureMbar: this.config.targetPressureMbar, targetTemperatureC: this.config.targetTemperatureC };
+  }
   public tick(sensors: MachineSensors, elapsedSeconds: number): ProcessState {
     const interlocks = this.evaluateInterlocks(sensors); this.state.sensors = { ...sensors }; this.state.interlocks = interlocks; this.state.elapsedSeconds = elapsedSeconds; this.state.alarm = null;
     if (interlocks.overTemperature) { this.trip('OVER_TEMPERATURE: heater disabled and process moved to FAULT.'); return this.snapshot(); }
