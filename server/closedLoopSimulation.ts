@@ -104,6 +104,9 @@ export class ClosedLoopSimulationEngine {
       waterRemovedKg: 0,
       oilRecoveredKg: 0,
       energyKwh: 0,
+      collectionVesselMassKg: [0, 0, 0, 0],
+      unroutedCondensateKg: 0,
+      collectionRoutingStatus: 'ROUTED',
     };
     this.state = new ProcessStateEngine(
       {
@@ -147,6 +150,9 @@ export class ClosedLoopSimulationEngine {
       waterRemovedKg: 0,
       oilRecoveredKg: 0,
       energyKwh: 0,
+      collectionVesselMassKg: [0, 0, 0, 0],
+      unroutedCondensateKg: 0,
+      collectionRoutingStatus: 'ROUTED',
     };
     this.state.reset(this.sensors);
     this.control.reset();
@@ -281,6 +287,8 @@ export class ClosedLoopSimulationEngine {
       'coldTrapHeatTransferAreasM2',
       'coldTrapVolumesL',
       'coldTrapCondensateCapacityKg',
+      'collectionVesselCapacityKg',
+      'oilCollectionRoutingFractions',
       'chamberVolumeL',
       'vacuumPipeDiameterMm',
       'vacuumPipeLengthM',
