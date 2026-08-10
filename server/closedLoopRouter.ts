@@ -5,6 +5,27 @@ import * as db from "./db";
 import { ClosedLoopSimulationEngine } from "./closedLoopSimulation";
 import { getClosedLoopSession, saveClosedLoopSession } from "./closedLoopSessionStore";
 
+const ultrasonicConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  frequencyHz: z.number().min(1).max(1_000_000),
+  electricalPowerW: z.number().min(0).max(1_000_000),
+  transducerEfficiency: z.number().min(0).max(1),
+  activeAreaM2: z.number().positive().max(10_000),
+  dutyCycle: z.number().min(0).max(1).default(1),
+  fluidDensityKgM3: z.number().positive().max(20_000).optional(),
+  soundSpeedMps: z.number().positive().max(20_000).optional(),
+  dynamicViscosityPaS: z.number().min(0).max(10).optional(),
+  surfaceTensionNPerM: z.number().min(0).max(10).optional(),
+  vaporPressurePa: z.number().min(0).max(30_000_000).optional(),
+  initialBubbleRadiusM: z.number().positive().max(1).optional(),
+  polytropicExponent: z.number().min(1).max(3).optional(),
+  attenuationNpPerM: z.number().min(0).max(100).optional(),
+  propagationDistanceM: z.number().min(0).max(10_000).optional(),
+  maxMassTransferEnhancement: z.number().min(0).max(100).optional(),
+  acousticHeatingFraction: z.number().min(0).max(1).optional(),
+  provenance: z.enum(["DEFAULT_WATER_BASELINE", "DATASHEET", "MEASURED", "CALIBRATED"]).default("DEFAULT_WATER_BASELINE"),
+}).optional();
+
 const configSchema = z.object({
   experimentId: z.string().min(1),
   materialWeight: z.number().min(0.1).max(1000),
@@ -14,6 +35,7 @@ const configSchema = z.object({
   targetTemperature: z.number().min(20).max(150),
   dtSeconds: z.number().min(0.1).max(10).default(1),
   maxSteps: z.number().int().min(1).max(100000).default(10000),
+  ultrasonic: ultrasonicConfigSchema,
 });
 
 const experimentIdSchema = z.object({ experimentId: z.string().min(1) });
