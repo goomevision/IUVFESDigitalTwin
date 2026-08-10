@@ -23,12 +23,41 @@ export interface ClosedLoopSimulationConfig {
   maxSteps?: number;
 }
 
+export interface MaterialInventory {
+  initialMassKg: number;
+  remainingMassKg: number;
+  waterInitialKg: number;
+  waterRemovedKg: number;
+  waterRemainingKg: number;
+  oilPotentialKg: number;
+  oilRecoveredKg: number;
+  oilRemainingPotentialKg: number;
+  recoveryPercent: number;
+}
+
+export interface SafetyFrame {
+  stage: ProcessState['stage'];
+  allSystemsSafe: boolean;
+  chamberSealed: boolean;
+  pressureSafeForHeating: boolean;
+  temperatureSafeForCooling: boolean;
+  vacuumAchieved: boolean;
+  overTemperature: boolean;
+  alarm: string | null;
+  transitionReason: string;
+}
+
 export interface CausalFrame {
   step: number;
   timestampSeconds: number;
   sensorBefore: MachineSensors;
   controller: ProcessState;
+  intendedCommands: ProcessState['commands'];
+  effectiveCommands: ProcessState['commands'];
+  physicalSensorAfter: MachineSensors;
   sensorAfter: MachineSensors;
+  materialInventory: MaterialInventory;
+  safety: SafetyFrame;
   paused: boolean;
 }
 
@@ -58,6 +87,11 @@ export class ClosedLoopSimulationEngine {
   private readonly dynamics: MachineDynamicsEngine;
   private readonly control: ProcessControlLoop;
   private readonly target: MachineSensors;
+  private readonly material: {
+    initialMassKg: number;
+    waterInitialKg: number;
+    oilPotentialKg: number;
+  };
   private sensors: MachineSensors;
   private elapsedSeconds = 0;
   private stepNumber = 0;
@@ -68,13 +102,20 @@ export class ClosedLoopSimulationEngine {
   constructor(config: ClosedLoopSimulationConfig) {
     this.dtSeconds = Math.max(0.1, config.dtSeconds ?? 1);
     this.maxSteps = Math.max(1, config.maxSteps ?? Math.ceil(24 * 3600 / this.dtSeconds));
+    const waterInitialKg = Math.max(0, config.materialWeightKg * config.waterContentPercent / 100);
+    const oilPotentialKg = Math.max(0, config.materialWeightKg * config.oilContentPercent / 100);
+    this.material = {
+      initialMassKg: Math.max(0, config.materialWeightKg),
+      waterInitialKg,
+      oilPotentialKg,
+    };
     this.target = {
       chamberSealed: true,
       pressureMbar: Math.max(1, config.targetPressureMbar),
       temperatureC: Math.max(25, config.targetTemperatureC),
       yieldPercent: 100,
-      waterRemovedKg: Math.max(0, config.materialWeightKg * config.waterContentPercent / 100),
-      oilRecoveredKg: Math.max(0, config.materialWeightKg * config.oilContentPercent / 100),
+      waterRemovedKg: waterInitialKg,
+      oilRecoveredKg: oilPotentialKg,
       energyKwh: 0,
     };
     this.sensors = {
@@ -139,11 +180,30 @@ export class ClosedLoopSimulationEngine {
       cooling: controlOutput.valve.coolingWater > 0.01,
     };
     const controller = { ...controllerBeforeActuation, commands };
-    const sensorAfter = this.dynamics.step(this.target, commands, this.dtSeconds);
+    const intendedCommands = { ...commands };
+    const effectiveCommands = controller.stage === 'FAULT'
+      ? { vacuumPump: false, heater: false, extractor: false, condenser: false, cooling: true }
+      : { ...commands };
+    const physicalSensorAfter = this.dynamics.step(this.target, effectiveCommands, this.dtSeconds);
     this.elapsedSeconds += this.dtSeconds;
     this.stepNumber += 1;
-    this.sensors = sensorAfter;
-    const frame: CausalFrame = { step: this.stepNumber, timestampSeconds: this.elapsedSeconds, sensorBefore, controller, sensorAfter: { ...sensorAfter }, paused: false };
+    this.sensors = physicalSensorAfter;
+    const controllerAfterActuation = this.state.tick(this.sensors, this.elapsedSeconds);
+    const materialInventory = this.buildMaterialInventory(this.sensors);
+    const safety = this.buildSafetyFrame(controllerAfterActuation);
+    const frame: CausalFrame = {
+      step: this.stepNumber,
+      timestampSeconds: this.elapsedSeconds,
+      sensorBefore,
+      controller: controllerAfterActuation,
+      intendedCommands,
+      effectiveCommands,
+      physicalSensorAfter: { ...physicalSensorAfter },
+      sensorAfter: { ...physicalSensorAfter },
+      materialInventory,
+      safety,
+      paused: false,
+    };
     this.frames.push(frame);
     return frame;
   }
@@ -167,7 +227,17 @@ export class ClosedLoopSimulationEngine {
       state: this.state.getSnapshot(),
       dynamics: this.dynamics.getSnapshot(),
       control: this.control.getSnapshot(),
-      frames: this.frames.map(frame => ({ ...frame, sensorBefore: { ...frame.sensorBefore }, sensorAfter: { ...frame.sensorAfter }, controller: { ...frame.controller, sensors: { ...frame.controller.sensors }, commands: { ...frame.controller.commands }, interlocks: { ...frame.controller.interlocks } } })),
+      frames: this.frames.map(frame => ({
+        ...frame,
+        sensorBefore: { ...frame.sensorBefore },
+        sensorAfter: { ...frame.sensorAfter },
+        physicalSensorAfter: { ...frame.physicalSensorAfter },
+        controller: { ...frame.controller, sensors: { ...frame.controller.sensors }, commands: { ...frame.controller.commands }, interlocks: { ...frame.controller.interlocks } },
+        intendedCommands: { ...frame.intendedCommands },
+        effectiveCommands: { ...frame.effectiveCommands },
+        materialInventory: { ...frame.materialInventory },
+        safety: { ...frame.safety },
+      })),
       pausedSteps: [...this.pausedSteps],
     };
   }
@@ -181,7 +251,17 @@ export class ClosedLoopSimulationEngine {
     this.dynamics.restore(snapshot.dynamics);
     this.control.restore(snapshot.control);
     this.frames.length = 0;
-    this.frames.push(...snapshot.frames.map(frame => ({ ...frame, sensorBefore: { ...frame.sensorBefore }, sensorAfter: { ...frame.sensorAfter }, controller: { ...frame.controller, sensors: { ...frame.controller.sensors }, commands: { ...frame.controller.commands }, interlocks: { ...frame.controller.interlocks } } })));
+    this.frames.push(...snapshot.frames.map(frame => ({
+      ...frame,
+      sensorBefore: { ...frame.sensorBefore },
+      sensorAfter: { ...frame.sensorAfter },
+      physicalSensorAfter: { ...frame.physicalSensorAfter },
+      controller: { ...frame.controller, sensors: { ...frame.controller.sensors }, commands: { ...frame.controller.commands }, interlocks: { ...frame.controller.interlocks } },
+      intendedCommands: { ...frame.intendedCommands },
+      effectiveCommands: { ...frame.effectiveCommands },
+      materialInventory: { ...frame.materialInventory },
+      safety: { ...frame.safety },
+    })));
     this.pausedSteps.length = 0;
     this.pausedSteps.push(...snapshot.pausedSteps);
   }
@@ -190,4 +270,37 @@ export class ClosedLoopSimulationEngine {
   public getFrames(): CausalFrame[] { return [...this.frames]; }
   public getSensors(): MachineSensors { return { ...this.sensors }; }
   public getState(): ProcessState { return this.state.tick(this.sensors, this.elapsedSeconds); }
+
+  private buildMaterialInventory(sensors: MachineSensors): MaterialInventory {
+    const waterRemovedKg = Math.min(this.material.waterInitialKg, Math.max(0, sensors.waterRemovedKg));
+    const oilRecoveredKg = Math.min(this.material.oilPotentialKg, Math.max(0, sensors.oilRecoveredKg));
+    const removedMassKg = waterRemovedKg + oilRecoveredKg;
+    const remainingMassKg = Math.max(0, this.material.initialMassKg - removedMassKg);
+    const recoveryPercent = this.material.oilPotentialKg > 0 ? oilRecoveredKg / this.material.oilPotentialKg * 100 : 0;
+    return {
+      initialMassKg: this.material.initialMassKg,
+      remainingMassKg,
+      waterInitialKg: this.material.waterInitialKg,
+      waterRemovedKg,
+      waterRemainingKg: Math.max(0, this.material.waterInitialKg - waterRemovedKg),
+      oilPotentialKg: this.material.oilPotentialKg,
+      oilRecoveredKg,
+      oilRemainingPotentialKg: Math.max(0, this.material.oilPotentialKg - oilRecoveredKg),
+      recoveryPercent,
+    };
+  }
+
+  private buildSafetyFrame(state: ProcessState): SafetyFrame {
+    return {
+      stage: state.stage,
+      allSystemsSafe: state.interlocks.allSystemsSafe,
+      chamberSealed: state.interlocks.chamberSealed,
+      pressureSafeForHeating: state.interlocks.pressureSafeForHeating,
+      temperatureSafeForCooling: state.interlocks.temperatureSafeForCooling,
+      vacuumAchieved: state.interlocks.vacuumAchieved,
+      overTemperature: state.interlocks.overTemperature,
+      alarm: state.alarm,
+      transitionReason: state.transitionReason,
+    };
+  }
 }
