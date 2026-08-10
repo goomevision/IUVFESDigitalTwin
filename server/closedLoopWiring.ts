@@ -1,41 +1,7 @@
 import type { ClosedLoopSimulationConfig } from "./closedLoopSimulation";
-
-export interface ExperimentInputParameters {
-  materialWeight: number;
-  waterContent: number;
-  oilContent: number;
-  targetPressure: number;
-  targetTemperature: number;
-  coolingTemperature?: number;
-  dtSeconds?: number;
-  maxSteps?: number;
-  ultrasonicFrequency?: number;
-  ultrasonicPowerW?: number;
-  ultrasonicDutyCyclePercent?: number;
-  ultrasonicMaxPowerW?: number;
-  duration?: number;
-  materialWaterRatio?: string;
-  processModel?: string;
-}
-export interface ClosedLoopWiringReport { engineDrivers: readonly string[]; metadataOnly: readonly string[]; }
-export const CLOSED_LOOP_ENGINE_DRIVERS = ["materialWeight", "waterContent", "oilContent", "targetPressure", "targetTemperature", "coolingTemperature", "dtSeconds", "maxSteps", "ultrasonicFrequency", "ultrasonicPowerW", "ultrasonicDutyCyclePercent", "ultrasonicMaxPowerW"] as const;
-export const CLOSED_LOOP_METADATA_ONLY = ["materialWaterRatio", "processModel"] as const;
-export function mapExperimentInputsToEngine(input: ExperimentInputParameters): ClosedLoopSimulationConfig {
-  return {
-    targetPressureMbar: input.targetPressure,
-    targetTemperatureC: input.targetTemperature,
-    coolingTemperatureC: input.coolingTemperature ?? 35,
-    materialWeightKg: input.materialWeight,
-    waterContentPercent: input.waterContent,
-    oilContentPercent: input.oilContent,
-    dtSeconds: input.dtSeconds ?? 1,
-    maxSteps: input.maxSteps ?? 10_000,
-    ultrasonic: {
-      frequencyKHz: input.ultrasonicFrequency,
-      requestedPowerW: input.ultrasonicPowerW,
-      dutyCyclePercent: input.ultrasonicDutyCyclePercent,
-      maxElectricalPowerW: input.ultrasonicMaxPowerW,
-    },
-  };
-}
-export function getClosedLoopWiringReport(): ClosedLoopWiringReport { return { engineDrivers: CLOSED_LOOP_ENGINE_DRIVERS, metadataOnly: CLOSED_LOOP_METADATA_ONLY }; }
+export interface ExperimentInputParameters { materialWeight:number; waterContent:number; oilContent:number; targetPressure:number; targetTemperature:number; coolingTemperature?:number; dtSeconds?:number; maxSteps?:number; hardwareProfileId?:string; ultrasonicFrequency?:number; ultrasonicPowerW?:number; ultrasonicDutyCyclePercent?:number; ultrasonicMaxPowerW?:number; duration?:number; materialWaterRatio?:string; processModel?:string; }
+export interface ClosedLoopWiringReport { engineDrivers:readonly string[]; metadataOnly:readonly string[]; }
+export const CLOSED_LOOP_ENGINE_DRIVERS=["materialWeight","waterContent","oilContent","targetPressure","targetTemperature","coolingTemperature","dtSeconds","maxSteps","hardwareProfileId","ultrasonicFrequency","ultrasonicPowerW","ultrasonicDutyCyclePercent","ultrasonicMaxPowerW"] as const;
+export const CLOSED_LOOP_METADATA_ONLY=["materialWaterRatio","processModel"] as const;
+export function mapExperimentInputsToEngine(input:ExperimentInputParameters):ClosedLoopSimulationConfig{return {targetPressureMbar:input.targetPressure,targetTemperatureC:input.targetTemperature,coolingTemperatureC:input.coolingTemperature??35,materialWeightKg:input.materialWeight,waterContentPercent:input.waterContent,oilContentPercent:input.oilContent,dtSeconds:input.dtSeconds??1,maxSteps:input.maxSteps??10000,hardwareProfileId:input.hardwareProfileId,ultrasonic:{frequencyKHz:input.ultrasonicFrequency,requestedPowerW:input.ultrasonicPowerW,dutyCyclePercent:input.ultrasonicDutyCyclePercent,maxElectricalPowerW:input.ultrasonicMaxPowerW}};}
+export function getClosedLoopWiringReport():ClosedLoopWiringReport{return {engineDrivers:CLOSED_LOOP_ENGINE_DRIVERS,metadataOnly:CLOSED_LOOP_METADATA_ONLY};}
