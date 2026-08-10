@@ -1,86 +1,31 @@
-/**
- * Deterministic process dynamics with optional virtual-hardware coupling.
- * Hardware values are engineering inputs, not safety certification.
- */
+/** Deterministic process dynamics with optional virtual-hardware coupling. */
 import type { MachineCommand, MachineSensors } from './processStateEngine';
 import { stepThermalModel } from './thermalEngineering';
 import { deriveVacuumConductance, combinePumpAndConductance } from './vacuumConductance';
 import { calculateColdTrapLoad } from './coldTrapEngineering';
 import { enforceUltrasonicHardwareLimits } from './ultrasonicHardwareCoupling';
-
-export interface VirtualHardwareDynamicsConfig {
-  connectedVolumeL: number;
-  pumpCapacityM3PerHour: number;
-  thermalMassKjPerK: number;
-  heatingPowerKw: number;
-  coolingPowerKw: number;
-  leakRateMbarPerSecond: number;
-  vacuumPipeDiameterMm?: number;
-  vacuumPipeLengthM?: number;
-  vacuumPipeEffectiveLengthFactor?: number;
-  vacuumPumpOutletPressureMbar?: number;
-  coldTrapTemperaturesC?: [number, number, number, number];
-  coldTrapHeatTransferCoefficientWPerM2K?: number;
-  coldTrapHeatTransferAreasM2?: [number, number, number, number];
-  coldTrapVolumesL?: [number, number, number, number];
-  coldTrapCondensateCapacityKg?: [number, number, number, number];
-  ultrasonicFrequencyMinKHz?: number;
-  ultrasonicFrequencyMaxKHz?: number;
-  ultrasonicMaxPowerKw?: number;
-  ultrasonicOperatingFrequencyKHz?: number;
-  ultrasonicRequestedPowerKw?: number;
-}
-
-export interface DynamicMachineConfig {
-  ambientPressureMbar?: number; ambientTemperatureC?: number; vacuumRateMbarPerSecond?: number;
-  heaterRateCPerSecond?: number; passiveHeatLossCPerSecond?: number; coolingRateCPerSecond?: number;
-  condenserCoolingFactor?: number; extractionYieldRatePerSecond?: number; actuatorLag?: number;
-  hardware?: VirtualHardwareDynamicsConfig;
-}
-export interface HardwareDynamicsDiagnostics {
-  connectedVolumeL:number; pipeVolumeL:number; vacuumConductanceM3h:number|null; effectivePumpCapacityM3h:number;
-  thermalMassKjPerK:number; heatingPowerKw:number; coolingPowerKw:number; leakRateMbarPerSecond:number;
-  ultrasonicEffectivePowerKw:number; ultrasonicPowerDensityWPerL:number; hardwareWarnings:string[];
-  coldTrapHeatLoadKw:number; coldTrapCondensationCapacityKgPerSecond:number; coldTrapStageCondensedWaterKg:[number,number,number,number];
-}
-export interface MachineDynamicsSnapshot { state: MachineSensors; config: DynamicMachineConfig; hardwareDiagnostics: HardwareDynamicsDiagnostics; }
-
+export interface VirtualHardwareDynamicsConfig { connectedVolumeL:number; pumpCapacityM3PerHour:number; thermalMassKjPerK:number; heatingPowerKw:number; coolingPowerKw:number; leakRateMbarPerSecond:number; vacuumPipeDiameterMm?:number; vacuumPipeLengthM?:number; vacuumPipeEffectiveLengthFactor?:number; vacuumPumpOutletPressureMbar?:number; coldTrapTemperaturesC?:[number,number,number,number]; coldTrapHeatTransferCoefficientWPerM2K?:number; coldTrapHeatTransferAreasM2?:[number,number,number,number]; coldTrapVolumesL?:[number,number,number,number]; coldTrapCondensateCapacityKg?:[number,number,number,number]; ultrasonicFrequencyMinKHz?:number; ultrasonicFrequencyMaxKHz?:number; ultrasonicMaxPowerKw?:number; ultrasonicOperatingFrequencyKHz?:number; ultrasonicRequestedPowerKw?:number; }
+export interface DynamicMachineConfig { ambientPressureMbar?:number; ambientTemperatureC?:number; vacuumRateMbarPerSecond?:number; heaterRateCPerSecond?:number; passiveHeatLossCPerSecond?:number; coolingRateCPerSecond?:number; condenserCoolingFactor?:number; extractionYieldRatePerSecond?:number; actuatorLag?:number; hardware?:VirtualHardwareDynamicsConfig; }
+export interface HardwareDynamicsDiagnostics { connectedVolumeL:number; pipeVolumeL:number; vacuumConductanceM3h:number|null; effectivePumpCapacityM3h:number; thermalMassKjPerK:number; heatingPowerKw:number; coolingPowerKw:number; leakRateMbarPerSecond:number; ultrasonicEffectivePowerKw:number; ultrasonicPowerDensityWPerL:number; hardwareWarnings:string[]; coldTrapHeatLoadKw:number; coldTrapCondensationCapacityKgPerSecond:number; coldTrapStageCondensedWaterKg:[number,number,number,number]; }
+export interface MachineDynamicsSnapshot { state:MachineSensors; config:DynamicMachineConfig; hardwareDiagnostics:HardwareDynamicsDiagnostics; }
 const DEFAULT_HW:VirtualHardwareDynamicsConfig={connectedVolumeL:250,pumpCapacityM3PerHour:200,thermalMassKjPerK:250,heatingPowerKw:9,coolingPowerKw:3,leakRateMbarPerSecond:0};
-
 export class MachineDynamicsEngine {
-  private readonly c: Required<Omit<DynamicMachineConfig,'hardware'>> & { hardware?:VirtualHardwareDynamicsConfig };
-  private state:MachineSensors;
-  private diagnostics:HardwareDynamicsDiagnostics;
-  constructor(initial:MachineSensors,config:DynamicMachineConfig={}){
-    this.c={ambientPressureMbar:1013.25,ambientTemperatureC:25,vacuumRateMbarPerSecond:7,heaterRateCPerSecond:0.18,passiveHeatLossCPerSecond:0.035,coolingRateCPerSecond:0.12,condenserCoolingFactor:0.05,extractionYieldRatePerSecond:0.00035,actuatorLag:0.35,...config};
-    this.state={...initial};
-    this.diagnostics={connectedVolumeL:config.hardware?.connectedVolumeL??DEFAULT_HW.connectedVolumeL,pipeVolumeL:0,vacuumConductanceM3h:null,effectivePumpCapacityM3h:config.hardware?.pumpCapacityM3PerHour??DEFAULT_HW.pumpCapacityM3PerHour,thermalMassKjPerK:config.hardware?.thermalMassKjPerK??DEFAULT_HW.thermalMassKjPerK,heatingPowerKw:config.hardware?.heatingPowerKw??DEFAULT_HW.heatingPowerKw,coolingPowerKw:config.hardware?.coolingPowerKw??DEFAULT_HW.coolingPowerKw,leakRateMbarPerSecond:config.hardware?.leakRateMbarPerSecond??0,ultrasonicEffectivePowerKw:0,ultrasonicPowerDensityWPerL:0,hardwareWarnings:[],coldTrapHeatLoadKw:0,coldTrapCondensationCapacityKgPerSecond:0,coldTrapStageCondensedWaterKg:[0,0,0,0]};
-  }
-  public step(target:MachineSensors,commands:MachineCommand,dtSeconds:number,massTransferMultiplier=1):MachineSensors{
-    const dt=Math.max(0.05,dtSeconds),lag=Math.max(0.05,Math.min(1,this.c.actuatorLag)),h=this.c.hardware;
-    const warnings:string[]=[]; const connectedVolumeL=Math.max(1,h?.connectedVolumeL??250); let pipeVolumeL=0; let effectivePumpCapacityM3h=h?.pumpCapacityM3PerHour??200; let conductanceM3h:number|null=null;
-    if(h?.vacuumPipeDiameterMm&&h.vacuumPipeDiameterMm>0&&h.vacuumPipeLengthM&&h.vacuumPipeLengthM>0){
-      const pipe=deriveVacuumConductance({pipeDiameterM:h.vacuumPipeDiameterMm/1000,pipeLengthM:h.vacuumPipeLengthM,upstreamPressureMbar:Math.max(this.state.pressureMbar,h.vacuumPumpOutletPressureMbar??1),downstreamPressureMbar:h.vacuumPumpOutletPressureMbar??1,gasViscosityPaS:1.81e-5,effectiveLengthFactor:h.vacuumPipeEffectiveLengthFactor??1});
-      pipeVolumeL=pipe.pipeVolumeM3*1000; conductanceM3h=pipe.conductanceM3PerHour; warnings.push(...pipe.warnings); effectivePumpCapacityM3h=combinePumpAndConductance(effectivePumpCapacityM3h,pipe.conductanceM3PerHour);
-    }
-    const volumeFactor=250/Math.max(1,connectedVolumeL+pipeVolumeL),pumpFactor=effectivePumpCapacityM3h/200; const vacuumRate=h?Math.max(0,this.c.vacuumRateMbarPerSecond*volumeFactor*pumpFactor):this.c.vacuumRateMbarPerSecond; const leak=Math.max(0,h?.leakRateMbarPerSecond??0);
-    const pressureDemand=commands.vacuumPump?Math.max(1,this.state.pressureMbar-vacuumRate*dt+leak*dt):this.state.pressureMbar+(this.c.ambientPressureMbar-this.state.pressureMbar)*0.03*dt+leak*dt; const pressure=this.blend(this.state.pressureMbar,Math.max(1,Math.min(this.c.ambientPressureMbar,pressureDemand)),lag);
-    const thermalMass=h?.thermalMassKjPerK??250,heatingPower=commands.heater?(h?.heatingPowerKw??4):0,coolingPower=commands.cooling?(h?.coolingPowerKw??1):0;
-    const thermal=stepThermalModel({initialTemperatureC:this.state.temperatureC,ambientTemperatureC:this.c.ambientTemperatureC,targetTemperatureC:target.temperatureC,thermalMassKJPerC:thermalMass,heaterPowerKW:heatingPower,coolingPowerKW:coolingPower,effectiveHeatLossKWPerC:h?0.01:this.c.passiveHeatLossCPerSecond*0.2,heaterEfficiency:1,coolingEfficiency:1},dt);
-    let temperature=thermal.temperatureC;if(commands.condenser)temperature-=this.c.condenserCoolingFactor*dt;temperature=this.blend(this.state.temperatureC,Math.max(this.c.ambientTemperatureC,Math.min(200,temperature)),lag);
-    const u= h?enforceUltrasonicHardwareLimits({installedFrequencyMinKHz:h.ultrasonicFrequencyMinKHz??20,installedFrequencyMaxKHz:h.ultrasonicFrequencyMaxKHz??40,installedMaxPowerKW:h.ultrasonicMaxPowerKw??6,operatingFrequencyKHz:h.ultrasonicOperatingFrequencyKHz??30,requestedPowerKW:commands.extractor?(h.ultrasonicRequestedPowerKw??0):0,workingVolumeL:connectedVolumeL}):null;
-    const effectiveUltrasonicPowerKw=u?.effectivePowerKW??0; if(u)warnings.push(...u.warnings); const acousticMultiplier=Math.max(0,Math.min(3,massTransferMultiplier*(1+0.25*Math.min(1,effectiveUltrasonicPowerKw/Math.max(h?.ultrasonicMaxPowerKw??6,0.001)))));
-    const thermalFactor=Math.max(0,Math.min(1,(temperature-25)/100)),vacuumFactor=Math.max(0,Math.min(1,1-pressure/this.c.ambientPressureMbar)),extractionDrive=commands.extractor?vacuumFactor*(0.35+thermalFactor*0.65)*acousticMultiplier:0;
-    const yieldPercentage=Math.min(target.yieldPercent,this.state.yieldPercent+this.c.extractionYieldRatePerSecond*extractionDrive*dt*100); const ratio=yieldPercentage/Math.max(target.yieldPercent,0.001); const oilRecoveredKg=Math.max(this.state.oilRecoveredKg,target.oilRecoveredKg*ratio); const waterRemovedKg=Math.max(this.state.waterRemovedKg,target.waterRemovedKg*ratio);
-    const trapTemps=h?.coldTrapTemperaturesC??[0,-20,-40,-80],areas=h?.coldTrapHeatTransferAreasM2??[0,0,0,0],volumes=h?.coldTrapVolumesL??[0,0,0,0],caps=h?.coldTrapCondensateCapacityKg??[0,0,0,0],U=h?.coldTrapHeatTransferCoefficientWPerM2K??0; const stage=[...this.diagnostics.coldTrapStageCondensedWaterKg] as [number,number,number,number]; let incoming=Math.max(0,waterRemovedKg-this.state.waterRemovedKg),coldTrapHeatLoadKw=0,coldTrapCapacity=0;
-    for(let i=0;i<4&&incoming>0;i++){const trap=calculateColdTrapLoad({temperatureC:trapTemps[i],volumeL:volumes[i],heatTransferAreaM2:areas[i],condensateCapacityKg:Math.max(0,caps[i]-stage[i])},{streamTemperatureC:temperature,dtSeconds:dt,incomingCondensableKg:incoming,overallHeatTransferCoefficientWPerM2K:U});stage[i]+=trap.condensedKg;incoming=trap.remainingIncomingKg;coldTrapHeatLoadKw+=trap.heatRemovalKW;coldTrapCapacity+=trap.thermalCapacityKgPerSecond;warnings.push(...trap.warnings);}
-    const energyRate=commands.heater?heatingPower/1000:0; const pumpEnergy=commands.vacuumPump?0.0015:0; const coolingEnergy=commands.cooling?coolingPower/1000:0; const ultrasonicEnergy=effectiveUltrasonicPowerKw/3600; const energyKwh=this.state.energyKwh+(energyRate+pumpEnergy+coolingEnergy+ultrasonicEnergy)*dt;
-    this.state={...this.state,pressureMbar:pressure,temperatureC:temperature,yieldPercent:yieldPercentage,waterRemovedKg:Math.min(target.waterRemovedKg,waterRemovedKg),oilRecoveredKg:Math.min(target.oilRecoveredKg,oilRecoveredKg),energyKwh:Math.max(0,energyKwh)};
-    this.diagnostics={connectedVolumeL,pipeVolumeL,vacuumConductanceM3h:conductanceM3h,effectivePumpCapacityM3h,thermalMassKjPerK:thermalMass,heatingPowerKw:h?.heatingPowerKw??4,coolingPowerKw:h?.coolingPowerKw??1,leakRateMbarPerSecond:leak,ultrasonicEffectivePowerKw:effectiveUltrasonicPowerKw,ultrasonicPowerDensityWPerL:u?.powerDensityWPerL??0,hardwareWarnings:warnings,coldTrapHeatLoadKw,coldTrapCondensationCapacityKgPerSecond:coldTrapCapacity,coldTrapStageCondensedWaterKg:stage};
-    return {...this.state};
-  }
-  public getHardwareDiagnostics():HardwareDynamicsDiagnostics{return {...this.diagnostics,hardwareWarnings:[...this.diagnostics.hardwareWarnings],coldTrapStageCondensedWaterKg:[...this.diagnostics.coldTrapStageCondensedWaterKg] as [number,number,number,number]};}
-  public snapshot():MachineDynamicsSnapshot{return {state:{...this.state},config:{...this.c},hardwareDiagnostics:this.getHardwareDiagnostics()};}
-  public restore(snapshot:MachineDynamicsSnapshot):void{this.state={...snapshot.state};if(snapshot.hardwareDiagnostics)this.diagnostics={...snapshot.hardwareDiagnostics,hardwareWarnings:[...snapshot.hardwareDiagnostics.hardwareWarnings],coldTrapStageCondensedWaterKg:[...snapshot.hardwareDiagnostics.coldTrapStageCondensedWaterKg] as [number,number,number,number]};}
-  private blend(current:number,next:number,factor:number):number{return current+(next-current)*factor;}
+ private readonly c:Required<Omit<DynamicMachineConfig,'hardware'>>&{hardware?:VirtualHardwareDynamicsConfig}; private state:MachineSensors; private diagnostics:HardwareDynamicsDiagnostics;
+ constructor(initial:MachineSensors,config:DynamicMachineConfig={}){this.c={ambientPressureMbar:1013.25,ambientTemperatureC:25,vacuumRateMbarPerSecond:7,heaterRateCPerSecond:0.18,passiveHeatLossCPerSecond:0.035,coolingRateCPerSecond:0.12,condenserCoolingFactor:0.05,extractionYieldRatePerSecond:0.00035,actuatorLag:0.35,...config};this.state={...initial};this.diagnostics={connectedVolumeL:config.hardware?.connectedVolumeL??DEFAULT_HW.connectedVolumeL,pipeVolumeL:0,vacuumConductanceM3h:null,effectivePumpCapacityM3h:config.hardware?.pumpCapacityM3PerHour??DEFAULT_HW.pumpCapacityM3PerHour,thermalMassKjPerK:config.hardware?.thermalMassKjPerK??DEFAULT_HW.thermalMassKjPerK,heatingPowerKw:config.hardware?.heatingPowerKw??DEFAULT_HW.heatingPowerKw,coolingPowerKw:config.hardware?.coolingPowerKw??DEFAULT_HW.coolingPowerKw,leakRateMbarPerSecond:config.hardware?.leakRateMbarPerSecond??0,ultrasonicEffectivePowerKw:0,ultrasonicPowerDensityWPerL:0,hardwareWarnings:[],coldTrapHeatLoadKw:0,coldTrapCondensationCapacityKgPerSecond:0,coldTrapStageCondensedWaterKg:[0,0,0,0]};}
+ public setUltrasonicHardwareControl(next:{frequencyKHz?:number;requestedPowerW?:number}):void{if(!this.c.hardware)return;this.c.hardware.ultrasonicOperatingFrequencyKHz=next.frequencyKHz??this.c.hardware.ultrasonicOperatingFrequencyKHz;this.c.hardware.ultrasonicRequestedPowerKw=(next.requestedPowerW??((this.c.hardware.ultrasonicRequestedPowerKw??0)*1000))/1000;}
+ public step(target:MachineSensors,commands:MachineCommand,dtSeconds:number,massTransferMultiplier=1):MachineSensors{
+  const dt=Math.max(0.05,dtSeconds),lag=Math.max(0.05,Math.min(1,this.c.actuatorLag)),h=this.c.hardware;const warnings:string[]=[];const connectedVolumeL=Math.max(1,h?.connectedVolumeL??250);let pipeVolumeL=0;let effectivePumpCapacityM3h=h?.pumpCapacityM3PerHour??200;let conductanceM3h:number|null=null;
+  if(h?.vacuumPipeDiameterMm&&h.vacuumPipeDiameterMm>0&&h.vacuumPipeLengthM&&h.vacuumPipeLengthM>0){const pipe=deriveVacuumConductance({pipeDiameterM:h.vacuumPipeDiameterMm/1000,pipeLengthM:h.vacuumPipeLengthM,upstreamPressureMbar:Math.max(this.state.pressureMbar,h.vacuumPumpOutletPressureMbar??1),downstreamPressureMbar:h.vacuumPumpOutletPressureMbar??1,gasViscosityPaS:1.81e-5,effectiveLengthFactor:h.vacuumPipeEffectiveLengthFactor??1});pipeVolumeL=pipe.pipeVolumeM3*1000;conductanceM3h=pipe.conductanceM3PerHour;warnings.push(...pipe.warnings);effectivePumpCapacityM3h=combinePumpAndConductance(effectivePumpCapacityM3h,pipe.conductanceM3PerHour);}
+  const volumeFactor=250/Math.max(1,connectedVolumeL+pipeVolumeL),pumpFactor=effectivePumpCapacityM3h/200,vacuumRate=h?Math.max(0,this.c.vacuumRateMbarPerSecond*volumeFactor*pumpFactor):this.c.vacuumRateMbarPerSecond,leak=Math.max(0,h?.leakRateMbarPerSecond??0);const pressureDemand=commands.vacuumPump?Math.max(1,this.state.pressureMbar-vacuumRate*dt+leak*dt):this.state.pressureMbar+(this.c.ambientPressureMbar-this.state.pressureMbar)*0.03*dt+leak*dt;const pressure=this.blend(this.state.pressureMbar,Math.max(1,Math.min(this.c.ambientPressureMbar,pressureDemand)),lag);
+  const thermalMass=h?.thermalMassKjPerK??250,heatingPower=commands.heater?(h?.heatingPowerKw??4):0,coolingPower=commands.cooling?(h?.coolingPowerKw??1):0;const thermal=stepThermalModel({initialTemperatureC:this.state.temperatureC,ambientTemperatureC:this.c.ambientTemperatureC,targetTemperatureC:target.temperatureC,thermalMassKJPerC:thermalMass,heaterPowerKW:heatingPower,coolingPowerKW:coolingPower,effectiveHeatLossKWPerC:h?0.01:this.c.passiveHeatLossCPerSecond*0.2,heaterEfficiency:1,coolingEfficiency:1},dt);let temperature=thermal.temperatureC;if(commands.condenser)temperature-=this.c.condenserCoolingFactor*dt;temperature=this.blend(this.state.temperatureC,Math.max(this.c.ambientTemperatureC,Math.min(200,temperature)),lag);
+  const u=h?enforceUltrasonicHardwareLimits({installedFrequencyMinKHz:h.ultrasonicFrequencyMinKHz??20,installedFrequencyMaxKHz:h.ultrasonicFrequencyMaxKHz??40,installedMaxPowerKW:h.ultrasonicMaxPowerKw??6,operatingFrequencyKHz:h.ultrasonicOperatingFrequencyKHz??30,requestedPowerKW:commands.extractor?(h.ultrasonicRequestedPowerKw??0):0,workingVolumeL:connectedVolumeL}):null;const effectiveUltrasonicPowerKw=u?.effectivePowerKW??0;if(u)warnings.push(...u.warnings);const acousticMultiplier=Math.max(0,Math.min(3,massTransferMultiplier*(1+0.25*Math.min(1,effectiveUltrasonicPowerKw/Math.max(h?.ultrasonicMaxPowerKw??6,0.001)))));
+  const thermalFactor=Math.max(0,Math.min(1,(temperature-25)/100)),vacuumFactor=Math.max(0,Math.min(1,1-pressure/this.c.ambientPressureMbar)),extractionDrive=commands.extractor?vacuumFactor*(0.35+thermalFactor*0.65)*acousticMultiplier:0;const yieldPercentage=Math.min(target.yieldPercent,this.state.yieldPercent+this.c.extractionYieldRatePerSecond*extractionDrive*dt*100);const ratio=yieldPercentage/Math.max(target.yieldPercent,0.001);const oilRecoveredKg=Math.max(this.state.oilRecoveredKg,target.oilRecoveredKg*ratio);const waterRemovedKg=Math.max(this.state.waterRemovedKg,target.waterRemovedKg*ratio);
+  const trapTemps=h?.coldTrapTemperaturesC??[0,-20,-40,-80],areas=h?.coldTrapHeatTransferAreasM2??[0,0,0,0],volumes=h?.coldTrapVolumesL??[0,0,0,0],caps=h?.coldTrapCondensateCapacityKg??[0,0,0,0],U=h?.coldTrapHeatTransferCoefficientWPerM2K??0;const stage=[...this.diagnostics.coldTrapStageCondensedWaterKg] as [number,number,number,number];let incoming=Math.max(0,waterRemovedKg-this.state.waterRemovedKg),coldTrapHeatLoadKw=0,coldTrapCapacity=0;for(let i=0;i<4&&incoming>0;i++){const trap=calculateColdTrapLoad({temperatureC:trapTemps[i],volumeL:volumes[i],heatTransferAreaM2:areas[i],condensateCapacityKg:Math.max(0,caps[i]-stage[i])},{streamTemperatureC:temperature,dtSeconds:dt,incomingCondensableKg:incoming,overallHeatTransferCoefficientWPerM2K:U});stage[i]+=trap.condensedKg;incoming=trap.remainingIncomingKg;coldTrapHeatLoadKw+=trap.heatRemovalKW;coldTrapCapacity+=trap.thermalCapacityKgPerSecond;warnings.push(...trap.warnings);}
+  const energyRate=commands.heater?heatingPower/1000:0,pumpEnergy=commands.vacuumPump?0.0015:0,coolingEnergy=commands.cooling?coolingPower/1000:0,ultrasonicEnergy=effectiveUltrasonicPowerKw/3600;this.state={...this.state,pressureMbar:pressure,temperatureC:temperature,yieldPercent:yieldPercentage,waterRemovedKg:Math.min(target.waterRemovedKg,waterRemovedKg),oilRecoveredKg:Math.min(target.oilRecoveredKg,oilRecoveredKg),energyKwh:Math.max(0,this.state.energyKwh+(energyRate+pumpEnergy+coolingEnergy+ultrasonicEnergy)*dt)};
+  this.diagnostics={connectedVolumeL,pipeVolumeL,vacuumConductanceM3h:conductanceM3h,effectivePumpCapacityM3h,thermalMassKjPerK:thermalMass,heatingPowerKw:h?.heatingPowerKw??4,coolingPowerKw:h?.coolingPowerKw??1,leakRateMbarPerSecond:leak,ultrasonicEffectivePowerKw:effectiveUltrasonicPowerKw,ultrasonicPowerDensityWPerL:u?.powerDensityWPerL??0,hardwareWarnings:warnings,coldTrapHeatLoadKw,coldTrapCondensationCapacityKgPerSecond:coldTrapCapacity,coldTrapStageCondensedWaterKg:stage};return {...this.state};
+ }
+ public getHardwareDiagnostics():HardwareDynamicsDiagnostics{return {...this.diagnostics,hardwareWarnings:[...this.diagnostics.hardwareWarnings],coldTrapStageCondensedWaterKg:[...this.diagnostics.coldTrapStageCondensedWaterKg] as [number,number,number,number]};}
+ public snapshot():MachineDynamicsSnapshot{return {state:{...this.state},config:{...this.c,hardware:this.c.hardware?{...this.c.hardware}:undefined},hardwareDiagnostics:this.getHardwareDiagnostics()};}
+ public restore(snapshot:MachineDynamicsSnapshot):void{this.state={...snapshot.state};if(snapshot.hardwareDiagnostics)this.diagnostics={...snapshot.hardwareDiagnostics,hardwareWarnings:[...snapshot.hardwareDiagnostics.hardwareWarnings],coldTrapStageCondensedWaterKg:[...snapshot.hardwareDiagnostics.coldTrapStageCondensedWaterKg] as [number,number,number,number]};}
+ private blend(current:number,next:number,factor:number):number{return current+(next-current)*factor;}
 }
