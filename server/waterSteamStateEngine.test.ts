@@ -17,15 +17,17 @@ describe("unified water steam state engine", () => {
     expect(state.phase).toBe("VAPOR");
     expect(state.status).toBe("READY_FOR_SIMULATION");
     expect(state.properties.enthalpyKJPerKg).toBeCloseTo(3335.68375, 4);
-    expect(state.properties.specificVolumeM3PerKg).toBeCloseTo(66.0081653, 5);
+    // At 700 K and 0.0035 MPa, 92.3015898 m3/kg is the consistent IF97 value.
+    expect(state.properties.specificVolumeM3PerKg).toBeCloseTo(92.3015898174, 5);
   });
 
   it("does not invent two-phase mixture properties", () => {
-    const state = resolveWaterSteamState(373.15, 0.101325);
+    const saturationPressureMPa = 0.1014179779;
+    const state = resolveWaterSteamState(373.15, saturationPressureMPa);
     expect(state.region).toBe(4);
     expect(state.phase).toBe("TWO_PHASE");
     expect(state.status).toBe("DATA_GAP");
-    expect(state.properties.saturationPressureMPa).toBeCloseTo(0.101325, 4);
+    expect(state.properties.saturationPressureMPa).toBeCloseTo(saturationPressureMPa, 8);
   });
 
   it("does not expose Region 3 as a fake property solution", () => {

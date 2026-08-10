@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { saturationPressureIF97 } from "./if97Region4Saturation";
 
 describe("IAPWS-IF97 Region 4 saturation pressure", () => {
-  it("matches the normal boiling-point reference", () => {
+  it("matches the saturation pressure at 373.15 K", () => {
     const result = saturationPressureIF97(373.15);
     expect(result.status).toBe("SUPPORTED");
-    expect(result.pressureMPa).toBeCloseTo(0.101325, 5);
+    // 373.15 K is exactly 100 °C; the IF97 saturation pressure is
+    // approximately 0.1014179779 MPa, not 0.101325 MPa (1 atm).
+    expect(result.pressureMPa).toBeCloseTo(0.1014179779, 8);
   });
 
   it("matches the critical point reference", () => {

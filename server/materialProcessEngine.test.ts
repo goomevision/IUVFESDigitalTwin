@@ -43,4 +43,33 @@ describe('material process thermodynamic coupling', () => {
     const lowPressure = engineB.step({ ...common, chamberPressureMbar: 200 });
     expect(lowPressure.moistureKg).toBeLessThanOrEqual(highPressure.moistureKg);
   });
+
+  it('closes the extractor-to-condenser material path without inventing recovery', () => {
+    const engine = new MaterialProcessEngine({ materialMassKg: 10, initialWaterFraction: 0.2, initialOilFraction: 0.05 });
+    const extraction = engine.step({
+      materialMassKg: 10, initialWaterFraction: 0.2, initialOilFraction: 0.05,
+      chamberPressureMbar: 200, materialTemperatureC: 60,
+      heaterPowerFraction: 1, vacuumPowerFraction: 1,
+      extractorPowerFraction: 1, condenserPowerFraction: 0,
+      coolingPowerFraction: 0, dtSeconds: 60,
+    });
+
+    expect(extraction.oilInMatrixKg).toBeLessThan(0.5);
+    expect(extraction.oilVaporKg).toBeGreaterThan(0);
+    expect(extraction.recoveredOilKg).toBe(0);
+
+    const condensed = engine.step({
+      materialMassKg: 10, initialWaterFraction: 0.2, initialOilFraction: 0.05,
+      chamberPressureMbar: 200, materialTemperatureC: 60,
+      heaterPowerFraction: 1, vacuumPowerFraction: 1,
+      extractorPowerFraction: 0, condenserPowerFraction: 1,
+      coolingPowerFraction: 1, dtSeconds: 1,
+    });
+
+    expect(condensed.oilVaporKg).toBeLessThan(extraction.oilVaporKg);
+    expect(condensed.recoveredOilKg).toBeGreaterThan(0);
+    expect(condensed.oilRecoveryFraction).toBeGreaterThan(0);
+    expect(condensed.massBalanceResidualKg).toBeCloseTo(0, 12);
+    expect(condensed.energyBalanceResidualKWh).toBeCloseTo(0, 12);
+  });
 });
