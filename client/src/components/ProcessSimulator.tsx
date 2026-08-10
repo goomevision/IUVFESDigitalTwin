@@ -38,7 +38,7 @@ const STAGES: Array<{ id: Stage; label: string; description: string }> = [
   { id: "COMPLETE", label: "COMPLETE", description: "Final mass and energy balance calculated" },
 ];
 
-function Gauge({ label, value, max, unit, icon: Icon, detail }: { label: string; value: number; max: number; unit: string; icon: typeof Wind; detail?: string }) {
+function MetricGauge({ label, value, max, unit, icon: Icon, detail }: { label: string; value: number; max: number; unit: string; icon: typeof Wind; detail?: string }) {
   const percent = Math.max(0, Math.min(100, value / Math.max(max, 0.001) * 100));
   return <div className="group rounded-2xl border border-cyan-500/15 bg-slate-950/65 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.03)] transition-colors hover:border-cyan-400/30">
     <div className="mb-3 flex items-center justify-between gap-3">
@@ -117,6 +117,12 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: ProcessSi
   const elapsedSeconds = frames.at(-1)?.timestampSeconds ?? 0;
   const sessionStatus = stateAlarm ? "FAULT" : completed ? "COMPLETE" : paused ? "PAUSED" : running ? "RUNNING" : "STANDBY";
   const sessionStatusClass = stateAlarm ? "border-red-500/30 bg-red-500/10 text-red-300" : completed ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : paused ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-300" : running ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-300" : "border-slate-700 bg-slate-900/70 text-slate-400";
+  const headerMetrics = [
+    { label: "SESSION", value: sessionStatus, Icon: Activity },
+    { label: "ELAPSED", value: `${elapsedSeconds.toFixed(0)} s`, Icon: Clock3 },
+    { label: "CAUSAL TRACE", value: `${frames.length} frames`, Icon: Database },
+    { label: "SAFETY", value: stateAlarm ? "ATTENTION" : "MONITORED", Icon: ShieldCheck },
+  ];
 
   return <div className="min-h-screen bg-[radial-gradient(circle_at_top,#10263a_0%,#050912_45%,#02040a_100%)] p-3 text-slate-100 md:p-5">
     <div className="mx-auto max-w-[1540px] space-y-4">
@@ -139,7 +145,7 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: ProcessSi
           </div>
         </div>
         <div className="grid grid-cols-2 border-t border-slate-800/80 md:grid-cols-4">
-          {[["SESSION", sessionStatus, Activity], ["ELAPSED", `${elapsedSeconds.toFixed(0)} s`, Clock3], ["CAUSAL TRACE", `${frames.length} frames`, Database], ["SAFETY", stateAlarm ? "ATTENTION" : "MONITORED", ShieldCheck]].map(([label, value, Icon]) => <div key={label as string} className="flex items-center gap-3 border-r border-slate-800/70 px-4 py-3 last:border-r-0"><Icon className="h-4 w-4 text-slate-500" /><div><div className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-600">{label}</div><div className={`mt-0.5 font-mono text-xs ${label === "SAFETY" && stateAlarm ? "text-red-300" : "text-slate-300"}`}>{value as string}</div></div></div>)}
+          {headerMetrics.map(({ label, value, Icon }) => <div key={label} className="flex items-center gap-3 border-r border-slate-800/70 px-4 py-3 last:border-r-0"><Icon className="h-4 w-4 text-slate-500" /><div><div className="font-mono text-[9px] uppercase tracking-[0.16em] text-slate-600">{label}</div><div className={`mt-0.5 font-mono text-xs ${label === "SAFETY" && stateAlarm ? "text-red-300" : "text-slate-300"}`}>{value}</div></div></div>)}
         </div>
       </header>
 
@@ -157,17 +163,17 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: ProcessSi
       {stateAlarm && <div className="flex items-start gap-3 rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-red-200 shadow-lg shadow-red-950/10"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /><div><div className="font-semibold tracking-wide">PROCESS ATTENTION</div><div className="mt-1 text-sm text-red-300/80">{stateAlarm}</div></div></div>}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <Gauge label="CHAMBER PRESSURE" value={current.pressureMbar} max={1013.25} unit="mbar" icon={Wind} detail="Vacuum chamber sensor" />
-        <Gauge label="PROCESS TEMPERATURE" value={current.temperatureC} max={150} unit="°C" icon={Thermometer} detail="Thermal process sensor" />
-        <Gauge label="RECOVERY YIELD" value={current.yieldPercent} max={100} unit="%" icon={CircleGauge} detail={`${current.oilRecoveredKg.toFixed(3)} kg oil recovered`} />
-        <Gauge label="ENERGY LOAD" value={current.energyKwh} max={10} unit="kWh" icon={Zap} detail="Accumulated process energy" />
+        <MetricGauge label="CHAMBER PRESSURE" value={current.pressureMbar} max={1013.25} unit="mbar" icon={Wind} detail="Vacuum chamber sensor" />
+        <MetricGauge label="PROCESS TEMPERATURE" value={current.temperatureC} max={150} unit="°C" icon={Thermometer} detail="Thermal process sensor" />
+        <MetricGauge label="RECOVERY YIELD" value={current.yieldPercent} max={100} unit="%" icon={CircleGauge} detail={`${current.oilRecoveredKg.toFixed(3)} kg oil recovered`} />
+        <MetricGauge label="ENERGY LOAD" value={current.energyKwh} max={10} unit="kWh" icon={Zap} detail="Accumulated process energy" />
       </div>
 
       <ProcessMachine3D machine={machine} />
 
       <div className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
         <section className="rounded-3xl border border-cyan-500/15 bg-slate-950/60 p-4 md:p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] uppercase tracking-[0.2em] text-slate-600">Live telemetry</p><h3 className="mt-1 font-semibold tracking-wider text-cyan-200">PROCESS TREND</h3></div><div className="flex items-center gap-3 font-mono text-[10px] text-slate-500"><span>T+ {(elapsedSeconds).toFixed(0)}s</span><span>{recentFrames.length} samples</span></div></div>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><p className="text-[10px] uppercase tracking-[0.2em] text-slate-600">Live telemetry</p><h3 className="mt-1 font-semibold tracking-wider text-cyan-200">PROCESS TREND</h3></div><div className="flex items-center gap-3 font-mono text-[10px] text-slate-500"><span>T+ {elapsedSeconds.toFixed(0)}s</span><span>{recentFrames.length} samples</span></div></div>
           <div className="relative h-72 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/80">
             <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "linear-gradient(rgba(34,211,238,.25) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,.25) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
             {chartPoints ? <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full p-5"><polyline points={chartPoints} fill="none" stroke="rgb(34 211 238)" strokeWidth="1.2" vectorEffect="non-scaling-stroke" /></svg> : <div className="absolute inset-0 flex items-center justify-center"><div className="text-center"><Activity className="mx-auto h-8 w-8 text-slate-700" /><p className="mt-2 font-mono text-[10px] uppercase tracking-[0.16em] text-slate-600">Waiting for telemetry</p></div></div>}
