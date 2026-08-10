@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ProcessMachine3D } from "@/components/ProcessMachine3D";
 import { ProcessEventTimeline } from "@/components/ProcessEventTimeline";
 import { ScientificRunRecorder } from "@/components/ScientificRunRecorder";
+import { loadControlHardwareConfig } from "@/lib/hardwareConfig";
 
 interface ProcessSimulatorProps { experimentId: string; onExit?: () => void; onComplete?: () => void; }
 type Stage = "PRE_FLIGHT" | "CHARGE" | "VACUUM" | "HEAT_UP" | "EXTRACTION" | "CONDENSATION" | "COOL_DOWN" | "COMPLETE" | "FAULT";
@@ -62,10 +63,11 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: ProcessSi
   const start = async () => {
     if (!experimentQuery.data || startMutation.isPending) return;
     const p = experimentQuery.data.inputParameters as Record<string, unknown>;
+    const hardware = loadControlHardwareConfig();
     try {
-      const result = await startMutation.mutateAsync({ experimentId, materialWeight: Number(p.materialWeight), waterContent: Number(p.waterContent), oilContent: Number(p.oilContent), targetPressure: Number(p.targetPressure), targetTemperature: Number(p.targetTemperature), dtSeconds: 1, maxSteps: Math.min(100000, Math.max(100, Math.ceil(Number(p.duration || 1) * 3600))) });
+      const result = await startMutation.mutateAsync({ experimentId, materialWeight: Number(p.materialWeight), waterContent: Number(p.waterContent), oilContent: Number(p.oilContent), targetPressure: Number(p.targetPressure), targetTemperature: Number(p.targetTemperature), dtSeconds: 1, maxSteps: Math.min(100000, Math.max(100, Math.ceil(Number(p.duration || 1) * 3600))), hardware });
       const existingFrames = (result.frames ?? []) as unknown as CausalFrame[];
-      setFrames(existingFrames); setAlarm(null); setCompleted(false); setPaused(false); setRunning(true); toast.success("Closed-loop control session started");
+      setFrames(existingFrames); setAlarm(null); setCompleted(false); setPaused(false); setRunning(true); toast.success("Closed-loop control session started with static hardware profile");
     } catch (error) { console.error(error); setAlarm("CLOSED-LOOP START ERROR — PROCESS NOT STARTED"); toast.error("Could not start process"); }
   };
 
