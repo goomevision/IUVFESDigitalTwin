@@ -11,6 +11,7 @@ import { ProcessControlLoop, type ProcessControlSnapshot } from './controlLoop';
 import { MachineDynamicsEngine, type MachineDynamicsSnapshot } from './machineDynamics';
 import { ProcessStateEngine, type MachineSensors, type ProcessState } from './processStateEngine';
 import type { UltrasonicConfig, UltrasonicState } from './ultrasonicEngine';
+import type { WaterThermoState } from './waterThermo';
 
 export interface ClosedLoopSimulationConfig {
   targetPressureMbar: number;
@@ -43,6 +44,7 @@ export interface CausalFrame {
   sensorAfter: MachineSensors;
   materialInventory: MaterialInventory;
   ultrasonic: UltrasonicState | null;
+  waterThermo: WaterThermoState;
   paused: boolean;
 }
 
@@ -173,6 +175,7 @@ export class ClosedLoopSimulationEngine {
     this.stepNumber += 1;
     this.sensors = physicalSensorAfter;
     const controllerAfterActuation = this.state.tick(this.sensors, this.elapsedSeconds);
+    const waterThermo = this.dynamics.getWaterThermoState(this.target.waterRemovedKg, this.dtSeconds);
     const materialInventory: MaterialInventory = {
       initialMassKg: this.material.initialMassKg,
       waterInitialKg: this.material.waterInitialKg,
@@ -192,6 +195,7 @@ export class ClosedLoopSimulationEngine {
       sensorAfter: { ...physicalSensorAfter },
       materialInventory,
       ultrasonic,
+      waterThermo,
       paused: false,
     };
     this.frames.push(frame);
