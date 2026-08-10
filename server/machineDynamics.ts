@@ -10,6 +10,7 @@ import type { MachineCommand, MachineSensors } from './processStateEngine';
 import { stepThermalModel } from './thermalEngineering';
 import { deriveVacuumConductance, combinePumpAndConductance } from './vacuumConductance';
 import { calculateColdTrapLoad } from './coldTrapEngineering';
+import { routeCondensateCollection } from './condensateCollection';
 import { enforceUltrasonicHardwareLimits } from './ultrasonicHardwareCoupling';
 
 export interface VirtualHardwareDynamicsConfig {
@@ -41,6 +42,10 @@ export interface VirtualHardwareDynamicsConfig {
   coldTrapHeatTransferAreasM2?: [number, number, number, number];
   coldTrapVolumesL?: [number, number, number, number];
   coldTrapCondensateCapacityKg?: [number, number, number, number];
+  /** Four receiver/collection vessel capacities. */
+  collectionVesselCapacityKg?: [number, number, number, number];
+  /** Default oil routing assumption: light / main oil / heavy. */
+  oilCollectionRoutingFractions?: [number, number, number];
   /** Dynamic ultrasonic request; static hardware max remains immutable. */
   ultrasonicOperatingFrequencyKHz?: number;
   ultrasonicRequestedPowerKW?: number;
@@ -110,6 +115,8 @@ export class MachineDynamicsEngine {
       coldTrapHeatTransferAreasM2: [0, 0, 0, 0],
       coldTrapVolumesL: [0, 0, 0, 0],
       coldTrapCondensateCapacityKg: [0, 0, 0, 0],
+      collectionVesselCapacityKg: [2, 2, 2, 2],
+      oilCollectionRoutingFractions: [0, 1, 0],
       ultrasonicOperatingFrequencyKHz: 30,
       ultrasonicRequestedPowerKW: 0,
       pumpCapacityM3h: 200,
@@ -120,13 +127,20 @@ export class MachineDynamicsEngine {
       effectiveHeatLossKWPerC: 0,
       ...config,
     };
-    this.state = { ...initial };
+    this.state = {
+      ...initial,
+      collectionVesselMassKg: initial.collectionVesselMassKg ?? [0, 0, 0, 0],
+      unroutedCondensateKg: initial.unroutedCondensateKg ?? 0,
+      collectionRoutingStatus: initial.collectionRoutingStatus ?? 'ROUTED',
+    };
   }
 
   public step(target: MachineSensors, commands: MachineCommand, dtSeconds: number): MachineSensors {
     const dt = Math.max(0.05, dtSeconds);
     const lag = Math.max(0.05, Math.min(1, this.c.actuatorLag));
 
+    const geometricRadiusM = this.c.reactorInternalDiameterMm / 2000;
+    const geometricVolumeL = Math.PI * geometricRadiusM ** 2 * (this.c.reactorShellLengthMm / 1000) * 1000;
     const pipeConfigured = this.c.vacuumPipeDiameterMm > 0 && this.c.vacuumPipeLengthM > 0;
     const pipe = pipeConfigured
       ? deriveVacuumConductance({
@@ -206,19 +220,17 @@ export class MachineDynamicsEngine {
     let coldTrapHeatLoadKW = 0;
     let coldTrapCondensationCapacityKgPerSecond = 0;
     let coldTrapCondensedWaterKg = this.state.coldTrapCondensedWaterKg ?? 0;
-    let aggregateCapacityRemainingKg = Math.max(0, this.c.coldTrapCondensateCapacityKg.reduce((sum, value) => sum + value, 0) - coldTrapCondensedWaterKg);
     const trapTemps = this.c.coldTrapTemperaturesC;
     const areas = this.c.coldTrapHeatTransferAreasM2;
     const volumes = this.c.coldTrapVolumesL;
     const capacities = this.c.coldTrapCondensateCapacityKg;
-    for (let i = 0; i < 4 && remainingCondensableKg > 0 && aggregateCapacityRemainingKg > 0; i += 1) {
-      const stageCapacity = Math.min(capacities[i], aggregateCapacityRemainingKg);
+    for (let i = 0; i < 4 && remainingCondensableKg > 0; i += 1) {
       const trap = calculateColdTrapLoad(
         {
           temperatureC: trapTemps[i],
           volumeL: volumes[i],
           heatTransferAreaM2: areas[i],
-          condensateCapacityKg: Math.max(0, stageCapacity),
+          condensateCapacityKg: Math.max(0, capacities[i] - coldTrapCondensedWaterKg),
         },
         {
           streamTemperatureC: temperature,
@@ -230,9 +242,29 @@ export class MachineDynamicsEngine {
       coldTrapHeatLoadKW += trap.heatRemovalKW;
       coldTrapCondensationCapacityKgPerSecond += trap.thermalCapacityKgPerSecond;
       coldTrapCondensedWaterKg += trap.condensedKg;
-      aggregateCapacityRemainingKg = Math.max(0, aggregateCapacityRemainingKg - trap.condensedKg);
       remainingCondensableKg = trap.remainingIncomingKg;
     }
+
+    const previousOil = this.state.oilRecoveredKg;
+    const previousCollectedWater = this.state.coldTrapCondensedWaterKg ?? 0;
+    const collection = commands.condenser
+      ? routeCondensateCollection({
+          deltaWaterKg: Math.max(0, coldTrapCondensedWaterKg - previousCollectedWater),
+          deltaOilKg: Math.max(0, oilRecoveredKg - previousOil),
+          existingMassKg: this.state.collectionVesselMassKg ?? [0, 0, 0, 0],
+          capacityKg: this.c.collectionVesselCapacityKg,
+          oilRoutingFractions: this.c.oilCollectionRoutingFractions,
+        })
+      : {
+          addedMassKg: [0, 0, 0, 0] as [number, number, number, number],
+          totalMassKg: this.state.collectionVesselMassKg ?? [0, 0, 0, 0],
+          collectedWaterKg: 0,
+          collectedOilKg: 0,
+          unroutedWaterKg: 0,
+          unroutedOilKg: 0,
+          status: 'ROUTED' as const,
+          warnings: [],
+        };
 
     const energyRate =
       (commands.heater ? Math.max(0, this.c.heatingPowerKW) / 2250 : 0) +
@@ -259,6 +291,9 @@ export class MachineDynamicsEngine {
       coldTrapHeatLoadKW,
       coldTrapCondensationCapacityKgPerSecond,
       coldTrapCondensedWaterKg,
+      collectionVesselMassKg: collection.totalMassKg,
+      unroutedCondensateKg: collection.unroutedWaterKg + collection.unroutedOilKg,
+      collectionRoutingStatus: collection.status,
     };
     return { ...this.state };
   }
