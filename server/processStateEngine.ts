@@ -15,12 +15,13 @@ export class ProcessStateEngine {
   private readonly config: Required<ProcessStateConfig>;
   private state: ProcessState;
   constructor(config: ProcessStateConfig, initialSensors: MachineSensors) { this.config = { ...DEFAULTS, ...config }; this.state = this.initialState(initialSensors, 'Controller initialized; waiting for pre-flight checks.'); }
-  public setTargets(targets: Pick<ProcessStateConfig, 'targetPressureMbar' | 'targetTemperatureC'>): void {
+  public setTargets(targets: Pick<ProcessStateConfig, 'targetPressureMbar' | 'targetTemperatureC' | 'coolingTemperatureC'>): void {
     this.config.targetPressureMbar = Math.max(1, Math.min(1000, targets.targetPressureMbar));
     this.config.targetTemperatureC = Math.max(25, Math.min(150, targets.targetTemperatureC));
+    if (targets.coolingTemperatureC !== undefined) this.config.coolingTemperatureC = Math.max(25, Math.min(80, targets.coolingTemperatureC));
   }
-  public getTargets(): Pick<ProcessStateConfig, 'targetPressureMbar' | 'targetTemperatureC'> {
-    return { targetPressureMbar: this.config.targetPressureMbar, targetTemperatureC: this.config.targetTemperatureC };
+  public getTargets(): Pick<ProcessStateConfig, 'targetPressureMbar' | 'targetTemperatureC' | 'coolingTemperatureC'> {
+    return { targetPressureMbar: this.config.targetPressureMbar, targetTemperatureC: this.config.targetTemperatureC, coolingTemperatureC: this.config.coolingTemperatureC };
   }
   public tick(sensors: MachineSensors, elapsedSeconds: number): ProcessState {
     const interlocks = this.evaluateInterlocks(sensors); this.state.sensors = { ...sensors }; this.state.interlocks = interlocks; this.state.elapsedSeconds = elapsedSeconds; this.state.alarm = null;
