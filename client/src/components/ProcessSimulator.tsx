@@ -7,6 +7,7 @@ import { ProcessMachine3D } from "@/components/ProcessMachine3D";
 import { ProcessEventTimeline } from "@/components/ProcessEventTimeline";
 import { ScientificRunRecorder } from "@/components/ScientificRunRecorder";
 import { LiveProcessTrend } from "@/components/LiveProcessTrend";
+import { CausalFrameInspector } from "@/components/CausalFrameInspector";
 
 type Stage = "PRE_FLIGHT" | "CHARGE" | "VACUUM" | "HEAT_UP" | "EXTRACTION" | "CONDENSATION" | "COOL_DOWN" | "COMPLETE" | "FAULT";
 type Sensors = { chamberSealed: boolean; pressureMbar: number; temperatureC: number; yieldPercent: number; waterRemovedKg: number; oilRecoveredKg: number; energyKwh: number };
@@ -16,7 +17,7 @@ type Frame = {
   controller:{stage:Stage;progress:number;elapsedSeconds:number;sensors:Sensors;commands:Commands;interlocks:{chamberSealed:boolean;pressureSafeForHeating:boolean;temperatureSafeForCooling:boolean;overTemperature:boolean;vacuumAchieved:boolean;allSystemsSafe:boolean};alarm:string|null;transitionReason:string};
   controlOutput:{heaterPower:number;vacuumPumpPower:number;valve:{vacuumIsolation:number;vaporToCondenser:number;coolingWater:number}};
   intendedCommands:Commands; effectiveCommands:Commands; physicalSensorAfter:Sensors; sensorAfter:Sensors; materialInventory:any;
-  safety:{stage:Stage;allSystemsSafe:boolean;chamberSealed:boolean;pressureSafeForHeating:boolean;temperatureSafeForCooling:boolean;vacuumAchieved:boolean;overTemperature:boolean;alarm:string|null;transitionReason:string}; paused:boolean;
+  safety:{stage:Stage;allSystemsSafe:boolean;chamberSealed:boolean;pressureSafeForHeating:boolean;temperatureSafeForCooling:boolean;overTemperature:boolean;vacuumAchieved:boolean;alarm:string|null;transitionReason:string}; paused:boolean;
   ultrasonic?:{effectiveFrequencyKHz?:number;effectivePowerKW?:number;powerDensityWPerL?:number;status?:string};
   hardwareDiagnostics?:{connectedVolumeL?:number;pipeVolumeL?:number;vacuumConductanceM3h?:number|null;effectivePumpCapacityM3h?:number;ultrasonicEffectivePowerKw?:number;ultrasonicPowerDensityWPerL?:number;hardwareWarnings?:string[];coldTrapTemperaturesC?:number[];coldTrapHeatLoadKw?:number;coldTrapCondensationCapacityKgPerSecond?:number;coldTrapStageCondensedWaterKg?:number[]};
 };
@@ -47,6 +48,7 @@ export function ProcessSimulator({experimentId,onExit,onComplete}:{experimentId:
   <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6"><Metric label="TEMPERATURE" value={sensor?`${fmt(sensor.temperatureC,1)} °C`:"—"}/><Metric label="PRESSURE" value={sensor?`${fmt(sensor.pressureMbar,1)} mbar`:"—"}/><Metric label="YIELD" value={sensor?`${fmt(sensor.yieldPercent,2)} %`:"—"} accent="emerald"/><Metric label="OIL RECOVERED" value={sensor?`${fmt(sensor.oilRecoveredKg,3)} kg`:"—"} accent="amber"/><Metric label="WATER REMOVED" value={sensor?`${fmt(sensor.waterRemovedKg,3)} kg`:"—"} accent="sky"/><Metric label="ENERGY" value={sensor?`${fmt(sensor.energyKwh,3)} kWh`:"—"} accent="amber"/></section>
   <section className="rounded-2xl border border-cyan-500/20 bg-slate-950/70 p-3"><ProcessMachine3D machine={machine}/></section>
   <LiveProcessTrend frames={recent}/>
+  <CausalFrameInspector frames={frames}/>
   <section className="grid gap-4 xl:grid-cols-2"><ProcessEventTimeline timeline={frames.map(f=>({stage:f.safety.stage,elapsedSeconds:f.controller.elapsedSeconds,alarm:f.safety.alarm,transitionReason:f.safety.transitionReason,interlocks:{overTemperature:f.safety.overTemperature,vacuumAchieved:f.safety.vacuumAchieved,allSystemsSafe:f.safety.allSystemsSafe}}))}/><div className="rounded-2xl border border-cyan-500/20 bg-slate-950/70 p-4"><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold tracking-wider text-cyan-300">PROCESS STATUS</h3><span className={`font-mono text-[10px] ${safety?.allSystemsSafe?"text-emerald-300":"text-red-300"}`}>{safety?.allSystemsSafe?"● ALL SYSTEMS SAFE":"● CHECK SAFETY"}</span></div><div className="grid grid-cols-2 gap-2 text-xs font-mono">{STAGES.map((s,i)=>{const current=state?.stage===s,done=state&&STAGES.indexOf(state.stage)>i;return <div key={s} className={`rounded-lg border p-2 ${current?"border-cyan-400/50 bg-cyan-400/10 text-cyan-300":done?"border-emerald-500/20 text-emerald-300":"border-slate-800 text-slate-600"}`}>{done?<CheckCircle2 className="inline h-3 w-3 mr-1"/>:current?<Zap className="inline h-3 w-3 mr-1"/>:null}{s}</div>})}</div>{safety?.alarm&&<div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300"><AlertTriangle className="mr-2 inline h-4 w-4"/>{safety.alarm}</div>}<div className="mt-3 text-[10px] text-slate-500">{safety?.transitionReason??"Waiting for engine frame."}</div></div></section>
   <div ref={scientificOutputRef}><ScientificRunRecorder experimentId={experimentId} frames={frames} completed={completed}/></div>
  </div></div>
