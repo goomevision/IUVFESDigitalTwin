@@ -10,6 +10,8 @@
 import { ProcessControlLoop, type ProcessControlSnapshot } from './controlLoop';
 import { MachineDynamicsEngine, type MachineDynamicsSnapshot } from './machineDynamics';
 import { ProcessStateEngine, type MachineSensors, type ProcessState } from './processStateEngine';
+import { buildScientificReportFromSimulation, type ScientificReportBridgeContext } from './scientificReportBridge';
+import type { ScientificReportV2 } from '../shared/scientific-v2';
 
 export interface ClosedLoopSimulationConfig { targetPressureMbar: number; targetTemperatureC: number; materialWeightKg: number; waterContentPercent: number; oilContentPercent: number; dtSeconds?: number; maxSteps?: number; }
 export interface CausalFrame { step: number; timestampSeconds: number; sensorBefore: MachineSensors; controller: ProcessState; sensorAfter: MachineSensors; paused: boolean; }
@@ -48,6 +50,12 @@ export class ClosedLoopSimulationEngine {
   public getFrames(): CausalFrame[] { return [...this.frames]; }
   public getSensors(): MachineSensors { return { ...this.sensors }; }
   public getState(): ProcessState { return this.state.tick(this.sensors, this.elapsedSeconds); }
+
+  /** Build the mandatory scientific report layers without promoting simulation to evidence. */
+  public buildScientificReport(context: ScientificReportBridgeContext): ScientificReportV2 {
+    const result = this.runToCompletion();
+    return buildScientificReportFromSimulation(result, context);
+  }
 
   public snapshot(): ClosedLoopSnapshot { return { version: 1, config: { ...this.config }, target: { ...this.target }, sensors: { ...this.sensors }, elapsedSeconds: this.elapsedSeconds, stepNumber: this.stepNumber, paused: this.paused, state: this.state.snapshotState(), dynamics: this.dynamics.snapshot(), control: this.control.snapshot(), frames: [...this.frames], pausedSteps: [...this.pausedSteps] }; }
 
