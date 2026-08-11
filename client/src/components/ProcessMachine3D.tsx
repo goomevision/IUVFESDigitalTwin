@@ -3,13 +3,7 @@ import * as THREE from "three";
 import type { ProcessStage } from "../../../server/processStateEngine";
 
 interface ColdTrapView { temperatureC?: number; condensedWaterKg?: number; }
-interface MachineState3D {
-  stage: ProcessStage;
-  commands: { vacuumPump: boolean; heater: boolean; extractor: boolean; condenser: boolean; cooling: boolean };
-  sensors: { pressureMbar: number; temperatureC: number };
-  interlocks: { vacuumAchieved: boolean; overTemperature: boolean };
-  coldTraps?: ColdTrapView[];
-}
+interface MachineState3D { stage: ProcessStage; commands: { vacuumPump: boolean; heater: boolean; extractor: boolean; condenser: boolean; cooling: boolean }; sensors: { pressureMbar: number; temperatureC: number }; interlocks: { vacuumAchieved: boolean; overTemperature: boolean }; coldTraps?: ColdTrapView[]; }
 interface Props { machine?: MachineState3D; }
 function tubeBetween(curve: THREE.Curve<THREE.Vector3>, radius: number, material: THREE.MeshBasicMaterial) { return new THREE.Mesh(new THREE.TubeGeometry(curve, 32, radius, 12, false), material); }
 
@@ -20,30 +14,20 @@ export function ProcessMachine3D({ machine }: Props) {
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0x020712);
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100); camera.position.set(10, 6.5, 15); camera.lookAt(0, 0.8, 0);
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); renderer.setSize(mount.clientWidth, mount.clientHeight); mount.appendChild(renderer.domElement);
-    scene.add(new THREE.HemisphereLight(0x9ee7ff, 0x07111f, 1.5));
-    const key = new THREE.PointLight(0x22d3ee, 18, 30); key.position.set(-2, 8, 7); scene.add(key);
-    const fill = new THREE.PointLight(0x2563eb, 8, 25); fill.position.set(5, 3, -5); scene.add(fill);
+    scene.add(new THREE.HemisphereLight(0x9ee7ff, 0x07111f, 1.5)); const key = new THREE.PointLight(0x22d3ee, 18, 30); key.position.set(-2, 8, 7); scene.add(key); const fill = new THREE.PointLight(0x2563eb, 8, 25); fill.position.set(5, 3, -5); scene.add(fill);
     const floor = new THREE.Mesh(new THREE.CircleGeometry(9, 64), new THREE.MeshBasicMaterial({ color: 0x06101c, transparent: true, opacity: 0.92 })); floor.rotation.x = -Math.PI / 2; floor.position.y = -2.05; scene.add(floor);
 
     const reactor = new THREE.Group(); reactor.position.set(-3.9, 0.7, 0); scene.add(reactor);
     const body = new THREE.Mesh(new THREE.CylinderGeometry(1.65, 1.65, 4.7, 48), new THREE.MeshStandardMaterial({ color: 0x18283b, metalness: 0.82, roughness: 0.2 })); reactor.add(body);
     const chamber = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 3.8, 48), new THREE.MeshStandardMaterial({ color: 0x0a1726, metalness: 0.25, roughness: 0.12, transparent: true, opacity: 0.56, emissive: 0x07334a })); reactor.add(chamber);
-    const top = new THREE.Mesh(new THREE.CylinderGeometry(1.72, 1.72, 0.28, 48), new THREE.MeshStandardMaterial({ color: 0x25374c, metalness: 0.9, roughness: 0.18 })); top.position.y = 2.38; reactor.add(top);
-    const bottom = top.clone(); bottom.position.y = -2.38; reactor.add(bottom);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(1.72, 1.72, 0.28, 48), new THREE.MeshStandardMaterial({ color: 0x25374c, metalness: 0.9, roughness: 0.18 })); top.position.y = 2.38; reactor.add(top); const bottom = top.clone(); bottom.position.y = -2.38; reactor.add(bottom);
     const heaterRing = new THREE.Mesh(new THREE.TorusGeometry(1.48, 0.085, 12, 48), new THREE.MeshBasicMaterial({ color: 0x334155 })); heaterRing.rotation.x = Math.PI / 2; heaterRing.position.y = 1.05; reactor.add(heaterRing);
     const ultrasonic = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.5, 24), new THREE.MeshBasicMaterial({ color: 0x334155 })); ultrasonic.position.y = -1.65; reactor.add(ultrasonic);
 
-    const pump = new THREE.Group(); pump.position.set(4.65, -0.5, 1.6); scene.add(pump);
-    const pumpBody = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.45, 1.5), new THREE.MeshStandardMaterial({ color: 0x172033, metalness: 0.86, roughness: 0.24 })); pump.add(pumpBody);
-    const pumpRotor = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.16, 32), new THREE.MeshBasicMaterial({ color: 0x334155 })); pumpRotor.rotation.z = Math.PI / 2; pumpRotor.position.x = -1.05; pump.add(pumpRotor);
+    const pump = new THREE.Group(); pump.position.set(4.65, -0.5, 1.6); scene.add(pump); const pumpBody = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.45, 1.5), new THREE.MeshStandardMaterial({ color: 0x172033, metalness: 0.86, roughness: 0.24 })); pump.add(pumpBody); const pumpRotor = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.16, 32), new THREE.MeshBasicMaterial({ color: 0x334155 })); pumpRotor.rotation.z = Math.PI / 2; pumpRotor.position.x = -1.05; pump.add(pumpRotor);
 
-    const trapGroups: THREE.Group[] = []; const trapBodies: THREE.Mesh[] = []; const trapCoils: THREE.Mesh[] = [];
-    for (let i = 0; i < 4; i++) {
-      const group = new THREE.Group(); group.position.set(-1.6 + i * 2.35, 3.25, -1.45); scene.add(group); trapGroups.push(group);
-      const shell = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.9, 32), new THREE.MeshStandardMaterial({ color: 0x15243a, metalness: 0.72, roughness: 0.24, transparent: true, opacity: 0.8, emissive: 0x061522 })); group.add(shell); trapBodies.push(shell);
-      const coil = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.065, 10, 32), new THREE.MeshBasicMaterial({ color: 0x2563eb })); coil.rotation.x = Math.PI / 2; coil.position.y = -0.15; group.add(coil); trapCoils.push(coil);
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.78, 0.12, 32), new THREE.MeshStandardMaterial({ color: 0x203149, metalness: 0.85, roughness: 0.2 })); base.position.y = -1.02; group.add(base);
-    }
+    const trapGroups: THREE.Group[] = []; const trapBodies: Array<THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>> = []; const trapCoils: Array<THREE.Mesh<THREE.TorusGeometry, THREE.MeshBasicMaterial>> = [];
+    for (let i = 0; i < 4; i++) { const group = new THREE.Group(); group.position.set(-1.6 + i * 2.35, 3.25, -1.45); scene.add(group); trapGroups.push(group); const shell = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 1.9, 32), new THREE.MeshStandardMaterial({ color: 0x15243a, metalness: 0.72, roughness: 0.24, transparent: true, opacity: 0.8, emissive: 0x061522 })); group.add(shell); trapBodies.push(shell); const coil = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.065, 10, 32), new THREE.MeshBasicMaterial({ color: 0x2563eb })); coil.rotation.x = Math.PI / 2; coil.position.y = -0.15; group.add(coil); trapCoils.push(coil); const base = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.78, 0.12, 32), new THREE.MeshStandardMaterial({ color: 0x203149, metalness: 0.85, roughness: 0.2 })); base.position.y = -1.02; group.add(base); }
 
     const vacuumLineMaterial = new THREE.MeshBasicMaterial({ color: 0x164e63 }); const vaporLineMaterial = new THREE.MeshBasicMaterial({ color: 0x155e75 }); const coolingLineMaterial = new THREE.MeshBasicMaterial({ color: 0x1e3a5f }); const powerCableMaterial = new THREE.MeshBasicMaterial({ color: 0x334155 });
     const vacuumCurve = new THREE.CatmullRomCurve3([new THREE.Vector3(-2.2, 0.2, 0.6), new THREE.Vector3(0.0, 0.2, 0.6), new THREE.Vector3(2.4, -0.05, 1.25), new THREE.Vector3(3.55, -0.35, 1.55)]);
@@ -51,14 +35,11 @@ export function ProcessMachine3D({ machine }: Props) {
     const coolingCurve = new THREE.CatmullRomCurve3([new THREE.Vector3(4.4, 1.6, -1.45), new THREE.Vector3(2.7, 1.6, -2.3), new THREE.Vector3(0.0, 1.7, -2.3), new THREE.Vector3(-2.0, 1.25, -0.8)]);
     const powerCurve = new THREE.CatmullRomCurve3([new THREE.Vector3(5.7, -1.25, 2.6), new THREE.Vector3(4.5, -1.0, 2.6), new THREE.Vector3(2.0, 0.0, 1.9), new THREE.Vector3(-1.0, 0.2, 0.8), new THREE.Vector3(-3.4, 0.2, 0.0)]);
     scene.add(tubeBetween(vacuumCurve, 0.095, vacuumLineMaterial), tubeBetween(vaporCurve, 0.085, vaporLineMaterial), tubeBetween(coolingCurve, 0.07, coolingLineMaterial), tubeBetween(powerCurve, 0.035, powerCableMaterial));
-
     const flowParticles = new THREE.Group(); scene.add(flowParticles); for (let i = 0; i < 20; i++) { const p = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 8), new THREE.MeshBasicMaterial({ color: 0x67e8f9 })); p.userData.offset = i / 20; flowParticles.add(p); }
     const chamberParticles = new THREE.Group(); scene.add(chamberParticles); for (let i = 0; i < 36; i++) { const p = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), new THREE.MeshBasicMaterial({ color: 0x67e8f9 })); p.userData.offset = i / 36; chamberParticles.add(p); }
-    let frame = 0; let raf = 0;
-    const resize = () => { if (!mount) return; camera.aspect = mount.clientWidth / Math.max(mount.clientHeight, 1); camera.updateProjectionMatrix(); renderer.setSize(mount.clientWidth, mount.clientHeight); }; window.addEventListener("resize", resize); resize();
+    let frame = 0; let raf = 0; const resize = () => { if (!mount) return; camera.aspect = mount.clientWidth / Math.max(mount.clientHeight, 1); camera.updateProjectionMatrix(); renderer.setSize(mount.clientWidth, mount.clientHeight); }; window.addEventListener("resize", resize); resize();
     const animate = () => {
-      const state = stateRef.current; const commands = state?.commands; const temperature = state?.sensors.temperatureC ?? 25; const pressure = state?.sensors.pressureMbar ?? 1013;
-      const hot = commands?.heater ?? false; const vacuum = commands?.vacuumPump ?? false; const extracting = commands?.extractor ?? false; const condensing = commands?.condenser ?? false; const cooling = commands?.cooling ?? false; const fault = state?.interlocks.overTemperature ?? false; const time = frame++ / 60;
+      const state = stateRef.current; const commands = state?.commands; const temperature = state?.sensors.temperatureC ?? 25; const pressure = state?.sensors.pressureMbar ?? 1013; const hot = commands?.heater ?? false; const vacuum = commands?.vacuumPump ?? false; const extracting = commands?.extractor ?? false; const condensing = commands?.condenser ?? false; const cooling = commands?.cooling ?? false; const fault = state?.interlocks.overTemperature ?? false; const time = frame++ / 60;
       const vacuumLevel = Math.max(0, Math.min(1, 1 - pressure / 1013.25)); const thermal = Math.max(0, Math.min(1, (temperature - 25) / 125));
       heaterRing.material.color.setHex(fault ? 0xef4444 : hot ? 0xf97316 : 0x334155); chamber.material.emissive.setHex(fault ? 0x5f1111 : hot ? 0x5a2108 : 0x07334a); ultrasonic.material.color.setHex(extracting ? 0xa78bfa : 0x334155); key.color.setHex(fault ? 0xef4444 : hot ? 0xfb923c : 0x22d3ee); key.intensity = hot ? 30 : 18; pumpRotor.rotation.x += vacuum ? 0.3 : 0.02; pumpRotor.material.color.setHex(vacuum ? 0x22d3ee : 0x334155);
       vacuumLineMaterial.color.setHex(vacuum ? 0x22d3ee : 0x164e63); vaporLineMaterial.color.setHex(extracting || condensing ? 0x38bdf8 : 0x155e75); coolingLineMaterial.color.setHex(cooling ? 0x60a5fa : 0x1e3a5f); powerCableMaterial.color.setHex(hot || vacuum || extracting || condensing || cooling ? 0xf59e0b : 0x334155);
