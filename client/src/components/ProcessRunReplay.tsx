@@ -11,7 +11,7 @@ type ReplayFrame = {
   safety?: { allSystemsSafe?: boolean; alarm?: string | null };
 };
 
-export function ProcessRunReplay({ frames, onFrameChange }: { frames: ReadonlyArray<ReplayFrame>; onFrameChange?: (frame: ReplayFrame | undefined, index: number) => void }) {
+export function ProcessRunReplay({ frames, onFrameChange }: { frames: ReadonlyArray<ReplayFrame>; onFrameChange?: (frame: any, index: number) => void }) {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
