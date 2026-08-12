@@ -256,11 +256,12 @@ export function ProcessMachine3D({ frame }: Props) {
         const hasTrapTemperature = finite(trapTemperature);
         const hasCondensate = finite(condensate) && condensate! > 0;
         const coldFactor = hasTrapTemperature ? Math.max(0, Math.min(1, (25 - trapTemperature!) / 105)) : undefined;
-        const active = condensing || cooling;
         const trapDataAvailable = hasTrapTemperature || finite(condensate);
-        setEmissive(trapBodies[index].material, active && coldFactor !== undefined ? (coldFactor > 0.65 ? 0x082f49 : 0x10243a) : 0x061522);
-        trapCoils[index].material.color.setHex(active && hasTrapTemperature ? (coldFactor! > 0.65 ? 0x60a5fa : 0x38bdf8) : trapDataAvailable ? 0x2563eb : 0x334155);
-        setHex(trapPorts[index].material, active ? 0x3b82f6 : trapDataAvailable ? 0x31465e : 0x202a38);
+        const trapCoolingCommanded = condensing || cooling;
+        const trapVisualKnown = hasTrapTemperature || finite(condensate);
+        setEmissive(trapBodies[index].material, trapVisualKnown && trapCoolingCommanded && coldFactor !== undefined ? (coldFactor > 0.65 ? 0x082f49 : 0x10243a) : 0x061522);
+        trapCoils[index].material.color.setHex(hasTrapTemperature ? (trapCoolingCommanded ? (coldFactor! > 0.65 ? 0x60a5fa : 0x38bdf8) : 0x2563eb) : trapDataAvailable ? 0x2563eb : 0x334155);
+        setHex(trapPorts[index].material, trapVisualKnown && trapCoolingCommanded ? 0x3b82f6 : trapDataAvailable ? 0x31465e : 0x202a38);
         setHex(trapIndicators[index].material, hasCondensate ? 0x38bdf8 : hasTrapTemperature ? 0x2563eb : 0x334155);
         trapIndicators[index].material.opacity = hasCondensate ? 0.9 : hasTrapTemperature ? 0.7 : 0.45;
         group.position.y = activeProcess ? 3.35 + Math.sin(time * 0.5 + index) * 0.015 : 3.35;
