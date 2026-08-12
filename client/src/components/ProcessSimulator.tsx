@@ -221,14 +221,6 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
   const doStop = async () => { if (!sessionId) return; try { await stop.mutateAsync(sessionId); clearTimer(); setRunning(false); setPaused(false); } catch { toast.error("Stop rejected"); } };
   const doReset = async () => { clearTimer(); if (sessionId) try { await reset.mutateAsync(sessionId); } catch { toast.error("Reset rejected"); } setSessionId(null); setFrames([]); setReplayMode(false); setReplayIndex(0); setRunning(false); setPaused(false); setCompleted(false); };
 
-  const machine = displayFrame ? {
-    stage: displayFrame.safety.stage,
-    commands: displayFrame.effectiveCommands,
-    sensors: { pressureMbar: displayFrame.sensorAfter.pressureMbar, temperatureC: displayFrame.sensorAfter.temperatureC },
-    interlocks: { vacuumAchieved: displayFrame.safety.vacuumAchieved, overTemperature: displayFrame.safety.overTemperature },
-    coldTraps: (displayFrame.hardwareDiagnostics?.coldTrapTemperaturesC ?? []).map((temperatureC, index) => ({ temperatureC, condensedWaterKg: displayFrame.hardwareDiagnostics?.coldTrapStageCondensedWaterKg?.[index] })),
-  } : undefined;
-
   return <div className="min-h-screen bg-[#020712] text-slate-100">
     <div className="min-h-screen bg-[radial-gradient(circle_at_50%_-12%,#123a54_0%,#06111d_35%,#020712_72%)] px-3 py-3 md:px-5 md:py-5">
       <div className="mx-auto max-w-[1660px] space-y-3">
@@ -250,7 +242,7 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
           </aside>
 
           <main className="min-w-0 space-y-3">
-            <section className="border border-cyan-500/25 bg-slate-950/70 p-3 shadow-[0_0_55px_rgba(14,116,144,0.12)]"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><div className="text-[9px] tracking-[0.24em] text-cyan-300">PROCESS TWIN</div><h2 className="mt-1 text-lg font-semibold tracking-wide">REACTOR → VAPOR → MULTI-STAGE CONDENSATION → RECOVERY</h2></div><div className="flex items-center gap-3"><ProgressRing progress={engineProgress} /><div className="font-mono text-[10px]"><div className="text-slate-500">ENGINE STAGE</div><div className="mt-1 text-cyan-200">{state?.stage ?? "WAITING"}</div><div className="mt-1 max-w-[220px] text-[9px] text-slate-500">{safety?.transitionReason ?? "Waiting for the first CausalFrame."}</div></div></div></div><ProcessMachine3D machine={machine} /></section>
+            <section className="border border-cyan-500/25 bg-slate-950/70 p-3 shadow-[0_0_55px_rgba(14,116,144,0.12)]"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><div className="text-[9px] tracking-[0.24em] text-cyan-300">PROCESS TWIN</div><h2 className="mt-1 text-lg font-semibold tracking-wide">REACTOR → VAPOR → MULTI-STAGE CONDENSATION → RECOVERY</h2></div><div className="flex items-center gap-3"><ProgressRing progress={engineProgress} /><div className="font-mono text-[10px]"><div className="text-slate-500">ENGINE STAGE</div><div className="mt-1 text-cyan-200">{state?.stage ?? "WAITING"}</div><div className="mt-1 max-w-[220px] text-[9px] text-slate-500">{safety?.transitionReason ?? "Waiting for the first CausalFrame."}</div></div></div></div><ProcessMachine3D frame={displayFrame} /></section>
             <section className="grid divide-x divide-slate-800 border border-slate-800 bg-slate-950/65 sm:grid-cols-3 xl:grid-cols-6"><Instrument label="TEMPERATURE" value={format(sensor?.temperatureC, 1)} unit="°C" /><Instrument label="PRESSURE" value={format(sensor?.pressureMbar, 1)} unit="mbar" tone="sky" /><Instrument label="YIELD" value={format(sensor?.yieldPercent, 2)} unit="%" tone="emerald" /><Instrument label="OIL RECOVERED" value={format(sensor?.oilRecoveredKg, 3)} unit="kg" tone="amber" /><Instrument label="WATER REMOVED" value={format(sensor?.waterRemovedKg, 3)} unit="kg" tone="sky" /><Instrument label="ENERGY" value={format(sensor?.energyKwh, 3)} unit="kWh" tone="amber" /></section>
           </main>
 
