@@ -282,8 +282,10 @@ export function ProcessMachine3D({ frame }: Props) {
     ]);
     const vaporCurve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(-2.72, 2.48, 0),
-      new THREE.Vector3(-0.8, 2.48, 0),
-      new THREE.Vector3(0.45, 3.02, -0.92),
+      new THREE.Vector3(-2.68, 3.65, -1.55),
+      new THREE.Vector3(-0.23, 3.65, -1.55),
+      new THREE.Vector3(2.22, 3.65, -1.55),
+      new THREE.Vector3(4.67, 3.65, -1.55),
       new THREE.Vector3(5.25, 3.02, -1.55),
     ]);
     const coolingCurve = new THREE.CatmullRomCurve3([
@@ -371,13 +373,16 @@ export function ProcessMachine3D({ frame }: Props) {
       const ultrasonicActivity = finite(visual.ultrasonicActivityIndex)
         ? Math.max(0, Math.min(1, visual.ultrasonicActivityIndex!))
         : undefined;
+      const ultrasonicActive = finite(visual.ultrasonicEffectivePowerW)
+        ? visual.ultrasonicEffectivePowerW! > 0
+        : ultrasonicActivity !== undefined && ultrasonicActivity > 0;
 
-      pumpRotor.rotation.x = timestamp * (vacuum ? 18 : 1.2);
-      reactor.rotation.y = Math.sin(timestamp * 0.35) * 0.02;
+      pumpRotor.rotation.x = vacuum ? timestamp * 18 : 0;
+      reactor.rotation.y = activeProcess ? Math.sin(timestamp * 0.35) * 0.02 : 0;
 
       setHex(heaterRing.material, fault ? 0xef4444 : hot ? 0xf97316 : 0x334155);
       setEmissive(chamber.material, fault ? 0x5f1111 : hot ? 0x5a2108 : 0x07334a);
-      setHex(ultrasonic.material, extracting ? 0xa78bfa : 0x334155);
+      setHex(ultrasonic.material, ultrasonicActive ? 0x8b5cf6 : 0x334155);
       key.color.setHex(fault ? 0xef4444 : hot ? 0xfb923c : 0x22d3ee);
       key.intensity = hot ? 30 : 18;
       setHex(pumpRotor.material, vacuum ? 0x22d3ee : 0x334155);
@@ -399,7 +404,6 @@ export function ProcessMachine3D({ frame }: Props) {
 
       const ultrasonicPulse = ultrasonicActivity === undefined ? 0 : ultrasonicActivity;
       ultrasonic.scale.setScalar(1 + ultrasonicPulse * 0.2);
-      setHex(ultrasonic.material, extracting ? 0x8b5cf6 : ultrasonicPulse > 0 ? 0x7c3aed : 0x334155);
 
       trapGroups.forEach((group, index) => {
         const trapTemperature = visual.coldTrapTemperaturesC?.[index];
@@ -408,17 +412,18 @@ export function ProcessMachine3D({ frame }: Props) {
         const hasCondensate = finite(condensate) && condensate! > 0;
         const coldFactor = hasTrapTemperature ? Math.max(0, Math.min(1, (25 - trapTemperature!) / 105)) : undefined;
         const active = condensing || cooling;
+        const trapDataAvailable = hasTrapTemperature || finite(condensate);
 
         setEmissive(
           trapBodies[index].material,
           active && coldFactor !== undefined ? (coldFactor > 0.65 ? 0x082f49 : 0x10243a) : 0x061522,
         );
         trapCoils[index].material.color.setHex(
-          active && coldFactor !== undefined ? (coldFactor > 0.65 ? 0x60a5fa : 0x38bdf8) : 0x2563eb,
+          active && hasTrapTemperature ? (coldFactor! > 0.65 ? 0x60a5fa : 0x38bdf8) : trapDataAvailable ? 0x2563eb : 0x334155,
         );
         setHex(trapPorts[index].material, active ? 0x3b82f6 : 0x31465e);
         trapBodies[index].scale.y = hasCondensate ? 1.03 : 1;
-        group.position.y = 3.35 + Math.sin(timestamp * 0.5 + index) * 0.015;
+        group.position.y = activeProcess ? 3.35 + Math.sin(timestamp * 0.5 + index) * 0.015 : 3.35;
       });
 
       chamberParticles.children.forEach((particle, index) => {
