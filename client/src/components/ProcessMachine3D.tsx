@@ -110,6 +110,10 @@ export function ProcessMachine3D({ frame }: Props) {
     reactor.add(reactorShell);
     const chamber = new THREE.Mesh(new THREE.CylinderGeometry(1.28, 1.28, 3.92, 48), new THREE.MeshStandardMaterial({ color: 0x0a1726, metalness: 0.25, roughness: 0.12, transparent: true, opacity: 0.56, emissive: 0x07334a }));
     reactor.add(chamber);
+    const stageBand = new THREE.Mesh(new THREE.TorusGeometry(1.36, 0.045, 10, 48), new THREE.MeshBasicMaterial({ color: 0x334155 }));
+    stageBand.rotation.x = Math.PI / 2;
+    stageBand.position.y = 1.9;
+    reactor.add(stageBand);
     const materialZone = new THREE.Mesh(new THREE.CylinderGeometry(0.96, 0.96, 2.5, 36), new THREE.MeshStandardMaterial({ color: 0x7c3aed, metalness: 0.05, roughness: 0.4, transparent: true, opacity: 0.2, emissive: 0x2e1065 }));
     materialZone.position.y = -0.25;
     reactor.add(materialZone);
@@ -144,6 +148,7 @@ export function ProcessMachine3D({ frame }: Props) {
     const trapBodies: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>[] = [];
     const trapCoils: THREE.Mesh<THREE.TorusGeometry, THREE.MeshBasicMaterial>[] = [];
     const trapPorts: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>[] = [];
+    const trapIndicators: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>[] = [];
     for (let i = 0; i < 4; i += 1) {
       const group = new THREE.Group();
       group.position.set(-1.9 + i * 2.45, 3.35, -1.55);
@@ -165,6 +170,11 @@ export function ProcessMachine3D({ frame }: Props) {
       port.position.set(-0.78, 0.3, 0);
       group.add(port);
       trapPorts.push(port);
+      const indicator = new THREE.Mesh(new THREE.RingGeometry(0.82, 0.9, 32), new THREE.MeshBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+      indicator.rotation.x = Math.PI / 2;
+      indicator.position.y = 1.02;
+      group.add(indicator);
+      trapIndicators.push(indicator);
     }
 
     const vacuumLineMaterial = new THREE.MeshBasicMaterial({ color: 0x164e63 });
@@ -218,6 +228,9 @@ export function ProcessMachine3D({ frame }: Props) {
 
       pumpRotor.rotation.x = vacuum && finite(timestamp) ? time * 18 : 0;
       reactor.rotation.y = activeProcess ? Math.sin(time * 0.35) * 0.02 : 0;
+      const stage = visual.stage;
+      const stageColor = fault ? 0xef4444 : stage === "CONDENSATION" ? 0x38bdf8 : stage === "EXTRACTION" ? 0xfbbf24 : stage === "HEAT_UP" ? 0xf97316 : visual.hasFrame ? 0x22d3ee : 0x334155;
+      setHex(stageBand.material, stageColor);
       setHex(heaterRing.material, fault ? 0xef4444 : hot ? 0xf97316 : 0x334155);
       setEmissive(chamber.material, fault ? 0x5f1111 : hot ? 0x5a2108 : 0x07334a);
       setHex(ultrasonic.material, ultrasonicActive ? 0x8b5cf6 : 0x334155);
@@ -248,7 +261,8 @@ export function ProcessMachine3D({ frame }: Props) {
         setEmissive(trapBodies[index].material, active && coldFactor !== undefined ? (coldFactor > 0.65 ? 0x082f49 : 0x10243a) : 0x061522);
         trapCoils[index].material.color.setHex(active && hasTrapTemperature ? (coldFactor! > 0.65 ? 0x60a5fa : 0x38bdf8) : trapDataAvailable ? 0x2563eb : 0x334155);
         setHex(trapPorts[index].material, active ? 0x3b82f6 : trapDataAvailable ? 0x31465e : 0x202a38);
-        trapBodies[index].scale.y = hasCondensate ? 1.03 : 1;
+        setHex(trapIndicators[index].material, hasCondensate ? 0x38bdf8 : hasTrapTemperature ? 0x2563eb : 0x334155);
+        trapIndicators[index].material.opacity = hasCondensate ? 0.9 : hasTrapTemperature ? 0.7 : 0.45;
         group.position.y = activeProcess ? 3.35 + Math.sin(time * 0.5 + index) * 0.015 : 3.35;
       });
 
