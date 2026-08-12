@@ -1088,6 +1088,45 @@ Dokumen ini dibuat untuk mengonsolidasikan pemahaman sistem dari rangkaian peker
 - ScientificReport terhubung ke evidence/process data.
 - Simulation vs laboratory boundary dipertahankan.
 
+## 2026-08-12 — Control Room causal-data contract correction
+
+**AI/Worker:** Manus AI  
+**Branch:** `feature/control-room-ui`  
+**Commit:** `15edc12b1cd46497ba2b3effe1cec17d8ce73d88`  
+**PR:** #8 (open, target `develop`)
+
+### Temuan
+
+Process Simulator dan beberapa consumer visual sebelumnya mendeklarasikan bentuk frame lokal yang berpotensi menyimpang dari `ClosedLoopSimulationEngine.CausalFrame`. Router reset juga melakukan pengecekan akses dengan session ID, bukan parent experiment ID. Kedua kondisi tersebut dapat melemahkan traceability dan otorisasi lifecycle.
+
+### Perubahan
+
+Consumer Control Room sekarang menggunakan output tRPC yang diinfer dari `AppRouter` atau langsung menggunakan tipe `CausalFrame` engine. Session dan frame aktif direkonsiliasi melalui query lifecycle yang sudah ada; tidak ada telemetry sintetis yang ditambahkan. Reset sekarang mengotorisasi berdasarkan `session.experimentId`. Cleanup kanvas ProcessMachine3D juga dijaga agar tidak menghapus node renderer yang sudah terlepas.
+
+### Data flow affected
+
+`ClosedLoopSimulationEngine → CausalFrame → closedLoop.frames/get → ProcessSimulator → trend / replay / causal inspector / recorder`. Nilai ultrasonic yang tidak disediakan engine tetap tampil sebagai `UNKNOWN` atau tidak diproyeksikan sebagai nilai fisik baru.
+
+### Scientific impact
+
+Tidak ada perubahan pada persamaan fisika, PID, safety, intended command, maupun effective command. Perubahan ini memperkuat UI sebagai lapisan observasi atas causal frame yang sama.
+
+### Simulation/Lab boundary impact
+
+Tidak berubah. Semua nilai tetap berasal dari `SIMULATION`/`DERIVED` kecuali dataset laboratorium terpisah secara eksplisit tersedia.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS, 20 test files dan 53 tests. `pnpm build`: PASS. Tambahan test memverifikasi reset mengotorisasi parent experiment, bukan session ID.
+
+### Status
+
+🟢 Contract dan reset authorization verified pada local Quality Gate. 🟡 Recovery session setelah browser reload tetap pending karena API discovery session-by-experiment belum tersedia.
+
+### Next action
+
+Audit endpoint lifecycle untuk menemukan atau menambahkan lookup session persisted per experiment sebelum mengklaim rehydration lintas refresh; lalu lanjutkan layout Process Simulator berbasis visual contract yang sudah diverifikasi.
+
 ### Next known priorities
 
 1. Lifecycle regression lengkap.
