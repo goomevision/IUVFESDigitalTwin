@@ -2,26 +2,26 @@ import { describe, expect, it } from "vitest";
 import { S3RawDatasetStore } from "./s3RawDatasetStore";
 
 class FakeS3Client {
-  private readonly objects = new Map<string, Buffer>();
+  private readonly objects = new Map<string, { bytes: Buffer; metadata: Record<string, string> }>();
 
   async send(command: { input: { Bucket?: string; Key?: string; Body?: Buffer; Metadata?: Record<string, string> }; constructor: unknown }) {
     const input = command.input;
     const key = `${input.Bucket}/${input.Key}`;
     const name = (command.constructor as { name: string }).name;
     if (name === "GetObjectCommand") {
-      const bytes = this.objects.get(key);
-      if (!bytes) throw new Error("NoSuchKey");
-      return { Body: { transformToByteArray: async () => new Uint8Array(bytes) } };
+      const object = this.objects.get(key);
+      if (!object) throw new Error("NoSuchKey");
+      return { Body: { transformToByteArray: async () => new Uint8Array(object.bytes) } };
     }
     if (name === "PutObjectCommand") {
       if (this.objects.has(key)) throw new Error("PreconditionFailed");
-      this.objects.set(key, Buffer.from(input.Body ?? []));
+      this.objects.set(key, { bytes: Buffer.from(input.Body ?? []), metadata: { ...(input.Metadata ?? {}) } });
       return {};
     }
     if (name === "HeadObjectCommand") {
-      const bytes = this.objects.get(key);
-      if (!bytes) throw new Error("NotFound");
-      return { ContentLength: bytes.byteLength, Metadata: input.Metadata };
+      const object = this.objects.get(key);
+      if (!object) throw new Error("NotFound");
+      return { ContentLength: object.bytes.byteLength, Metadata: object.metadata };
     }
     throw new Error(`Unsupported command ${name}`);
   }
