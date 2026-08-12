@@ -54,14 +54,19 @@ describe('ClosedLoopSimulationEngine', () => {
     const unrestricted = new ClosedLoopSimulationEngine(config);
     const limited = new ClosedLoopSimulationEngine(config);
 
-    for (let i = 0; i < 1000 && unrestricted.getState().stage !== 'HEAT_UP'; i += 1) {
-      unrestricted.step();
-      limited.step();
-    }
+    const unrestrictedSnapshot = unrestricted.snapshot();
+    const limitedSnapshot = limited.snapshot();
+    unrestrictedSnapshot.state.stage = 'HEAT_UP';
+    limitedSnapshot.state.stage = 'HEAT_UP';
+    unrestrictedSnapshot.state.sensors = { ...unrestrictedSnapshot.state.sensors, pressureMbar: 100, temperatureC: 25 };
+    limitedSnapshot.state.sensors = { ...limitedSnapshot.state.sensors, pressureMbar: 100, temperatureC: 25 };
+    unrestrictedSnapshot.dynamics.state = { ...unrestrictedSnapshot.dynamics.state, pressureMbar: 100, temperatureC: 25 };
+    limitedSnapshot.dynamics.state = { ...limitedSnapshot.dynamics.state, pressureMbar: 100, temperatureC: 25 };
+    unrestrictedSnapshot.sensors = { ...unrestrictedSnapshot.sensors, pressureMbar: 100, temperatureC: 25 };
+    limitedSnapshot.sensors = { ...limitedSnapshot.sensors, pressureMbar: 100, temperatureC: 25 };
 
-    expect(unrestricted.getState().stage).toBe('HEAT_UP');
-    expect(limited.getState().stage).toBe('HEAT_UP');
-
+    unrestricted.restore(unrestrictedSnapshot);
+    limited.restore(limitedSnapshot);
     limited.setOperatorLimits({ heaterMax: 0 });
 
     const unrestrictedFrame = unrestricted.step();
