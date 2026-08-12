@@ -298,3 +298,11 @@
 - [x] Poll and reconcile the known active Process Simulator session from the session API without fabricating telemetry.
 - [ ] Add a lifecycle API to discover a persisted session by experiment after a full browser reload.
 - [x] Guard ProcessMachine3D renderer cleanup so React never removes a detached canvas node.
+
+## PROCESS SIMULATOR — LIVING MACHINE REDESIGN (ACTIVE)
+
+- [x] Recompose the Process Simulator into a control-room canvas with a live status top bar, operator rail, machine hero, and hardware rail.
+- [x] Bind operating-input displays, simulation progress, and sensor instrumentation only to experiment inputs, session state, or CausalFrame data.
+- [x] Surface engine-derived vacuum, cold-trap, ultrasonic, safety, and provenance diagnostics without creating synthetic telemetry.
+- [x] Pass stored ultrasonic operator inputs into the closed-loop session configuration when they are available.
+- [x] Preserve causal trace, replay, trend, and recorder interactions in the redesigned Control Room.

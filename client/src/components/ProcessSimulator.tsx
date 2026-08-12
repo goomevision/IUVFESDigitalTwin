@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, FileText, Pause, Play, RotateCcw, Snowflake, Square, Thermometer, Wind, Zap } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { Activity, AlertTriangle, CheckCircle2, CircleGauge, Droplets, FileText, Gauge, Pause, Play, Radio, RotateCcw, ShieldCheck, Snowflake, Square, Thermometer, Wind, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -14,47 +14,260 @@ import type { AppRouter } from "../../../server/routers";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type Frame = RouterOutputs["closedLoop"]["frames"]["frames"][number];
-type Stage = Frame["safety"]["stage"];
-const STAGES:Stage[]=["PRE_FLIGHT","CHARGE","VACUUM","HEAT_UP","EXTRACTION","CONDENSATION","COOL_DOWN","COMPLETE","FAULT"];
-function Slider({label,value,min,max,step,unit,Icon,onChange,onApply,disabled}:{label:string;value:number;min:number;max:number;step:number;unit:string;Icon:any;onChange:(v:number)=>void;onApply:()=>void;disabled?:boolean}){return <div className="rounded-xl border border-cyan-500/20 bg-slate-900/70 p-3"><div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-slate-500"><span className="flex items-center gap-2"><Icon className="h-4 w-4 text-cyan-400"/>{label}</span><span className="font-mono text-cyan-300">{value.toFixed(step<1?1:0)} {unit}</span></div><input disabled={disabled} className="mt-3 w-full accent-cyan-400 disabled:opacity-40" type="range" min={min} max={max} step={step} value={value} onChange={e=>onChange(Number(e.target.value))} onPointerUp={onApply}/><div className="mt-2 flex justify-between text-[9px] font-mono text-slate-600"><span>{min}</span><span>{max}</span></div></div>}
-function Metric({label,value,accent="cyan"}:{label:string;value:string;accent?:"cyan"|"sky"|"amber"|"emerald"}){const text={cyan:"text-cyan-300",sky:"text-sky-300",amber:"text-amber-300",emerald:"text-emerald-300"}[accent];return <div className="rounded-xl border border-slate-800 bg-slate-950/75 p-3"><div className="text-[9px] tracking-[0.2em] text-slate-500">{label}</div><div className={`mt-1 font-mono text-lg ${text}`}>{value}</div></div>}
-function fmt(v:unknown,d=3){return typeof v==="number"&&Number.isFinite(v)?v.toFixed(d):"—"}
+type NumericInput = number | undefined;
 
-export function ProcessSimulator({experimentId,onExit,onComplete}:{experimentId:string;onExit?:()=>void;onComplete?:()=>void}){
- const experiment=trpc.experiments.get.useQuery(experimentId);
- const create=trpc.closedLoop.create.useMutation(),start=trpc.closedLoop.start.useMutation(),step=trpc.closedLoop.step.useMutation(),control=trpc.closedLoop.control.useMutation(),pause=trpc.closedLoop.pause.useMutation(),resume=trpc.closedLoop.resume.useMutation(),stop=trpc.closedLoop.stop.useMutation(),reset=trpc.closedLoop.reset.useMutation();
- const [sessionId,setSessionId]=useState<string|null>(null),[frames,setFrames]=useState<Frame[]>([]),[running,setRunning]=useState(false),[paused,setPaused]=useState(false),[completed,setCompleted]=useState(false);
- const session=trpc.closedLoop.get.useQuery(sessionId??"",{enabled:Boolean(sessionId),refetchInterval:sessionId?1000:false});
- const sessionFrames=trpc.closedLoop.frames.useQuery(sessionId??"",{enabled:Boolean(sessionId),refetchInterval:sessionId?1000:false});
- const [replayMode,setReplayMode]=useState(false),[replayIndex,setReplayIndex]=useState(0);
- const [temperature,setTemperature]=useState(62),[pressure,setPressure]=useState(20),[cooling,setCooling]=useState(35),[heaterLimit,setHeaterLimit]=useState(1),[pumpLimit,setPumpLimit]=useState(1),[condenserLimit,setCondenserLimit]=useState(1),[coolingLimit,setCoolingLimit]=useState(1);
- const busy=useRef(false),timer=useRef<number|null>(null),scientificOutputRef=useRef<HTMLDivElement|null>(null);const clearTimer=()=>{if(timer.current!==null)window.clearInterval(timer.current);timer.current=null};useEffect(()=>()=>clearTimer(),[]);
- useEffect(()=>{const persisted=sessionFrames.data?.frames as Frame[]|undefined;if(!persisted)return;setFrames(previous=>persisted.length>=previous.length?persisted:previous)},[sessionFrames.data]);
- useEffect(()=>{const status=session.data?.status;if(!status)return;const terminal=status==="completed"||status==="fault"||status==="stopped";if(terminal){clearTimer();setRunning(false);setPaused(false);setCompleted(status==="completed")}else if(status==="paused"){clearTimer();setRunning(false);setPaused(true)}},[session.data]);
- const latest=frames.at(-1),liveSensor=latest?.sensorAfter,liveState=latest?.controller,liveSafety=latest?.safety;
- const displayIndex=replayMode?Math.min(replayIndex,Math.max(0,frames.length-1)):Math.max(0,frames.length-1);
- const displayFrame=frames.length?frames[displayIndex]:undefined;
- const sensor=displayFrame?.sensorAfter,state=displayFrame?.controller,output=displayFrame?.controlOutput,safety=displayFrame?.safety;
- const recent=useMemo(()=>replayMode?frames.slice(0,displayIndex+1).slice(-80):frames.slice(-80),[frames,replayMode,displayIndex]);
- const replayFrames=useMemo(()=>replayMode?frames.slice(0,displayIndex+1):frames,[frames,replayMode,displayIndex]);
- const onReplayFrame=useCallback((frame:Frame|undefined,index:number)=>{if(!frame)return;setReplayMode(true);setReplayIndex(index)},[]);
- const oneStep=async(id:string)=>{if(busy.current)return;busy.current=true;try{const result=await step.mutateAsync(id);if(result.frame){const frame=result.frame as Frame;setFrames(prev=>[...prev,frame]);setReplayMode(false);if(frame.safety.stage==="COMPLETE"){setRunning(false);setCompleted(true);clearTimer();onComplete?.()}if(frame.safety.stage==="FAULT"){setRunning(false);clearTimer();toast.error(frame.safety.alarm??"Safety fault")}}}catch(e){console.error(e);setRunning(false);clearTimer();toast.error("Live step failed")}finally{busy.current=false}};
- useEffect(()=>{clearTimer();if(!running||paused||!sessionId)return;timer.current=window.setInterval(()=>void oneStep(sessionId),1000);return clearTimer},[running,paused,sessionId]);
- const startSimulation=async()=>{if(!experiment.data)return;const p=experiment.data.inputParameters as Record<string,unknown>;try{clearTimer();setFrames([]);setReplayMode(false);setReplayIndex(0);setCompleted(false);setPaused(false);const hours=Number(p.duration),maxSteps=Math.max(1,Math.min(100000,Math.ceil(Number.isFinite(hours)&&hours>0?hours*3600:300)));const created=await create.mutateAsync({experimentId,materialWeight:Number(p.materialWeight),waterContent:Number(p.waterContent),oilContent:Number(p.oilContent),targetPressure:pressure,targetTemperature:temperature,coolingTemperature:cooling,dtSeconds:1,maxSteps});await start.mutateAsync(created.sessionId);setSessionId(created.sessionId);setRunning(true);await oneStep(created.sessionId);toast.success("Closed-loop engine connected")}catch(e){console.error(e);toast.error("Could not start closed-loop controller")}};
- const apply=async()=>{if(!sessionId)return;try{const view=await control.mutateAsync({sessionId,targetPressureMbar:pressure,targetTemperatureC:temperature,coolingTemperatureC:cooling,heaterMax:heaterLimit,vacuumPumpMax:pumpLimit,condenserMax:condenserLimit,coolingMax:coolingLimit,operatorNotes:"Operator live controller adjustment."});setTemperature(view.targets.targetTemperatureC);setPressure(view.targets.targetPressureMbar);setCooling(view.targets.coolingTemperatureC);setHeaterLimit(view.operatorLimits.heaterMax);setPumpLimit(view.operatorLimits.vacuumPumpMax);setCondenserLimit(view.operatorLimits.condenserMax);setCoolingLimit(view.operatorLimits.coolingMax);toast.success("Controller settings applied")}catch{toast.error("Controller setting rejected")}};
- const doPause=async()=>{if(!sessionId)return;try{await pause.mutateAsync(sessionId);clearTimer();setPaused(true);setRunning(false)}catch{toast.error("Pause rejected")}};const doResume=async()=>{if(!sessionId)return;try{await resume.mutateAsync(sessionId);setPaused(false);setRunning(true);setReplayMode(false)}catch{toast.error("Resume rejected")}};const doStop=async()=>{if(!sessionId)return;try{await stop.mutateAsync(sessionId);clearTimer();setRunning(false);setPaused(false)}catch{toast.error("Stop rejected")}};const doReset=async()=>{clearTimer();if(sessionId)try{await reset.mutateAsync(sessionId)}catch{}setSessionId(null);setFrames([]);setReplayMode(false);setReplayIndex(0);setRunning(false);setPaused(false);setCompleted(false)};
- const machine=displayFrame?{stage:displayFrame.safety.stage,commands:displayFrame.effectiveCommands,sensors:{pressureMbar:displayFrame.sensorAfter.pressureMbar,temperatureC:displayFrame.sensorAfter.temperatureC},interlocks:{vacuumAchieved:displayFrame.safety.vacuumAchieved,overTemperature:displayFrame.safety.overTemperature},coldTraps:(displayFrame.hardwareDiagnostics?.coldTrapTemperaturesC??[]).map((temperatureC,i)=>({temperatureC,condensedWaterKg:displayFrame.hardwareDiagnostics?.coldTrapStageCondensedWaterKg?.[i]}))}:undefined;
- const disabled=!running||replayMode;
- return <div className="min-h-screen bg-[radial-gradient(circle_at_top,#10263a_0%,#050912_45%,#02040a_100%)] p-4 text-slate-100 md:p-6"><div className="mx-auto max-w-[1550px] space-y-4">
-  <header className="flex flex-col gap-4 rounded-2xl border border-cyan-500/20 bg-slate-950/80 p-5 md:flex-row md:items-center md:justify-between"><div><div className="font-mono text-xs tracking-[0.3em] text-cyan-400">IUVFES // DIGITAL TWIN</div><h1 className="mt-2 text-2xl font-bold">PROCESS SIMULATOR</h1><p className="font-mono text-xs text-slate-500">{replayMode?"RUN REPLAY": "LIVE CLOSED-LOOP"} · {sessionId?`SESSION ${sessionId.slice(0,8)}`:"NOT CONNECTED"}</p></div><div className="flex flex-wrap gap-2"><Button onClick={()=>scientificOutputRef.current?.scrollIntoView({behavior:"smooth"})} disabled={!frames.length} variant="outline" className="border-emerald-500/40 text-emerald-300"><FileText className="mr-2 h-4 w-4"/>RESULTS / PRINT</Button><Button onClick={()=>void startSimulation()} disabled={running||paused||create.isPending||start.isPending} className="bg-cyan-500 text-slate-950"><Play className="mr-2 h-4 w-4"/>START</Button><Button onClick={()=>void(paused?doResume():doPause())} disabled={!running&&!paused} variant="outline" className="border-yellow-500/40 text-yellow-300">{paused?<Play className="mr-2 h-4 w-4"/>:<Pause className="mr-2 h-4 w-4"/>}{paused?"RESUME":"PAUSE"}</Button><Button onClick={()=>void doStop()} disabled={!sessionId} variant="outline" className="border-red-500/40 text-red-300"><Square className="mr-2 h-4 w-4"/>STOP</Button><Button onClick={()=>void doReset()} variant="outline"><RotateCcw className="mr-2 h-4 w-4"/>RESET</Button>{onExit&&<Button onClick={onExit} variant="outline">EXIT</Button>}</div></header>
-  <section className="grid gap-3 lg:grid-cols-3"><Slider label="CONTROL SUHU" value={temperature} min={30} max={100} step={0.5} unit="°C" Icon={Thermometer} onChange={setTemperature} onApply={()=>void apply()} disabled={disabled}/><Slider label="CONTROL VAKUM" value={pressure} min={5} max={500} step={1} unit="mbar" Icon={Wind} onChange={setPressure} onApply={()=>void apply()} disabled={disabled}/><Slider label="TARGET COOL-DOWN" value={cooling} min={25} max={70} step={0.5} unit="°C" Icon={Snowflake} onChange={setCooling} onApply={()=>void apply()} disabled={disabled}/></section>
-  <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Slider label="HEATER LIMIT" value={heaterLimit*100} min={0} max={100} step={1} unit="%" Icon={Zap} onChange={v=>setHeaterLimit(v/100)} onApply={()=>void apply()} disabled={disabled}/><Slider label="VACUUM PUMP LIMIT" value={pumpLimit*100} min={0} max={100} step={1} unit="%" Icon={Wind} onChange={v=>setPumpLimit(v/100)} onApply={()=>void apply()} disabled={disabled}/><Slider label="CONDENSER LIMIT" value={condenserLimit*100} min={0} max={100} step={1} unit="%" Icon={Snowflake} onChange={v=>setCondenserLimit(v/100)} onApply={()=>void apply()} disabled={disabled}/><Slider label="COOLING LIMIT" value={coolingLimit*100} min={0} max={100} step={1} unit="%" Icon={Snowflake} onChange={v=>setCoolingLimit(v/100)} onApply={()=>void apply()} disabled={disabled}/></section>
-  <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-6"><Metric label="TEMPERATURE" value={sensor?`${fmt(sensor.temperatureC,1)} °C`:"—"}/><Metric label="PRESSURE" value={sensor?`${fmt(sensor.pressureMbar,1)} mbar`:"—"}/><Metric label="YIELD" value={sensor?`${fmt(sensor.yieldPercent,2)} %`:"—"} accent="emerald"/><Metric label="OIL RECOVERED" value={sensor?`${fmt(sensor.oilRecoveredKg,3)} kg`:"—"} accent="amber"/><Metric label="WATER REMOVED" value={sensor?`${fmt(sensor.waterRemovedKg,3)} kg`:"—"} accent="sky"/><Metric label="ENERGY" value={sensor?`${fmt(sensor.energyKwh,3)} kWh`:"—"} accent="amber"/></section>
-  <section className="rounded-2xl border border-cyan-500/20 bg-slate-950/70 p-3"><ProcessMachine3D machine={machine}/></section>
-  {frames.length>0&&<ProcessRunReplay frames={frames} onFrameChange={onReplayFrame}/>} 
-  <LiveProcessTrend frames={recent}/>
-  <CausalFrameInspector frames={replayFrames}/>
-  <section className="grid gap-4 xl:grid-cols-2"><ProcessEventTimeline timeline={replayFrames.map(f=>({stage:f.safety.stage,elapsedSeconds:f.controller.elapsedSeconds,alarm:f.safety.alarm,transitionReason:f.safety.transitionReason,interlocks:{overTemperature:f.safety.overTemperature,vacuumAchieved:f.safety.vacuumAchieved,allSystemsSafe:f.safety.allSystemsSafe}}))}/><div className="rounded-2xl border border-cyan-500/20 bg-slate-950/70 p-4"><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold tracking-wider text-cyan-300">PROCESS STATUS</h3><span className={`font-mono text-[10px] ${safety?.allSystemsSafe?"text-emerald-300":"text-red-300"}`}>{safety?.allSystemsSafe?"● ALL SYSTEMS SAFE":"● CHECK SAFETY"}</span></div><div className="grid grid-cols-2 gap-2 text-xs font-mono">{STAGES.map((s,i)=>{const current=state?.stage===s,done=state&&STAGES.indexOf(state.stage)>i;return <div key={s} className={`rounded-lg border p-2 ${current?"border-cyan-400/50 bg-cyan-400/10 text-cyan-300":done?"border-emerald-500/20 text-emerald-300":"border-slate-800 text-slate-600"}`}>{done?<CheckCircle2 className="inline h-3 w-3 mr-1"/>:current?<Zap className="inline h-3 w-3 mr-1"/>:null}{s}</div>})}</div>{safety?.alarm&&<div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300"><AlertTriangle className="mr-2 inline h-4 w-4"/>{safety.alarm}</div>}<div className="mt-3 text-[10px] text-slate-500">{safety?.transitionReason??"Waiting for engine frame."}</div></div></section>
-  <div ref={scientificOutputRef}><ScientificRunRecorder experimentId={experimentId} frames={frames} completed={completed}/></div>
- </div></div>
+const metricTone = {
+  cyan: "text-cyan-300 border-cyan-500/20",
+  sky: "text-sky-300 border-sky-500/20",
+  amber: "text-amber-300 border-amber-500/20",
+  emerald: "text-emerald-300 border-emerald-500/20",
+} as const;
+
+function numberValue(value: unknown): number | undefined {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function format(value: unknown, digits = 2) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "—";
+}
+
+function ControlSlider({ label, value, min, max, step, unit, Icon, onChange, onApply, disabled }: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  unit: string;
+  Icon: ComponentType<{ className?: string }>;
+  onChange: (value: number) => void;
+  onApply: () => void;
+  disabled?: boolean;
+}) {
+  return <label className="block rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+    <span className="flex items-center justify-between gap-3 text-[10px] uppercase tracking-[0.14em] text-slate-500"><span className="flex items-center gap-2"><Icon className="h-3.5 w-3.5 text-cyan-400" />{label}</span><span className="font-mono text-cyan-300">{value.toFixed(step < 1 ? 1 : 0)} {unit}</span></span>
+    <input disabled={disabled} className="mt-3 w-full accent-cyan-400 disabled:cursor-not-allowed disabled:opacity-35" type="range" min={min} max={max} step={step} value={value} onChange={event => onChange(Number(event.target.value))} onPointerUp={onApply} />
+    <span className="mt-1 flex justify-between font-mono text-[8px] text-slate-700"><span>{min}</span><span>{max}</span></span>
+  </label>;
+}
+
+function Instrument({ label, value, unit, tone = "cyan", source = "CAUSAL FRAME" }: { label: string; value: string; unit: string; tone?: keyof typeof metricTone; source?: string }) {
+  return <div className={`border-l bg-slate-950/65 px-3 py-2 ${metricTone[tone]}`}>
+    <div className="text-[8px] font-medium tracking-[0.18em] text-slate-500">{label}</div>
+    <div className="mt-1 flex items-end gap-1 font-mono"><span className="text-lg leading-none">{value}</span><span className="text-[9px] text-slate-500">{unit}</span></div>
+    <div className="mt-1 text-[7px] tracking-[0.12em] text-slate-600">{source}</div>
+  </div>;
+}
+
+function DetailLine({ label, value, tone = "text-slate-200" }: { label: string; value: string; tone?: string }) {
+  return <div className="flex items-center justify-between gap-3 border-b border-slate-800/70 py-2 font-mono text-[10px] last:border-0"><span className="text-slate-500">{label}</span><span className={`text-right ${tone}`}>{value}</span></div>;
+}
+
+function ProgressRing({ progress }: { progress: number }) {
+  const safeProgress = Math.max(0, Math.min(100, progress));
+  return <div className="relative grid h-28 w-28 place-items-center rounded-full" style={{ background: `conic-gradient(rgb(34 211 238) ${safeProgress * 3.6}deg, rgb(15 23 42) 0deg)` }}>
+    <div className="grid h-[92px] w-[92px] place-items-center rounded-full border border-cyan-500/20 bg-slate-950 text-center"><span className="font-mono text-2xl text-cyan-200">{Math.round(safeProgress)}%</span><span className="text-[8px] tracking-[0.16em] text-slate-500">ENGINE PROGRESS</span></div>
+  </div>;
+}
+
+export function ProcessSimulator({ experimentId, onExit, onComplete }: { experimentId: string; onExit?: () => void; onComplete?: () => void }) {
+  const experiment = trpc.experiments.get.useQuery(experimentId);
+  const create = trpc.closedLoop.create.useMutation();
+  const start = trpc.closedLoop.start.useMutation();
+  const step = trpc.closedLoop.step.useMutation();
+  const control = trpc.closedLoop.control.useMutation();
+  const pause = trpc.closedLoop.pause.useMutation();
+  const resume = trpc.closedLoop.resume.useMutation();
+  const stop = trpc.closedLoop.stop.useMutation();
+  const reset = trpc.closedLoop.reset.useMutation();
+
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [frames, setFrames] = useState<Frame[]>([]);
+  const [running, setRunning] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [completed, setCompleted] = useState(false);
+  const [replayMode, setReplayMode] = useState(false);
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [temperature, setTemperature] = useState(62);
+  const [pressure, setPressure] = useState(20);
+  const [cooling, setCooling] = useState(35);
+  const [heaterLimit, setHeaterLimit] = useState(1);
+  const [pumpLimit, setPumpLimit] = useState(1);
+  const [condenserLimit, setCondenserLimit] = useState(1);
+  const [coolingLimit, setCoolingLimit] = useState(1);
+
+  const session = trpc.closedLoop.get.useQuery(sessionId ?? "", { enabled: Boolean(sessionId), refetchInterval: sessionId ? 1000 : false });
+  const sessionFrames = trpc.closedLoop.frames.useQuery(sessionId ?? "", { enabled: Boolean(sessionId), refetchInterval: sessionId ? 1000 : false });
+  const busy = useRef(false);
+  const timer = useRef<number | null>(null);
+  const scientificOutputRef = useRef<HTMLDivElement | null>(null);
+  const clearTimer = () => { if (timer.current !== null) window.clearInterval(timer.current); timer.current = null; };
+
+  useEffect(() => () => clearTimer(), []);
+  useEffect(() => {
+    const parameters = experiment.data?.inputParameters as Record<string, unknown> | undefined;
+    if (!parameters) return;
+    setTemperature(previous => numberValue(parameters.targetTemperature) ?? previous);
+    setPressure(previous => numberValue(parameters.targetPressure) ?? previous);
+    setCooling(previous => numberValue(parameters.coolingTemperature) ?? previous);
+  }, [experiment.data]);
+  useEffect(() => {
+    const persisted = sessionFrames.data?.frames as Frame[] | undefined;
+    if (!persisted) return;
+    setFrames(previous => persisted.length >= previous.length ? persisted : previous);
+  }, [sessionFrames.data]);
+  useEffect(() => {
+    const status = session.data?.status;
+    if (!status) return;
+    const terminal = status === "completed" || status === "fault" || status === "stopped";
+    if (terminal) { clearTimer(); setRunning(false); setPaused(false); setCompleted(status === "completed"); }
+    else if (status === "paused") { clearTimer(); setRunning(false); setPaused(true); }
+  }, [session.data]);
+
+  const displayIndex = replayMode ? Math.min(replayIndex, Math.max(0, frames.length - 1)) : Math.max(0, frames.length - 1);
+  const displayFrame = frames.length ? frames[displayIndex] : undefined;
+  const sensor = displayFrame?.sensorAfter;
+  const state = displayFrame?.controller;
+  const safety = displayFrame?.safety;
+  const hardware = displayFrame?.hardwareDiagnostics;
+  const material = displayFrame?.materialInventory;
+  const recent = useMemo(() => replayMode ? frames.slice(0, displayIndex + 1).slice(-80) : frames.slice(-80), [frames, replayMode, displayIndex]);
+  const replayFrames = useMemo(() => replayMode ? frames.slice(0, displayIndex + 1) : frames, [frames, replayMode, displayIndex]);
+  const operatorInputs = (experiment.data?.inputParameters ?? {}) as Record<string, unknown>;
+  const engineProgress = Math.max(0, Math.min(100, (state?.progress ?? 0) * 100));
+  const runtimeStatus = replayMode ? "REPLAY" : session.data?.status?.toUpperCase() ?? (running ? "RUNNING" : paused ? "PAUSED" : completed ? "COMPLETED" : "READY");
+  const statusTone = runtimeStatus === "RUNNING" ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10" : runtimeStatus === "PAUSED" || runtimeStatus === "REPLAY" ? "text-amber-300 border-amber-500/30 bg-amber-500/10" : runtimeStatus === "FAULT" ? "text-red-300 border-red-500/30 bg-red-500/10" : "text-cyan-300 border-cyan-500/30 bg-cyan-500/10";
+  const disabled = !running || replayMode;
+
+  const onReplayFrame = useCallback((frame: Frame | undefined, index: number) => { if (!frame) return; setReplayMode(true); setReplayIndex(index); }, []);
+  const oneStep = async (id: string) => {
+    if (busy.current) return;
+    busy.current = true;
+    try {
+      const result = await step.mutateAsync(id);
+      if (!result.frame) return;
+      const frame = result.frame as Frame;
+      setFrames(previous => [...previous, frame]);
+      setReplayMode(false);
+      if (frame.safety.stage === "COMPLETE") { setRunning(false); setCompleted(true); clearTimer(); onComplete?.(); }
+      if (frame.safety.stage === "FAULT") { setRunning(false); clearTimer(); toast.error(frame.safety.alarm ?? "Safety fault"); }
+    } catch (error) {
+      console.error(error);
+      setRunning(false);
+      clearTimer();
+      toast.error("Live step failed");
+    } finally { busy.current = false; }
+  };
+
+  useEffect(() => {
+    clearTimer();
+    if (!running || paused || !sessionId) return;
+    timer.current = window.setInterval(() => void oneStep(sessionId), 1000);
+    return clearTimer;
+  }, [running, paused, sessionId]);
+
+  const startSimulation = async () => {
+    if (!experiment.data) return;
+    const parameters = experiment.data.inputParameters as Record<string, unknown>;
+    try {
+      clearTimer();
+      setFrames([]);
+      setReplayMode(false);
+      setReplayIndex(0);
+      setCompleted(false);
+      setPaused(false);
+      const durationHours = Number(parameters.duration);
+      const maxSteps = Math.max(1, Math.min(100000, Math.ceil(Number.isFinite(durationHours) && durationHours > 0 ? durationHours * 3600 : 300)));
+      const created = await create.mutateAsync({
+        experimentId,
+        materialWeight: Number(parameters.materialWeight),
+        waterContent: Number(parameters.waterContent),
+        oilContent: Number(parameters.oilContent),
+        targetPressure: pressure,
+        targetTemperature: temperature,
+        coolingTemperature: cooling,
+        dtSeconds: 1,
+        maxSteps,
+        ultrasonicFrequency: numberValue(parameters.ultrasonicFrequency),
+        ultrasonicPowerW: numberValue(parameters.ultrasonicPowerW ?? parameters.ultrasonicPower),
+        ultrasonicDutyCyclePercent: numberValue(parameters.ultrasonicDutyCyclePercent ?? parameters.ultrasonicDuty),
+        ultrasonicMaxPowerW: numberValue(parameters.ultrasonicMaxPowerW),
+      });
+      await start.mutateAsync(created.sessionId);
+      setSessionId(created.sessionId);
+      setRunning(true);
+      await oneStep(created.sessionId);
+      toast.success("Closed-loop engine connected");
+    } catch (error) { console.error(error); toast.error("Could not start closed-loop controller"); }
+  };
+
+  const apply = async () => {
+    if (!sessionId) return;
+    try {
+      const view = await control.mutateAsync({ sessionId, targetPressureMbar: pressure, targetTemperatureC: temperature, coolingTemperatureC: cooling, heaterMax: heaterLimit, vacuumPumpMax: pumpLimit, condenserMax: condenserLimit, coolingMax: coolingLimit, operatorNotes: "Operator live controller adjustment." });
+      setTemperature(view.targets.targetTemperatureC);
+      setPressure(view.targets.targetPressureMbar);
+      setCooling(view.targets.coolingTemperatureC);
+      setHeaterLimit(view.operatorLimits.heaterMax);
+      setPumpLimit(view.operatorLimits.vacuumPumpMax);
+      setCondenserLimit(view.operatorLimits.condenserMax);
+      setCoolingLimit(view.operatorLimits.coolingMax);
+      toast.success("Controller settings applied");
+    } catch { toast.error("Controller setting rejected"); }
+  };
+
+  const doPause = async () => { if (!sessionId) return; try { await pause.mutateAsync(sessionId); clearTimer(); setPaused(true); setRunning(false); } catch { toast.error("Pause rejected"); } };
+  const doResume = async () => { if (!sessionId) return; try { await resume.mutateAsync(sessionId); setPaused(false); setRunning(true); setReplayMode(false); } catch { toast.error("Resume rejected"); } };
+  const doStop = async () => { if (!sessionId) return; try { await stop.mutateAsync(sessionId); clearTimer(); setRunning(false); setPaused(false); } catch { toast.error("Stop rejected"); } };
+  const doReset = async () => { clearTimer(); if (sessionId) try { await reset.mutateAsync(sessionId); } catch { toast.error("Reset rejected"); } setSessionId(null); setFrames([]); setReplayMode(false); setReplayIndex(0); setRunning(false); setPaused(false); setCompleted(false); };
+
+  const machine = displayFrame ? {
+    stage: displayFrame.safety.stage,
+    commands: displayFrame.effectiveCommands,
+    sensors: { pressureMbar: displayFrame.sensorAfter.pressureMbar, temperatureC: displayFrame.sensorAfter.temperatureC },
+    interlocks: { vacuumAchieved: displayFrame.safety.vacuumAchieved, overTemperature: displayFrame.safety.overTemperature },
+    coldTraps: (displayFrame.hardwareDiagnostics?.coldTrapTemperaturesC ?? []).map((temperatureC, index) => ({ temperatureC, condensedWaterKg: displayFrame.hardwareDiagnostics?.coldTrapStageCondensedWaterKg?.[index] })),
+  } : undefined;
+
+  return <div className="min-h-screen bg-[#020712] text-slate-100">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_50%_-12%,#123a54_0%,#06111d_35%,#020712_72%)] px-3 py-3 md:px-5 md:py-5">
+      <div className="mx-auto max-w-[1660px] space-y-3">
+        <header className="grid gap-3 border-y border-cyan-500/25 bg-slate-950/80 px-4 py-3 backdrop-blur xl:grid-cols-[1fr_auto_1fr] xl:items-center">
+          <div><div className="font-mono text-[9px] tracking-[0.32em] text-cyan-400">IUVFES // INTEGRATED ULTRASONIC VACUUM FRYING EXTRACTION SYSTEM</div><h1 className="mt-1 text-xl font-semibold tracking-[0.08em] text-slate-100">PROCESS SIMULATOR</h1><p className="mt-1 text-[9px] tracking-[0.2em] text-slate-500">LIVE PROCESS VISUALIZATION · ENGINE-BACKED CAUSAL TELEMETRY</p></div>
+          <div className="text-center"><div className="font-mono text-[9px] tracking-[0.16em] text-slate-500">EXPERIMENT / RUN</div><div className="mt-1 font-mono text-sm text-cyan-200">{experimentId}</div><div className="mt-1 text-[8px] tracking-[0.14em] text-slate-600">{sessionId ? `SESSION ${sessionId.slice(0, 8)}` : "NO ACTIVE SESSION"}</div></div>
+          <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end"><span className={`inline-flex items-center gap-2 border px-3 py-2 font-mono text-[10px] tracking-[0.14em] ${statusTone}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{runtimeStatus}</span><span className="border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-[10px] text-slate-400">T+{format(displayFrame?.timestampSeconds, 1)} s</span><span className="border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-[10px] text-slate-400">{frames.length} FRAMES</span></div>
+        </header>
+
+        <section className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)_300px]">
+          <aside className="space-y-3 border border-slate-800 bg-slate-950/70 p-3 backdrop-blur">
+            <div className="border-b border-slate-800 pb-3"><div className="flex items-center gap-2 text-[9px] tracking-[0.2em] text-cyan-300"><Gauge className="h-3.5 w-3.5" />OPERATOR CONTROL</div><p className="mt-1 text-[9px] leading-relaxed text-slate-500">Operator inputs become engine targets and limits. They are never live sensor readings.</p></div>
+            <ControlSlider label="TARGET TEMPERATURE" value={temperature} min={30} max={100} step={0.5} unit="°C" Icon={Thermometer} onChange={setTemperature} onApply={() => void apply()} disabled={disabled} />
+            <ControlSlider label="TARGET VACUUM" value={pressure} min={5} max={500} step={1} unit="mbar" Icon={Wind} onChange={setPressure} onApply={() => void apply()} disabled={disabled} />
+            <ControlSlider label="COOL-DOWN TARGET" value={cooling} min={25} max={70} step={0.5} unit="°C" Icon={Snowflake} onChange={setCooling} onApply={() => void apply()} disabled={disabled} />
+            <div className="grid grid-cols-2 gap-2"><ControlSlider label="HEATER LIMIT" value={heaterLimit * 100} min={0} max={100} step={1} unit="%" Icon={Zap} onChange={value => setHeaterLimit(value / 100)} onApply={() => void apply()} disabled={disabled} /><ControlSlider label="PUMP LIMIT" value={pumpLimit * 100} min={0} max={100} step={1} unit="%" Icon={Wind} onChange={value => setPumpLimit(value / 100)} onApply={() => void apply()} disabled={disabled} /></div>
+            <div className="rounded-lg border border-slate-800 bg-slate-950/80 p-3"><div className="mb-2 text-[9px] tracking-[0.18em] text-slate-500">EXPERIMENT INPUT</div><DetailLine label="MATERIAL" value={String(experiment.data?.materialId ?? "UNKNOWN")} /><DetailLine label="MASS" value={`${format(numberValue(operatorInputs.materialWeight), 2)} kg`} /><DetailLine label="WATER CONTENT" value={`${format(numberValue(operatorInputs.waterContent), 2)} %`} /><DetailLine label="OIL CONTENT" value={`${format(numberValue(operatorInputs.oilContent), 2)} %`} /></div>
+            <div className="grid grid-cols-2 gap-2"><Button onClick={() => void startSimulation()} disabled={running || paused || create.isPending || start.isPending} className="bg-emerald-500 text-slate-950 hover:bg-emerald-400"><Play className="mr-1 h-3.5 w-3.5" />START</Button><Button onClick={() => void (paused ? doResume() : doPause())} disabled={!running && !paused} variant="outline" className="border-amber-500/40 text-amber-300">{paused ? <Play className="mr-1 h-3.5 w-3.5" /> : <Pause className="mr-1 h-3.5 w-3.5" />}{paused ? "RESUME" : "PAUSE"}</Button><Button onClick={() => void doStop()} disabled={!sessionId} variant="outline" className="border-red-500/40 text-red-300"><Square className="mr-1 h-3.5 w-3.5" />STOP</Button><Button onClick={() => void doReset()} variant="outline" className="border-slate-700 text-slate-300"><RotateCcw className="mr-1 h-3.5 w-3.5" />RESET</Button></div>
+          </aside>
+
+          <main className="min-w-0 space-y-3">
+            <section className="border border-cyan-500/25 bg-slate-950/70 p-3 shadow-[0_0_55px_rgba(14,116,144,0.12)]"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><div className="text-[9px] tracking-[0.24em] text-cyan-300">PROCESS TWIN</div><h2 className="mt-1 text-lg font-semibold tracking-wide">REACTOR → VAPOR → MULTI-STAGE CONDENSATION → RECOVERY</h2></div><div className="flex items-center gap-3"><ProgressRing progress={engineProgress} /><div className="font-mono text-[10px]"><div className="text-slate-500">ENGINE STAGE</div><div className="mt-1 text-cyan-200">{state?.stage ?? "WAITING"}</div><div className="mt-1 max-w-[220px] text-[9px] text-slate-500">{safety?.transitionReason ?? "Waiting for the first CausalFrame."}</div></div></div></div><ProcessMachine3D machine={machine} /></section>
+            <section className="grid divide-x divide-slate-800 border border-slate-800 bg-slate-950/65 sm:grid-cols-3 xl:grid-cols-6"><Instrument label="TEMPERATURE" value={format(sensor?.temperatureC, 1)} unit="°C" /><Instrument label="PRESSURE" value={format(sensor?.pressureMbar, 1)} unit="mbar" tone="sky" /><Instrument label="YIELD" value={format(sensor?.yieldPercent, 2)} unit="%" tone="emerald" /><Instrument label="OIL RECOVERED" value={format(sensor?.oilRecoveredKg, 3)} unit="kg" tone="amber" /><Instrument label="WATER REMOVED" value={format(sensor?.waterRemovedKg, 3)} unit="kg" tone="sky" /><Instrument label="ENERGY" value={format(sensor?.energyKwh, 3)} unit="kWh" tone="amber" /></section>
+          </main>
+
+          <aside className="space-y-3 border border-slate-800 bg-slate-950/70 p-3 backdrop-blur">
+            <section><div className="flex items-center gap-2 border-b border-slate-800 pb-2 text-[9px] tracking-[0.2em] text-sky-300"><Snowflake className="h-3.5 w-3.5" />COLD TRAP DIAGNOSTICS</div><div className="mt-2 grid grid-cols-2 gap-2">{[0, 1, 2, 3].map(index => <div key={index} className="border border-slate-800 bg-slate-950/80 p-2"><div className="text-[8px] tracking-[0.16em] text-slate-500">TRAP {index + 1}</div><div className="mt-1 font-mono text-sm text-sky-200">{format(hardware?.coldTrapTemperaturesC?.[index], 1)} °C</div><div className="mt-1 text-[8px] text-slate-600">CONDENSED {format(hardware?.coldTrapStageCondensedWaterKg?.[index], 3)} kg</div><div className="mt-1 text-[7px] tracking-[0.12em] text-slate-700">MODEL DIAGNOSTIC</div></div>)}</div></section>
+            <section className="border border-slate-800 bg-slate-950/80 p-3"><div className="flex items-center gap-2 text-[9px] tracking-[0.2em] text-cyan-300"><Wind className="h-3.5 w-3.5" />VACUUM & ULTRASONIC</div><div className="mt-2"><DetailLine label="VACUUM OUTPUT" value={`${format(typeof displayFrame?.controlOutput.vacuumPumpPower === "number" ? displayFrame.controlOutput.vacuumPumpPower * 100 : undefined, 1)} %`} /><DetailLine label="EFFECTIVE PUMP" value={`${format(hardware?.effectivePumpCapacityM3h, 1)} m³/h`} /><DetailLine label="CONDUCTANCE" value={`${format(hardware?.vacuumConductanceM3h, 3)} m³/h`} /><DetailLine label="ULTRASONIC FREQ." value={`${format(displayFrame?.ultrasonic.frequencyKHz, 1)} kHz`} /><DetailLine label="ULTRASONIC POWER" value={`${format(displayFrame?.ultrasonic.effectivePowerW, 1)} W`} /></div></section>
+            <section className={`border p-3 ${safety?.allSystemsSafe ? "border-emerald-500/25 bg-emerald-500/5" : "border-red-500/30 bg-red-500/10"}`}><div className="flex items-center gap-2 text-[9px] tracking-[0.2em]"><ShieldCheck className={`h-3.5 w-3.5 ${safety?.allSystemsSafe ? "text-emerald-300" : "text-red-300"}`} />SAFETY / INTERLOCK</div><div className={`mt-2 font-mono text-sm ${safety?.allSystemsSafe ? "text-emerald-300" : "text-red-300"}`}>{safety?.allSystemsSafe ? "SYSTEM SAFE" : safety?.alarm ?? "CHECK SAFETY"}</div><div className="mt-2 grid grid-cols-2 gap-x-3 text-[8px] text-slate-500"><span>VACUUM {safety?.vacuumAchieved ? "PASS" : "WAIT"}</span><span>THERMAL {safety?.overTemperature ? "TRIPPED" : "SAFE"}</span></div></section>
+            <section className="border border-slate-800 bg-slate-950/80 p-3"><div className="flex items-center gap-2 text-[9px] tracking-[0.2em] text-violet-300"><Radio className="h-3.5 w-3.5" />DATA PROVENANCE</div><div className="mt-2"><DetailLine label="PRIMARY SOURCE" value="SIMULATION" tone="text-violet-200" /><DetailLine label="FRAME ORIGIN" value="CLOSED-LOOP ENGINE" tone="text-violet-200" /><DetailLine label="LAB VALIDATION" value="NOT AVAILABLE" tone="text-amber-300" /><DetailLine label="FRAME" value={displayFrame ? `#${displayFrame.step}` : "UNKNOWN"} /></div><p className="mt-2 text-[8px] leading-relaxed text-slate-600">Simulation-derived values are not laboratory observations. Missing properties remain UNKNOWN / DATA GAP.</p></section>
+          </aside>
+        </section>
+
+        <section className="grid gap-3 xl:grid-cols-[1.15fr_.85fr]"><LiveProcessTrend frames={recent} /><CausalFrameInspector frames={replayFrames} /></section>
+        <section className="grid gap-3 xl:grid-cols-[1fr_.8fr]"><ProcessRunReplay frames={frames} onFrameChange={onReplayFrame} /><section className="border border-slate-800 bg-slate-950/70 p-4"><div className="flex items-center justify-between"><div><div className="text-[9px] tracking-[0.2em] text-cyan-300">PROCESS STATE</div><div className="mt-1 text-lg font-semibold">{state?.stage ?? "WAITING"}</div></div><Activity className={`h-7 w-7 ${safety?.allSystemsSafe ? "text-emerald-300" : "text-red-300"}`} /></div><div className="mt-4 grid grid-cols-3 gap-2 text-center"><div className="border border-slate-800 p-2"><div className="text-[8px] text-slate-600">MATERIAL REMAINING</div><div className="mt-1 font-mono text-xs text-slate-200">{format(material?.remainingMassKg, 3)} kg</div></div><div className="border border-slate-800 p-2"><div className="text-[8px] text-slate-600">WATER REMAINING</div><div className="mt-1 font-mono text-xs text-sky-200">{format(material?.waterRemainingKg, 3)} kg</div></div><div className="border border-slate-800 p-2"><div className="text-[8px] text-slate-600">OIL POTENTIAL</div><div className="mt-1 font-mono text-xs text-amber-200">{format(material?.oilRemainingPotentialKg, 3)} kg</div></div></div><div className="mt-4 flex items-center gap-2 text-[9px] text-slate-500"><Droplets className="h-3.5 w-3.5 text-sky-300" />Mass-inventory values are derived from the active engine frame.</div></section></section>
+        <section className="grid gap-3 xl:grid-cols-[.85fr_1.15fr]"><ProcessEventTimeline timeline={replayFrames.map(frame => ({ stage: frame.safety.stage, elapsedSeconds: frame.controller.elapsedSeconds, alarm: frame.safety.alarm, transitionReason: frame.safety.transitionReason, interlocks: { overTemperature: frame.safety.overTemperature, vacuumAchieved: frame.safety.vacuumAchieved, allSystemsSafe: frame.safety.allSystemsSafe } }))} /><section className="border border-slate-800 bg-slate-950/70 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] tracking-[0.2em] text-emerald-300">SCIENTIFIC OUTPUT</div><p className="mt-1 text-xs text-slate-500">Use the recorder below to preserve run metadata and the causal-frame dataset.</p></div><Button onClick={() => scientificOutputRef.current?.scrollIntoView({ behavior: "smooth" })} disabled={!frames.length} variant="outline" className="border-emerald-500/40 text-emerald-300"><FileText className="mr-2 h-4 w-4" />RESULTS / PRINT</Button></div></section></section>
+        <div ref={scientificOutputRef}><ScientificRunRecorder experimentId={experimentId} frames={frames} completed={completed} /></div>
+        {onExit && <div className="flex justify-end"><Button onClick={onExit} variant="outline" className="border-slate-700 text-slate-400">EXIT CONTROL ROOM</Button></div>}
+      </div>
+    </div>
+  </div>;
 }
