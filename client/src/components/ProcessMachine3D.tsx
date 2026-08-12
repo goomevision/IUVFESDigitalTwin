@@ -298,11 +298,26 @@ export function ProcessMachine3D({ frame }: Props) {
       cancelAnimationFrame(raf);
       resizeObserver?.disconnect();
       if (!resizeObserver) window.removeEventListener("resize", resize);
+      const disposedGeometries = new Set<THREE.BufferGeometry>();
+      const disposedMaterials = new Set<THREE.Material>();
       scene.traverse(object => {
         if (object instanceof THREE.Mesh) {
-          object.geometry.dispose();
+          if (!disposedGeometries.has(object.geometry)) {
+            disposedGeometries.add(object.geometry);
+            object.geometry.dispose();
+          }
           const material = object.material;
-          if (Array.isArray(material)) material.forEach(item => item.dispose()); else material.dispose();
+          if (Array.isArray(material)) {
+            material.forEach(item => {
+              if (!disposedMaterials.has(item)) {
+                disposedMaterials.add(item);
+                item.dispose();
+              }
+            });
+          } else if (!disposedMaterials.has(material)) {
+            disposedMaterials.add(material);
+            material.dispose();
+          }
         }
       });
       renderer.dispose();
