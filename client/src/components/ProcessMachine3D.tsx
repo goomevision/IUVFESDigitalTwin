@@ -48,7 +48,7 @@ export function ProcessMachine3D({ machine }: Props) {
       flowParticles.children.forEach((p, i) => { const offset = p.userData.offset as number; const active = vacuum || extracting || condensing || cooling; const curve = extracting || condensing ? vaporCurve : cooling ? coolingCurve : vacuumCurve; const travel = active ? (time * (vacuum ? 0.18 : 0.1) + offset) % 1 : 0; p.position.copy(active ? curve.getPointAt(travel) : new THREE.Vector3(0, -20, 0)); p.visible = active; p.scale.setScalar(active ? 0.7 + thermal * 0.5 : 0); const m = (p as THREE.Mesh).material as THREE.MeshBasicMaterial; m.color.setHex(cooling ? 0x60a5fa : vacuum ? 0x22d3ee : 0xfbbf24); if (i % 3 === 0 && condensing) p.scale.multiplyScalar(0.7); });
       reactor.rotation.y = Math.sin(time * 0.35) * 0.02; renderer.render(scene, camera); raf = requestAnimationFrame(animate);
     };
-    animate(); return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); renderer.dispose(); mount.removeChild(renderer.domElement); };
+    animate(); return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); renderer.dispose(); if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement); };
   }, []);
   const stage = machine?.stage ?? "PRE_FLIGHT"; const fault = machine?.interlocks.overTemperature; const commands = machine?.commands; const hasEngineFrame = Boolean(machine); const traps = machine?.coldTraps ?? [];
   return <div className="relative h-[590px] overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-950/90 shadow-2xl shadow-cyan-950/20"><div ref={mountRef} className="absolute inset-0" />

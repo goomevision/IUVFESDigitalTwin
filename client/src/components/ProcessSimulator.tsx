@@ -9,19 +9,12 @@ import { ScientificRunRecorder } from "@/components/ScientificRunRecorder";
 import { LiveProcessTrend } from "@/components/LiveProcessTrend";
 import { CausalFrameInspector } from "@/components/CausalFrameInspector";
 import { ProcessRunReplay } from "@/components/ProcessRunReplay";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../../server/routers";
 
-type Stage = "PRE_FLIGHT" | "CHARGE" | "VACUUM" | "HEAT_UP" | "EXTRACTION" | "CONDENSATION" | "COOL_DOWN" | "COMPLETE" | "FAULT";
-type Sensors = { chamberSealed: boolean; pressureMbar: number; temperatureC: number; yieldPercent: number; waterRemovedKg: number; oilRecoveredKg: number; energyKwh: number };
-type Commands = { vacuumPump: boolean; heater: boolean; extractor: boolean; condenser: boolean; cooling: boolean };
-type Frame = {
-  step:number; timestampSeconds:number; sensorBefore:Sensors;
-  controller:{stage:Stage;progress:number;elapsedSeconds:number;sensors:Sensors;commands:Commands;interlocks:{chamberSealed:boolean;pressureSafeForHeating:boolean;temperatureSafeForCooling:boolean;overTemperature:boolean;vacuumAchieved:boolean;allSystemsSafe:boolean};alarm:string|null;transitionReason:string};
-  controlOutput:{heaterPower:number;vacuumPumpPower:number;valve:{vacuumIsolation:number;vaporToCondenser:number;coolingWater:number}};
-  intendedCommands:Commands; effectiveCommands:Commands; physicalSensorAfter:Sensors; sensorAfter:Sensors; materialInventory:any;
-  safety:{stage:Stage;allSystemsSafe:boolean;chamberSealed:boolean;pressureSafeForHeating:boolean;temperatureSafeForCooling:boolean;overTemperature:boolean;vacuumAchieved:boolean;alarm:string|null;transitionReason:string}; paused:boolean;
-  ultrasonic?:{effectiveFrequencyKHz?:number;effectivePowerKW?:number;powerDensityWPerL?:number;status?:string};
-  hardwareDiagnostics?:{connectedVolumeL?:number;pipeVolumeL?:number;vacuumConductanceM3h?:number|null;effectivePumpCapacityM3h?:number;ultrasonicEffectivePowerKw?:number;ultrasonicPowerDensityWPerL?:number;hardwareWarnings?:string[];coldTrapTemperaturesC?:number[];coldTrapHeatLoadKw?:number;coldTrapCondensationCapacityKgPerSecond?:number;coldTrapStageCondensedWaterKg?:number[]};
-};
+type RouterOutputs = inferRouterOutputs<AppRouter>;
+type Frame = RouterOutputs["closedLoop"]["frames"]["frames"][number];
+type Stage = Frame["safety"]["stage"];
 const STAGES:Stage[]=["PRE_FLIGHT","CHARGE","VACUUM","HEAT_UP","EXTRACTION","CONDENSATION","COOL_DOWN","COMPLETE","FAULT"];
 function Slider({label,value,min,max,step,unit,Icon,onChange,onApply,disabled}:{label:string;value:number;min:number;max:number;step:number;unit:string;Icon:any;onChange:(v:number)=>void;onApply:()=>void;disabled?:boolean}){return <div className="rounded-xl border border-cyan-500/20 bg-slate-900/70 p-3"><div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-slate-500"><span className="flex items-center gap-2"><Icon className="h-4 w-4 text-cyan-400"/>{label}</span><span className="font-mono text-cyan-300">{value.toFixed(step<1?1:0)} {unit}</span></div><input disabled={disabled} className="mt-3 w-full accent-cyan-400 disabled:opacity-40" type="range" min={min} max={max} step={step} value={value} onChange={e=>onChange(Number(e.target.value))} onPointerUp={onApply}/><div className="mt-2 flex justify-between text-[9px] font-mono text-slate-600"><span>{min}</span><span>{max}</span></div></div>}
 function Metric({label,value,accent="cyan"}:{label:string;value:string;accent?:"cyan"|"sky"|"amber"|"emerald"}){const text={cyan:"text-cyan-300",sky:"text-sky-300",amber:"text-amber-300",emerald:"text-emerald-300"}[accent];return <div className="rounded-xl border border-slate-800 bg-slate-950/75 p-3"><div className="text-[9px] tracking-[0.2em] text-slate-500">{label}</div><div className={`mt-1 font-mono text-lg ${text}`}>{value}</div></div>}
@@ -31,9 +24,13 @@ export function ProcessSimulator({experimentId,onExit,onComplete}:{experimentId:
  const experiment=trpc.experiments.get.useQuery(experimentId);
  const create=trpc.closedLoop.create.useMutation(),start=trpc.closedLoop.start.useMutation(),step=trpc.closedLoop.step.useMutation(),control=trpc.closedLoop.control.useMutation(),pause=trpc.closedLoop.pause.useMutation(),resume=trpc.closedLoop.resume.useMutation(),stop=trpc.closedLoop.stop.useMutation(),reset=trpc.closedLoop.reset.useMutation();
  const [sessionId,setSessionId]=useState<string|null>(null),[frames,setFrames]=useState<Frame[]>([]),[running,setRunning]=useState(false),[paused,setPaused]=useState(false),[completed,setCompleted]=useState(false);
+ const session=trpc.closedLoop.get.useQuery(sessionId??"",{enabled:Boolean(sessionId),refetchInterval:sessionId?1000:false});
+ const sessionFrames=trpc.closedLoop.frames.useQuery(sessionId??"",{enabled:Boolean(sessionId),refetchInterval:sessionId?1000:false});
  const [replayMode,setReplayMode]=useState(false),[replayIndex,setReplayIndex]=useState(0);
  const [temperature,setTemperature]=useState(62),[pressure,setPressure]=useState(20),[cooling,setCooling]=useState(35),[heaterLimit,setHeaterLimit]=useState(1),[pumpLimit,setPumpLimit]=useState(1),[condenserLimit,setCondenserLimit]=useState(1),[coolingLimit,setCoolingLimit]=useState(1);
  const busy=useRef(false),timer=useRef<number|null>(null),scientificOutputRef=useRef<HTMLDivElement|null>(null);const clearTimer=()=>{if(timer.current!==null)window.clearInterval(timer.current);timer.current=null};useEffect(()=>()=>clearTimer(),[]);
+ useEffect(()=>{const persisted=sessionFrames.data?.frames as Frame[]|undefined;if(!persisted)return;setFrames(previous=>persisted.length>=previous.length?persisted:previous)},[sessionFrames.data]);
+ useEffect(()=>{const status=session.data?.status;if(!status)return;const terminal=status==="completed"||status==="fault"||status==="stopped";if(terminal){clearTimer();setRunning(false);setPaused(false);setCompleted(status==="completed")}else if(status==="paused"){clearTimer();setRunning(false);setPaused(true)}},[session.data]);
  const latest=frames.at(-1),liveSensor=latest?.sensorAfter,liveState=latest?.controller,liveSafety=latest?.safety;
  const displayIndex=replayMode?Math.min(replayIndex,Math.max(0,frames.length-1)):Math.max(0,frames.length-1);
  const displayFrame=frames.length?frames[displayIndex]:undefined;

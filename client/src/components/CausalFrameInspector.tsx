@@ -1,15 +1,6 @@
 import { useMemo, useState } from "react";
 
-type Frame = {
-  step: number; timestampSeconds: number;
-  sensorBefore: Record<string, unknown>;
-  controller: { stage: string; progress: number; elapsedSeconds: number; sensors: Record<string, unknown>; commands: Record<string, boolean>; interlocks: Record<string, boolean>; alarm: string | null; transitionReason: string };
-  controlOutput: { heaterPower: number; vacuumPumpPower: number; valve: Record<string, number> };
-  intendedCommands: Record<string, boolean>; effectiveCommands: Record<string, boolean>;
-  physicalSensorAfter: Record<string, unknown>; sensorAfter: Record<string, unknown>; materialInventory: Record<string, unknown>;
-  safety: { stage: string; allSystemsSafe: boolean; chamberSealed: boolean; pressureSafeForHeating: boolean; temperatureSafeForCooling: boolean; overTemperature: boolean; vacuumAchieved: boolean; alarm: string | null; transitionReason: string };
-  paused: boolean; ultrasonic?: Record<string, unknown>; hardwareDiagnostics?: Record<string, unknown>;
-};
+import type { CausalFrame as Frame } from "../../../server/closedLoopSimulation";
 function scalar(v: unknown) { if (typeof v === "number" && Number.isFinite(v)) return v.toFixed(4); if (typeof v === "boolean") return v ? "TRUE" : "FALSE"; if (v == null) return "UNKNOWN"; return String(v); }
 function Group({ title, entries }: { title: string; entries: Array<[string, unknown]> }) { return <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3"><div className="mb-2 text-[9px] tracking-[0.2em] text-slate-500">{title}</div><div className="grid gap-1.5 sm:grid-cols-2">{entries.map(([key,value])=><div key={key} className="flex items-center justify-between gap-3 rounded bg-slate-900/60 px-2 py-1.5 font-mono text-[9px]"><span className="text-slate-500">{key}</span><span className="text-slate-200">{scalar(value)}</span></div>)}</div></div>; }
 export function CausalFrameInspector({ frames }: { frames: ReadonlyArray<Frame> }) {

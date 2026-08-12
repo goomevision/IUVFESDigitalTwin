@@ -1,12 +1,6 @@
 import { useMemo } from "react";
 
-type TrendFrame = {
-  timestampSeconds: number;
-  sensorAfter: { temperatureC: number; pressureMbar: number };
-  ultrasonic?: { effectivePowerKW?: number; powerDensityWPerL?: number };
-  hardwareDiagnostics?: { coldTrapHeatLoadKw?: number; coldTrapCondensationCapacityKgPerSecond?: number };
-  controlOutput?: { vacuumPumpPower?: number };
-};
+import type { CausalFrame as TrendFrame } from "../../../server/closedLoopSimulation";
 
 type Series = { key: string; label: string; unit: string; value: (f: TrendFrame) => number | undefined; tone: string };
 
@@ -14,7 +8,7 @@ const SERIES: Series[] = [
   { key: "temperature", label: "TEMPERATURE", unit: "°C", value: f => f.sensorAfter.temperatureC, tone: "text-cyan-300" },
   { key: "pressure", label: "PRESSURE", unit: "mbar", value: f => f.sensorAfter.pressureMbar, tone: "text-sky-300" },
   { key: "vacuum", label: "VACUUM OUTPUT", unit: "%", value: f => typeof f.controlOutput?.vacuumPumpPower === "number" ? f.controlOutput.vacuumPumpPower * 100 : undefined, tone: "text-indigo-300" },
-  { key: "ultrasonic", label: "ULTRASONIC POWER", unit: "kW", value: f => f.ultrasonic?.effectivePowerKW, tone: "text-violet-300" },
+  { key: "ultrasonic", label: "ULTRASONIC POWER", unit: "W", value: f => f.ultrasonic?.effectivePowerW, tone: "text-violet-300" },
   { key: "condensation", label: "CONDENSATION LOAD", unit: "kW", value: f => f.hardwareDiagnostics?.coldTrapHeatLoadKw, tone: "text-blue-300" },
 ];
 

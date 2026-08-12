@@ -2,16 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pause, Play, RotateCcw, SkipBack, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type ReplayFrame = {
-  step: number;
-  timestampSeconds: number;
-  controller?: { stage?: string; progress?: number };
-  sensorAfter?: { temperatureC?: number; pressureMbar?: number; yieldPercent?: number; oilRecoveredKg?: number; waterRemovedKg?: number; energyKwh?: number };
-  effectiveCommands?: Record<string, boolean>;
-  safety?: { allSystemsSafe?: boolean; alarm?: string | null };
-};
+import type { CausalFrame as ReplayFrame } from "../../../server/closedLoopSimulation";
 
-export function ProcessRunReplay({ frames, onFrameChange }: { frames: ReadonlyArray<ReplayFrame>; onFrameChange?: (frame: any, index: number) => void }) {
+export function ProcessRunReplay({ frames, onFrameChange }: { frames: ReadonlyArray<ReplayFrame>; onFrameChange?: (frame: ReplayFrame | undefined, index: number) => void }) {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
