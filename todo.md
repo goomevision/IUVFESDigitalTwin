@@ -292,7 +292,7 @@
 - [x] Synchronize the local branch with the official remote `feature/control-room-ui` baseline.
 - [x] Verify the current Quality Gate baseline: 19 test files / 52 tests passing locally.
 - [x] Audit the ProcessSimulator data bindings against CausalFrame and session sources.
-- [ ] Record confirmed repository and architecture discrepancies in the Buku Besar.
+- [x] Record confirmed repository and architecture discrepancies in the Buku Besar.
 - [x] Fix closed-loop reset authorization to validate the parent experiment rather than the session identifier.
 - [x] Replace the ProcessSimulator's duplicated frame contract with tRPC-inferred closed-loop API types.
 - [x] Poll and reconcile the known active Process Simulator session from the session API without fabricating telemetry.
