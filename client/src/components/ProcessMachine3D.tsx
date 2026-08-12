@@ -11,6 +11,7 @@ export interface ProcessMachineVisualState {
   stage: CausalFrame["safety"]["stage"] | undefined;
   timestampSeconds: number | undefined;
   commands: CausalFrame["effectiveCommands"] | undefined;
+  controlOutput: CausalFrame["controlOutput"] | undefined;
   temperatureC: number | undefined;
   pressureMbar: number | undefined;
   overTemperature: boolean | undefined;
@@ -30,6 +31,7 @@ export function getProcessMachineVisualState(frame?: CausalFrame): ProcessMachin
       stage: undefined,
       timestampSeconds: undefined,
       commands: undefined,
+      controlOutput: undefined,
       temperatureC: undefined,
       pressureMbar: undefined,
       overTemperature: undefined,
@@ -48,6 +50,7 @@ export function getProcessMachineVisualState(frame?: CausalFrame): ProcessMachin
     stage: frame.safety.stage,
     timestampSeconds: frame.timestampSeconds,
     commands: frame.effectiveCommands,
+    controlOutput: frame.controlOutput,
     temperatureC: frame.sensorAfter.temperatureC,
     pressureMbar: frame.sensorAfter.pressureMbar,
     overTemperature: frame.safety.overTemperature,
@@ -66,13 +69,15 @@ function tubeBetween(curve: THREE.Curve<THREE.Vector3>, radius: number, material
 }
 
 function setHex(material: THREE.Material, hex: number) {
-  if (material instanceof THREE.MeshBasicMaterial || material instanceof THREE.MeshStandardMaterial) {
-    material.color.setHex(hex);
-  }
+  if (material instanceof THREE.MeshBasicMaterial || material instanceof THREE.MeshStandardMaterial) material.color.setHex(hex);
 }
 
 function setEmissive(material: THREE.Material, hex: number) {
   if (material instanceof THREE.MeshStandardMaterial) material.emissive.setHex(hex);
+}
+
+function setOpacity(material: THREE.Material, opacity: number) {
+  if (material instanceof THREE.MeshBasicMaterial || material instanceof THREE.MeshStandardMaterial) material.opacity = opacity;
 }
 
 function finite(value: number | undefined): value is number {
@@ -83,17 +88,27 @@ function displayNumber(value: number | undefined, digits: number, unit: string) 
   return finite(value) ? `${value.toFixed(digits)} ${unit}` : "UNKNOWN";
 }
 
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
+}
+
 function makeFlowParticles(count: number, radius: number, color: number) {
   const group = new THREE.Group();
   for (let i = 0; i < count; i += 1) {
-    const particle = new THREE.Mesh(
-      new THREE.SphereGeometry(radius, 8, 8),
-      new THREE.MeshBasicMaterial({ color }),
-    );
+    const particle = new THREE.Mesh(new THREE.SphereGeometry(radius, 8, 8), new THREE.MeshBasicMaterial({ color }));
     particle.userData.offset = i / count;
     group.add(particle);
   }
   return group;
+}
+
+function makePathValve(color: number) {
+  const valve = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14, 0.14, 0.24, 20),
+    new THREE.MeshBasicMaterial({ color }),
+  );
+  valve.rotation.z = Math.PI / 2;
+  return valve;
 }
 
 export function ProcessMachine3D({ frame }: Props) {
@@ -135,7 +150,7 @@ export function ProcessMachine3D({ frame }: Props) {
     floor.position.y = -2.25;
     scene.add(floor);
 
-    // REACTOR: shell -> chamber -> material -> heater -> ultrasonic transducer.
+    // REACTOR: the visual hierarchy is shell -> chamber -> material -> heater -> ultrasonic.
     const reactor = new THREE.Group();
     reactor.position.set(-4.1, 0.55, 0);
     scene.add(reactor);
@@ -148,27 +163,13 @@ export function ProcessMachine3D({ frame }: Props) {
 
     const chamber = new THREE.Mesh(
       new THREE.CylinderGeometry(1.28, 1.28, 3.92, 48),
-      new THREE.MeshStandardMaterial({
-        color: 0x0a1726,
-        metalness: 0.25,
-        roughness: 0.12,
-        transparent: true,
-        opacity: 0.56,
-        emissive: 0x07334a,
-      }),
+      new THREE.MeshStandardMaterial({ color: 0x0a1726, metalness: 0.25, roughness: 0.12, transparent: true, opacity: 0.56, emissive: 0x07334a }),
     );
     reactor.add(chamber);
 
     const materialZone = new THREE.Mesh(
       new THREE.CylinderGeometry(0.96, 0.96, 2.5, 36),
-      new THREE.MeshStandardMaterial({
-        color: 0x7c3aed,
-        metalness: 0.05,
-        roughness: 0.4,
-        transparent: true,
-        opacity: 0.2,
-        emissive: 0x2e1065,
-      }),
+      new THREE.MeshStandardMaterial({ color: 0x7c3aed, metalness: 0.05, roughness: 0.4, transparent: true, opacity: 0.2, emissive: 0x2e1065 }),
     );
     materialZone.position.y = -0.25;
     reactor.add(materialZone);
@@ -183,46 +184,48 @@ export function ProcessMachine3D({ frame }: Props) {
     bottom.position.y = -2.46;
     reactor.add(bottom);
 
-    const heaterRing = new THREE.Mesh(
-      new THREE.TorusGeometry(1.51, 0.09, 12, 48),
-      new THREE.MeshBasicMaterial({ color: 0x334155 }),
+    const vaporOutlet = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.2, 0.2, 0.7, 24),
+      new THREE.MeshStandardMaterial({ color: 0x31465e, metalness: 0.85, roughness: 0.2 }),
     );
+    vaporOutlet.rotation.z = Math.PI / 2;
+    vaporOutlet.position.set(1.55, 1.7, 0);
+    reactor.add(vaporOutlet);
+
+    const vacuumOutlet = vaporOutlet.clone();
+    vacuumOutlet.position.set(1.55, 0.2, 0.58);
+    reactor.add(vacuumOutlet);
+
+    const heaterRing = new THREE.Mesh(new THREE.TorusGeometry(1.51, 0.09, 12, 48), new THREE.MeshBasicMaterial({ color: 0x334155 }));
     heaterRing.rotation.x = Math.PI / 2;
     heaterRing.position.y = 1.04;
     reactor.add(heaterRing);
 
-    const ultrasonic = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.24, 0.24, 0.58, 24),
-      new THREE.MeshBasicMaterial({ color: 0x334155 }),
-    );
+    const ultrasonic = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.58, 24), new THREE.MeshBasicMaterial({ color: 0x334155 }));
     ultrasonic.position.y = -1.68;
     reactor.add(ultrasonic);
+
+    const ultrasonicRing = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.035, 8, 32), new THREE.MeshBasicMaterial({ color: 0x334155 }));
+    ultrasonicRing.rotation.x = Math.PI / 2;
+    ultrasonicRing.position.y = -1.36;
+    reactor.add(ultrasonicRing);
 
     // VACUUM HARDWARE.
     const pump = new THREE.Group();
     pump.position.set(4.7, -0.55, 1.55);
     scene.add(pump);
-    const pumpBody = new THREE.Mesh(
-      new THREE.BoxGeometry(2.25, 1.5, 1.58),
-      new THREE.MeshStandardMaterial({ color: 0x172033, metalness: 0.86, roughness: 0.24 }),
-    );
+    const pumpBody = new THREE.Mesh(new THREE.BoxGeometry(2.25, 1.5, 1.58), new THREE.MeshStandardMaterial({ color: 0x172033, metalness: 0.86, roughness: 0.24 }));
     pump.add(pumpBody);
-    const pumpRotor = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.44, 0.44, 0.16, 32),
-      new THREE.MeshBasicMaterial({ color: 0x334155 }),
-    );
+    const pumpRotor = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.16, 32), new THREE.MeshBasicMaterial({ color: 0x334155 }));
     pumpRotor.rotation.z = Math.PI / 2;
     pumpRotor.position.x = -1.07;
     pump.add(pumpRotor);
-    const pumpInlet = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.22, 0.22, 0.28, 24),
-      new THREE.MeshStandardMaterial({ color: 0x263b52, metalness: 0.85, roughness: 0.2 }),
-    );
+    const pumpInlet = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.28, 24), new THREE.MeshStandardMaterial({ color: 0x263b52, metalness: 0.85, roughness: 0.2 }));
     pumpInlet.rotation.z = Math.PI / 2;
     pumpInlet.position.x = -1.25;
     pump.add(pumpInlet);
 
-    // COLD TRAPS: one visual element per diagnostics tuple entry.
+    // COLD TRAPS: fixed hardware topology; diagnostic state controls appearance only.
     const trapGroups: THREE.Group[] = [];
     const trapBodies: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>[] = [];
     const trapCoils: THREE.Mesh<THREE.TorusGeometry, THREE.MeshBasicMaterial>[] = [];
@@ -235,38 +238,22 @@ export function ProcessMachine3D({ frame }: Props) {
 
       const shell = new THREE.Mesh(
         new THREE.CylinderGeometry(0.72, 0.72, 1.95, 32),
-        new THREE.MeshStandardMaterial({
-          color: 0x15243a,
-          metalness: 0.72,
-          roughness: 0.24,
-          transparent: true,
-          opacity: 0.8,
-          emissive: 0x061522,
-        }),
+        new THREE.MeshStandardMaterial({ color: 0x15243a, metalness: 0.72, roughness: 0.24, transparent: true, opacity: 0.8, emissive: 0x061522 }),
       );
       group.add(shell);
       trapBodies.push(shell);
 
-      const coil = new THREE.Mesh(
-        new THREE.TorusGeometry(0.47, 0.065, 10, 32),
-        new THREE.MeshBasicMaterial({ color: 0x2563eb }),
-      );
+      const coil = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.065, 10, 32), new THREE.MeshBasicMaterial({ color: 0x2563eb }));
       coil.rotation.x = Math.PI / 2;
       coil.position.y = -0.15;
       group.add(coil);
       trapCoils.push(coil);
 
-      const base = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.8, 0.8, 0.12, 32),
-        new THREE.MeshStandardMaterial({ color: 0x203149, metalness: 0.85, roughness: 0.2 }),
-      );
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.12, 32), new THREE.MeshStandardMaterial({ color: 0x203149, metalness: 0.85, roughness: 0.2 }));
       base.position.y = -1.04;
       group.add(base);
 
-      const port = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.12, 0.12, 0.42, 20),
-        new THREE.MeshStandardMaterial({ color: 0x31465e, metalness: 0.85, roughness: 0.2 }),
-      );
+      const port = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.42, 20), new THREE.MeshStandardMaterial({ color: 0x31465e, metalness: 0.85, roughness: 0.2 }));
       port.rotation.z = Math.PI / 2;
       port.position.x = -0.78;
       port.position.y = 0.3;
@@ -274,7 +261,7 @@ export function ProcessMachine3D({ frame }: Props) {
       trapPorts.push(port);
     }
 
-    // PROCESS PIPING. Geometry is static; activation is driven only by effective frame commands.
+    // PROCESS PIPING: static topology; state activation comes only from effective commands.
     const vacuumLineMaterial = new THREE.MeshBasicMaterial({ color: 0x164e63 });
     const vaporLineMaterial = new THREE.MeshBasicMaterial({ color: 0x155e75 });
     const coolingLineMaterial = new THREE.MeshBasicMaterial({ color: 0x1e3a5f });
@@ -282,13 +269,13 @@ export function ProcessMachine3D({ frame }: Props) {
     const manifoldMaterial = new THREE.MeshBasicMaterial({ color: 0x1f3b55 });
 
     const vacuumCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-2.25, 0.15, 0.58),
+      new THREE.Vector3(-2.55, 0.15, 0.58),
       new THREE.Vector3(-0.1, 0.15, 0.58),
       new THREE.Vector3(2.35, -0.02, 1.22),
       new THREE.Vector3(3.62, -0.35, 1.55),
     ]);
     const vaporCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-2.72, 2.48, 0),
+      new THREE.Vector3(-2.55, 2.25, 0),
       new THREE.Vector3(-2.68, 3.65, -1.55),
       new THREE.Vector3(-0.23, 3.65, -1.55),
       new THREE.Vector3(2.22, 3.65, -1.55),
@@ -316,14 +303,20 @@ export function ProcessMachine3D({ frame }: Props) {
       tubeBetween(powerCurve, 0.036, powerCableMaterial),
     );
 
-    // Explicit trap-to-trap manifold makes topology readable without inventing flow values.
+    const vacuumValve = makePathValve(0x164e63);
+    vacuumValve.position.set(2.2, 0.03, 1.17);
+    scene.add(vacuumValve);
+    const vaporValve = makePathValve(0x155e75);
+    vaporValve.position.set(2.15, 3.65, -1.55);
+    scene.add(vaporValve);
+    const coolingValve = makePathValve(0x1e3a5f);
+    coolingValve.position.set(2.55, 1.62, -2.35);
+    scene.add(coolingValve);
+
     for (let i = 0; i < 3; i += 1) {
       const x1 = -1.9 + i * 2.45 + 0.78;
       const x2 = -1.9 + (i + 1) * 2.45 - 0.78;
-      const curve = new THREE.LineCurve3(
-        new THREE.Vector3(x1, 3.65, -1.55),
-        new THREE.Vector3(x2, 3.65, -1.55),
-      );
+      const curve = new THREE.LineCurve3(new THREE.Vector3(x1, 3.65, -1.55), new THREE.Vector3(x2, 3.65, -1.55));
       scene.add(tubeBetween(curve, 0.055, manifoldMaterial));
     }
 
@@ -353,6 +346,7 @@ export function ProcessMachine3D({ frame }: Props) {
     const animate = () => {
       const visual = getProcessMachineVisualState(frameRef.current);
       const commands = visual.commands;
+      const output = visual.controlOutput;
       const timestamp = visual.timestampSeconds ?? 0;
       const temperature = visual.temperatureC;
       const pressure = visual.pressureMbar;
@@ -365,62 +359,66 @@ export function ProcessMachine3D({ frame }: Props) {
       const cooling = commands?.cooling === true;
       const fault = visual.overTemperature === true;
       const activeProcess = Boolean(commands);
-      const vacuumLevel = hasPressure ? Math.max(0, Math.min(1, 1 - pressure! / 1013.25)) : undefined;
-      const thermal = hasTemperature ? Math.max(0, Math.min(1, (temperature! - 25) / 125)) : undefined;
-      const ultrasonicActivity = finite(visual.ultrasonicActivityIndex)
-        ? Math.max(0, Math.min(1, visual.ultrasonicActivityIndex!))
-        : undefined;
-      const ultrasonicActive = finite(visual.ultrasonicEffectivePowerW)
-        ? visual.ultrasonicEffectivePowerW! > 0
-        : ultrasonicActivity !== undefined && ultrasonicActivity > 0;
+      const vacuumPower = finite(output?.vacuumPumpPower) ? clamp01(output!.vacuumPumpPower) : undefined;
+      const heaterPower = finite(output?.heaterPower) ? clamp01(output!.heaterPower) : undefined;
+      const vaporValvePower = finite(output?.valve.vaporToCondenser) ? clamp01(output!.valve.vaporToCondenser) : undefined;
+      const coolingValvePower = finite(output?.valve.coolingWater) ? clamp01(output!.valve.coolingWater) : undefined;
+      const vacuumLevel = hasPressure ? clamp01(1 - pressure! / 1013.25) : undefined;
+      const thermal = hasTemperature ? clamp01((temperature! - 25) / 125) : undefined;
+      const ultrasonicActivity = finite(visual.ultrasonicActivityIndex) ? clamp01(visual.ultrasonicActivityIndex!) : undefined;
+      const ultrasonicPowerKnown = finite(visual.ultrasonicEffectivePowerW);
+      const ultrasonicActive = ultrasonicPowerKnown ? visual.ultrasonicEffectivePowerW! > 0 : ultrasonicActivity !== undefined && ultrasonicActivity > 0;
 
-      // Deterministic animation derives only from persisted frame state/time. It is not telemetry.
-      pumpRotor.rotation.x = vacuum ? timestamp * 18 : 0;
+      // Deterministic animation uses persisted frame time/state only. It is not telemetry generation.
+      pumpRotor.rotation.x = vacuum ? timestamp * (8 + (vacuumPower ?? 0) * 14) : 0;
       reactor.rotation.y = activeProcess ? Math.sin(timestamp * 0.35) * 0.02 : 0;
       setHex(heaterRing.material, fault ? 0xef4444 : hot ? 0xf97316 : 0x334155);
       setEmissive(chamber.material, fault ? 0x5f1111 : hot ? 0x5a2108 : 0x07334a);
       setHex(ultrasonic.material, ultrasonicActive ? 0x8b5cf6 : 0x334155);
+      setHex(ultrasonicRing.material, ultrasonicActive ? 0xb77cff : 0x334155);
       key.color.setHex(fault ? 0xef4444 : hot ? 0xfb923c : 0x22d3ee);
-      key.intensity = hot ? 30 : 18;
+      key.intensity = hot ? 18 + (heaterPower ?? 0) * 20 : 18;
       setHex(pumpRotor.material, vacuum ? 0x22d3ee : 0x334155);
       setHex(vacuumLineMaterial, vacuum ? 0x22d3ee : 0x164e63);
       setHex(vaporLineMaterial, extracting || condensing ? 0x38bdf8 : 0x155e75);
       setHex(coolingLineMaterial, cooling ? 0x60a5fa : 0x1e3a5f);
       setHex(powerCableMaterial, hot || vacuum || extracting || condensing || cooling ? 0xf59e0b : 0x334155);
       setHex(manifoldMaterial, condensing ? 0x38bdf8 : 0x1f3b55);
+      setHex(vacuumValve.material, vacuum ? 0x22d3ee : 0x164e63);
+      setHex(vaporValve.material, condensing ? 0x38bdf8 : 0x155e75);
+      setHex(coolingValve.material, cooling ? 0x60a5fa : 0x1e3a5f);
+      setOpacity(vacuumLineMaterial, vacuumPower === undefined ? 0.62 : 0.35 + vacuumPower * 0.65);
+      setOpacity(vaporLineMaterial, vaporValvePower === undefined ? 0.62 : 0.35 + vaporValvePower * 0.65);
+      setOpacity(coolingLineMaterial, coolingValvePower === undefined ? 0.62 : 0.35 + coolingValvePower * 0.65);
 
       const materialInitial = visual.materialInitialKg;
       const materialRemaining = visual.materialRemainingKg;
-      const materialFraction = finite(materialInitial) && finite(materialRemaining) && materialInitial! > 0
-        ? Math.max(0, Math.min(1, materialRemaining! / materialInitial!))
-        : undefined;
-      materialZone.visible = finite(materialFraction) ? materialFraction! > 0 : false;
+      const materialFraction = finite(materialInitial) && finite(materialRemaining) && materialInitial! > 0 ? clamp01(materialRemaining! / materialInitial!) : undefined;
+      materialZone.visible = true;
       if (finite(materialFraction)) {
         materialZone.scale.y = 0.25 + materialFraction! * 0.75;
-        (materialZone.material as THREE.MeshStandardMaterial).opacity = 0.08 + materialFraction! * 0.22;
+        setOpacity(materialZone.material, 0.08 + materialFraction! * 0.22);
+      } else {
+        materialZone.scale.y = 0.65;
+        setOpacity(materialZone.material, 0.05);
       }
 
       const ultrasonicPulse = ultrasonicActivity ?? 0;
       ultrasonic.scale.setScalar(1 + ultrasonicPulse * 0.2);
+      ultrasonicRing.scale.setScalar(1 + ultrasonicPulse * 0.25);
 
       trapGroups.forEach((group, index) => {
         const trapTemperature = visual.coldTrapTemperaturesC?.[index];
         const condensate = visual.condensedWaterKg?.[index];
         const hasTrapTemperature = finite(trapTemperature);
-        const hasCondensate = finite(condensate) && condensate! > 0;
-        const coldFactor = hasTrapTemperature ? Math.max(0, Math.min(1, (25 - trapTemperature!) / 105)) : undefined;
-        const active = condensing || cooling;
-        const trapDataAvailable = hasTrapTemperature || finite(condensate);
-
-        setEmissive(
-          trapBodies[index].material,
-          active && coldFactor !== undefined ? (coldFactor > 0.65 ? 0x082f49 : 0x10243a) : 0x061522,
-        );
-        trapCoils[index].material.color.setHex(
-          active && hasTrapTemperature ? (coldFactor! > 0.65 ? 0x60a5fa : 0x38bdf8) : trapDataAvailable ? 0x2563eb : 0x334155,
-        );
-        setHex(trapPorts[index].material, active ? 0x3b82f6 : 0x31465e);
-        trapBodies[index].scale.y = hasCondensate ? 1.03 : 1;
+        const hasCondensate = finite(condensate);
+        const hasTrapData = hasTrapTemperature || hasCondensate;
+        const coldFactor = hasTrapTemperature ? clamp01((25 - trapTemperature!) / 105) : undefined;
+        const active = hasTrapData && (condensing || cooling);
+        setEmissive(trapBodies[index].material, active && coldFactor !== undefined ? (coldFactor > 0.65 ? 0x082f49 : 0x10243a) : hasTrapData ? 0x071a2b : 0x061522);
+        trapCoils[index].material.color.setHex(active && hasTrapTemperature ? (coldFactor! > 0.65 ? 0x60a5fa : 0x38bdf8) : hasTrapData ? 0x2563eb : 0x475569);
+        setHex(trapPorts[index].material, active ? 0x3b82f6 : hasTrapData ? 0x31465e : 0x475569);
+        trapBodies[index].scale.y = hasCondensate && condensate! > 0 ? 1.03 : 1;
         group.position.y = activeProcess ? 3.35 + Math.sin(timestamp * 0.5 + index) * 0.015 : 3.35;
       });
 
@@ -428,15 +426,9 @@ export function ProcessMachine3D({ frame }: Props) {
         const offset = particle.userData.offset as number;
         const travel = (timestamp * (vacuum || extracting ? 0.09 : 0.015) + offset) % 1;
         const visible = activeProcess && hasPressure && (vacuum || extracting || hot);
-        particle.position.set(
-          -1.0 + travel * 1.9,
-          -1.35 + ((index * 0.47) % 2.7),
-          0.4 + Math.sin(index * 1.7 + timestamp) * 0.5,
-        );
+        particle.position.set(-1.0 + travel * 1.9, -1.35 + ((index * 0.47) % 2.7), 0.4 + Math.sin(index * 1.7 + timestamp) * 0.5);
         particle.visible = visible;
-        particle.scale.setScalar(visible && vacuumLevel !== undefined && thermal !== undefined
-          ? 0.45 + vacuumLevel * 1.2 + thermal * 0.7
-          : 0);
+        particle.scale.setScalar(visible && vacuumLevel !== undefined && thermal !== undefined ? 0.45 + vacuumLevel * 1.2 + thermal * 0.7 : 0);
       });
 
       flowParticles.children.forEach((particle, index) => {
@@ -514,9 +506,11 @@ export function ProcessMachine3D({ frame }: Props) {
           <div><span className={commands?.cooling ? "text-blue-300" : "text-slate-600"}>●</span> COOLING PATH</div>
           <div><span className={commands?.heater ? "text-amber-300" : "text-slate-600"}>●</span> HEAT / POWER</div>
         </div>
-        <div className="mt-2 border-t border-white/10 pt-2 text-[8px] text-slate-600">
-          FLOW PARTICLES = EFFECTIVE PATH STATE, NOT FLOW-RATE MEASUREMENT
-        </div>
+        <div className="mt-2 border-t border-white/10 pt-2 text-[8px] text-slate-600">FLOW PARTICLES = EFFECTIVE PATH STATE, NOT FLOW-RATE MEASUREMENT</div>
+      </div>
+
+      <div className="pointer-events-none absolute left-3 top-[245px] rounded-lg border border-white/10 bg-slate-950/75 px-2 py-1 font-mono text-[8px] text-slate-500 backdrop-blur">
+        COLD TRAP ARRAY · 4 CHANNELS · FRAME DIAGNOSTICS
       </div>
 
       <div className="absolute bottom-3 left-3 right-3 grid grid-cols-2 gap-2 md:grid-cols-6">
@@ -539,10 +533,8 @@ export function ProcessMachine3D({ frame }: Props) {
 
       <div className="pointer-events-none absolute bottom-[102px] left-4 rounded-lg border border-violet-500/20 bg-slate-950/80 px-3 py-2 font-mono text-[8px] backdrop-blur">
         <div className="text-slate-600">ULTRASONIC</div>
-        <div className="mt-1 text-violet-300">
-          {ultrasonicModelled ? displayNumber(visual.ultrasonicEffectivePowerW, 0, "W") : "UNKNOWN"}
-        </div>
-        <div className="text-slate-600">MODELLED / EXPERIMENTAL-DATA-LIMITED</div>
+        <div className="mt-1 text-violet-300">{ultrasonicModelled ? displayNumber(visual.ultrasonicEffectivePowerW, 0, "W") : "UNKNOWN"}</div>
+        <div className="text-slate-600">FRAME DIAGNOSTIC · NO SYNTHETIC TELEMETRY</div>
       </div>
     </div>
   );
