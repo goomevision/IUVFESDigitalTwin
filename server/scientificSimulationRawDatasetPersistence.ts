@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { FilesystemRawDatasetStore, type RawDatasetStore } from "./scientificRawDatasetStore";
@@ -22,10 +23,11 @@ export async function persistCompletedSimulationRawDataset(input: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  const provenanceId = randomUUID();
   const dataset = await persistSimulationRawDataset({
     experimentId: input.experimentId,
     frames: input.frames,
-    provenanceRefs: input.provenanceRefs,
+    provenanceRefs: [provenanceId, ...(input.provenanceRefs ?? [])],
     store: input.store ?? getDefaultStore(),
   });
 
@@ -44,7 +46,6 @@ export async function persistCompletedSimulationRawDataset(input: {
       (${dataset.manifest.datasetId}, ${dataset.manifest.experimentId}, ${dataset.manifest.version}, ${dataset.manifest.origin}, ${dataset.manifest.qualityStatus}, ${dataset.manifest.sha256}, ${dataset.manifest.storageRef}, ${JSON.stringify(metadata)})
   `);
 
-  const provenanceId = dataset.manifest.provenanceRefs[0] ?? `simulation:${dataset.manifest.datasetId}`;
   await db.execute(sql`
     INSERT INTO provenanceRecords
       (id, entityId, activityId, agentId, inputRefs, outputRefs)
