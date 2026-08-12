@@ -274,10 +274,10 @@
 
 ---
 
-**Status:** Phase 1 Complete - Screen 1 Opening Animation ✓
-**Current Phase:** Phase 2 - Redesign SetupWizard (Screen 2-4)
-**Last Updated:** 31 July 2026
-**Implementation Strategy:** Hybrid physics model, 5 FPS updates, MySQL database, checkpoint after each phase
+**Status:** Control Room causal-data and replay-evidence baseline complete; persisted-session lookup remains pending.
+**Current Phase:** Quality Gate green; ready for review on `feature/control-room-ui`.
+**Last Updated:** 12 August 2026
+**Implementation Strategy:** Closed-loop causal frames, engine-bound visual telemetry, explicit simulation provenance, and evidence-first replay.
 
 ### UI Fixes (Reported 31 Jul 2026)
 - [x] Fix Tailwind CSS px-4 error breaking all styling
@@ -318,4 +318,4 @@
 - [x] TypeScript validation passed (`pnpm check`).
 - [x] Regression suite passed (20 test files, 53 tests).
 - [x] Production build passed (`pnpm build`); non-blocking bundle-size warning documented.
-- [x] GitHub Actions IUVFES Quality Gate passed for commit `64b159c`.
+- [x] GitHub Actions IUVFES Quality Gate passed for commit `ea3f7a0`.
