@@ -13,6 +13,11 @@ concurrency:
   group: pages-branch
   cancel-in-progress: true
 
+env:
+  # Set GitHub Actions secret IUVFES_API_URL after the backend receives
+  # its public Railway domain. Empty keeps same-origin behavior for local/full-server deploys.
+  VITE_IUVFES_API_URL: ${{ secrets.IUVFES_API_URL }}
+
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
