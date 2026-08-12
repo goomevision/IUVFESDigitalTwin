@@ -1166,6 +1166,45 @@ Tidak berubah. Panel provenance menyatakan source `SIMULATION`, dan eksplisit me
 
 Tambahkan lookup session persisted berdasarkan experiment bila lifecycle persistence harus survive refresh, kemudian lakukan browser validation melalui experiment intake yang valid.
 
+## 2026-08-12 — Causal-only replay and evidence export
+
+**AI/Worker:** Manus AI  
+**Branch:** `feature/control-room-ui`  
+**Commit:** `109ee98ab87d9bfc324fdfb2e1d8088bcf713d77`  
+**PR:** #8 (open, target `develop`)
+
+### Temuan
+
+Halaman replay sebelumnya memberi nilai numerik fallback untuk frame persisted yang tidak lengkap dan menerima legacy result format sebagai replay. Fallback tersebut berisiko terlihat sebagai telemetry sah, padahal tidak dapat dibuktikan berasal dari causal chain lengkap.
+
+### Perubahan
+
+Replay sekarang hanya menerima frame dengan struktur `sensorBefore → controller → effectiveCommands → materialInventory → safety`. Field yang tidak tersedia tetap ditampilkan sebagai `—`; legacy frame dikeluarkan dari replay ilmiah dan jumlahnya dinyatakan kepada pengguna. Operator dapat memilih rentang frame dan mengekspor paket JSON evidence dengan schema `IUVFES-REPLAY-EVIDENCE-1`, source/boundary metadata, CausalFrame asli, serta SHA-256 canonical payload.
+
+### Data flow affected
+
+Persisted `realTimeData` → validasi structural CausalFrame → replay window → evidence package. Tidak ada recalculation, imputasi, atau synthetic frame pada alur ini.
+
+### Scientific impact
+
+Evidence replay kini dapat menyatakan batas data dengan lebih ketat. Export meningkatkan traceability di dalam model, tetapi checksum browser-side bukan pengganti immutable object storage atau laboratory validation.
+
+### Simulation/Lab boundary impact
+
+Paket evidence diberi source `SIMULATION` dan scientific boundary eksplisit. Tidak ada laboratory measurement ataupun klaim validasi eksperimen yang dimasukkan.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS, 20 test files dan 53 tests. `pnpm build`: PASS. Warning ukuran JavaScript bundle lebih dari 500 kB tetap non-blocking dan belum dioptimasi pada patch ini.
+
+### Status
+
+🟢 Causal replay dan export evidence tersedia. 🟡 Persisted replay belum disertai object-storage immutable atau server-side evidence signing.
+
+### Next action
+
+Audit dan implementasikan data persistence/lookup session bila evidence harus dapat direkonstruksi setelah browser reload atau process restart.
+
 ### Next known priorities
 
 1. Lifecycle regression lengkap.
