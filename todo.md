@@ -312,3 +312,10 @@
 - [x] Remove fabricated numeric fallbacks from persisted replay normalization and expose missing data as UNKNOWN.
 - [x] Restrict scientific replay to structurally valid causal frames while clearly identifying unsupported legacy results.
 - [x] Add a reproducible JSON evidence export for the selected persisted replay window with source and boundary metadata.
+
+## QUALITY GATE VALIDATION — 2026-08-12
+
+- [x] TypeScript validation passed (`pnpm check`).
+- [x] Regression suite passed (20 test files, 53 tests).
+- [x] Production build passed (`pnpm build`); non-blocking bundle-size warning documented.
+- [x] GitHub Actions IUVFES Quality Gate passed for commit `64b159c`.
