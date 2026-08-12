@@ -1127,6 +1127,45 @@ Tidak berubah. Semua nilai tetap berasal dari `SIMULATION`/`DERIVED` kecuali dat
 
 Audit endpoint lifecycle untuk menemukan atau menambahkan lookup session persisted per experiment sebelum mengklaim rehydration lintas refresh; lalu lanjutkan layout Process Simulator berbasis visual contract yang sudah diverifikasi.
 
+## 2026-08-12 — Engine-backed Process Simulator Control Room redesign
+
+**AI/Worker:** Manus AI  
+**Branch:** `feature/control-room-ui`  
+**Commit:** `5dd11e6273b1eac7c37715a0fa11e5a037a3451d`  
+**PR:** #8 (open, target `develop`)
+
+### Temuan
+
+Layout sebelumnya menyebarkan telemetry, operator control, process twin, and diagnostics ke panel generik. Datanya sudah engine-backed, tetapi hierarchy visual belum menegaskan hubungan operator input → closed-loop state → CausalFrame → visual machine state.
+
+### Perubahan
+
+`ProcessSimulator` direkomposisi sebagai satu Control Room dengan status top bar, rail operator, hero ProcessMachine3D, rail hardware dan safety, instrument strip, trend, replay, causal inspector, event timeline, dan scientific recorder. Stored ultrasonic operator inputs kini diteruskan ke konfigurasi session ketika tersedia.
+
+### Data flow affected
+
+Input operator di kiri diteruskan menjadi target atau operator limits. Semua telemetry di canvas, instrumentation, diagnostics, process progress, dan material inventory dibaca dari session state atau `CausalFrame`. Nilai yang engine tidak sediakan tetap `UNKNOWN` / `DATA GAP` dan tidak dibuatkan angka pengganti.
+
+### Scientific impact
+
+Tidak ada perubahan formula fisika ataupun control law. Visual pipe/flow/thermal effect hanya mengikuti command, diagnostics, sensors, dan state yang sudah diproduksi engine.
+
+### Simulation/Lab boundary impact
+
+Tidak berubah. Panel provenance menyatakan source `SIMULATION`, dan eksplisit menandai laboratory validation belum tersedia.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS, 20 test files dan 53 tests. `pnpm build`: PASS. Build mengeluarkan warning ukuran JavaScript bundle lebih dari 500 kB; warning ini tidak memblokir build dan belum dioptimasi pada patch ini.
+
+### Status
+
+🟢 Visual Control Room terikat pada data engine yang tersedia. 🟡 Discovery persisted session setelah full browser reload tetap pending pada lifecycle API.
+
+### Next action
+
+Tambahkan lookup session persisted berdasarkan experiment bila lifecycle persistence harus survive refresh, kemudian lakukan browser validation melalui experiment intake yang valid.
+
 ### Next known priorities
 
 1. Lifecycle regression lengkap.
