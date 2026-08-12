@@ -306,3 +306,9 @@
 - [x] Surface engine-derived vacuum, cold-trap, ultrasonic, safety, and provenance diagnostics without creating synthetic telemetry.
 - [x] Pass stored ultrasonic operator inputs into the closed-loop session configuration when they are available.
 - [x] Preserve causal trace, replay, trend, and recorder interactions in the redesigned Control Room.
+
+## REPLAY / EVIDENCE / PROVENANCE (ACTIVE)
+
+- [x] Remove fabricated numeric fallbacks from persisted replay normalization and expose missing data as UNKNOWN.
+- [x] Restrict scientific replay to structurally valid causal frames while clearly identifying unsupported legacy results.
+- [x] Add a reproducible JSON evidence export for the selected persisted replay window with source and boundary metadata.
