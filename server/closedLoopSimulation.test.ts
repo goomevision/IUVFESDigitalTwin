@@ -50,6 +50,64 @@ describe('ClosedLoopSimulationEngine', () => {
     expect(frame!.sensorBefore.pressureMbar).toBeGreaterThanOrEqual(frame!.sensorAfter.pressureMbar);
   });
 
+  it('actuator limits materially change the next physical frame', () => {
+    const unrestricted = new ClosedLoopSimulationEngine(config);
+    const limited = new ClosedLoopSimulationEngine(config);
+
+    for (let i = 0; i < 1000 && unrestricted.getState().stage !== 'HEAT_UP'; i += 1) {
+      unrestricted.step();
+      limited.step();
+    }
+
+    expect(unrestricted.getState().stage).toBe('HEAT_UP');
+    expect(limited.getState().stage).toBe('HEAT_UP');
+
+    limited.setOperatorLimits({ heaterMax: 0 });
+
+    const unrestrictedFrame = unrestricted.step();
+    const limitedFrame = limited.step();
+
+    expect(unrestrictedFrame).not.toBeNull();
+    expect(limitedFrame).not.toBeNull();
+    expect(unrestrictedFrame!.effectiveCommands.heater).toBe(true);
+    expect(limitedFrame!.effectiveCommands.heater).toBe(false);
+    expect(unrestrictedFrame!.sensorAfter.temperatureC).toBeGreaterThan(limitedFrame!.sensorAfter.temperatureC);
+  });
+
+  it('restores an exact snapshot and continues deterministically', () => {
+    const original = new ClosedLoopSimulationEngine(config);
+    original.step();
+    original.step();
+    const snapshot = original.snapshot();
+
+    const restored = new ClosedLoopSimulationEngine(config);
+    restored.restore(snapshot);
+
+    const originalNext = original.step();
+    const restoredNext = restored.step();
+
+    expect(restoredNext).toEqual(originalNext);
+    expect(restored.getSensors()).toEqual(original.getSensors());
+    expect(restored.getFrames()).toEqual(original.getFrames());
+  });
+
+  it('trips the safety interlock when restored state is over temperature', () => {
+    const engine = new ClosedLoopSimulationEngine(config);
+    const snapshot = engine.snapshot();
+    snapshot.sensors.temperatureC = 150;
+    snapshot.state.sensors.temperatureC = 150;
+    snapshot.dynamics.state.temperatureC = 150;
+
+    engine.restore(snapshot);
+    const frame = engine.step();
+
+    expect(frame).not.toBeNull();
+    expect(frame!.safety.stage).toBe('FAULT');
+    expect(frame!.safety.overTemperature).toBe(true);
+    expect(frame!.effectiveCommands.heater).toBe(false);
+    expect(frame!.safety.alarm).toContain('OVER_TEMPERATURE');
+  });
+
   it('reset returns the machine to deterministic initial conditions', () => {
     const engine = new ClosedLoopSimulationEngine(config);
     engine.step();
