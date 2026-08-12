@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - feature/control-room-ui
+      - 'p0/**'
+      - 'audit/**'
   pull_request:
     branches:
       - feature/control-room-ui
@@ -30,5 +32,14 @@ jobs:
       - name: Type check
         run: pnpm check
 
+      - name: P0 closed-loop acceptance
+        run: pnpm exec vitest run server/closedLoopSimulation.test.ts
+
       - name: Runtime session regression
         run: pnpm exec vitest run server/closedLoopRuntimeStore.test.ts
+
+      - name: Full unit test suite
+        run: pnpm test
+
+      - name: Production build
+        run: pnpm build

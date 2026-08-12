@@ -71,6 +71,14 @@ describe("closed-loop runtime session", () => {
     expect(getRuntimeSnapshot(second.sessionId).stepNumber).toBe(0);
   });
 
+  it("marks a max-step terminal frame completed immediately", () => {
+    const session = createRuntimeSession("exp-terminal", { ...config(), maxSteps: 1 });
+    startRuntimeSession(session.sessionId);
+    const frame = stepRuntimeSession(session.sessionId);
+    expect(frame).not.toBeNull();
+    expect(getRuntimeSession(session.sessionId).status).toBe("completed");
+  });
+
   it("resets the engine-backed session", () => {
     const session = createRuntimeSession("exp-5", config());
     startRuntimeSession(session.sessionId);

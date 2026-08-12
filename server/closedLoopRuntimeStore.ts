@@ -27,8 +27,13 @@ function assertSession(sessionId: string): ClosedLoopRuntimeSession {
 }
 
 function refreshStatus(session: ClosedLoopRuntimeSession): void {
-  if (session.status === "stopped" || session.status === "fault") return;
-  if (session.engine.getSnapshot().stepNumber >= (session.configuration.maxSteps ?? Number.MAX_SAFE_INTEGER)) {
+  if (session.status === "stopped") return;
+  const snapshot = session.engine.getSnapshot();
+  if (snapshot.state.stage === "FAULT") {
+    session.status = "fault";
+    return;
+  }
+  if (snapshot.state.stage === "COMPLETE" || snapshot.stepNumber >= (session.configuration.maxSteps ?? Number.MAX_SAFE_INTEGER)) {
     session.status = "completed";
   }
 }
@@ -88,7 +93,7 @@ export function stepRuntimeSession(sessionId: string): CausalFrame | null {
   if (session.status !== "running") return null;
   const frame = session.engine.step();
   session.updatedAt = now();
-  if (!frame) refreshStatus(session);
+  refreshStatus(session);
   return frame;
 }
 
