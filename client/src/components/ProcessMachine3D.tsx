@@ -83,6 +83,19 @@ function displayNumber(value: number | undefined, digits: number, unit: string) 
   return finite(value) ? `${value.toFixed(digits)} ${unit}` : "UNKNOWN";
 }
 
+function makeFlowParticles(count: number, radius: number, color: number) {
+  const group = new THREE.Group();
+  for (let i = 0; i < count; i += 1) {
+    const particle = new THREE.Mesh(
+      new THREE.SphereGeometry(radius, 8, 8),
+      new THREE.MeshBasicMaterial({ color }),
+    );
+    particle.userData.offset = i / count;
+    group.add(particle);
+  }
+  return group;
+}
+
 export function ProcessMachine3D({ frame }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<CausalFrame | undefined>(frame);
@@ -96,15 +109,14 @@ export function ProcessMachine3D({ frame }: Props) {
     scene.background = new THREE.Color(0x020712);
 
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
-    camera.position.set(11.8, 7.4, 16.8);
-    camera.lookAt(0.3, 0.75, -0.15);
+    camera.position.set(12.4, 7.6, 17.4);
+    camera.lookAt(0.35, 0.8, -0.15);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
-    renderer.setSize(mount.clientWidth, mount.clientHeight);
     mount.appendChild(renderer.domElement);
 
     scene.add(new THREE.HemisphereLight(0x9ee7ff, 0x07111f, 1.45));
@@ -123,8 +135,7 @@ export function ProcessMachine3D({ frame }: Props) {
     floor.position.y = -2.25;
     scene.add(floor);
 
-    // REACTOR HIERARCHY
-    // shell -> chamber -> material zone -> heater -> ultrasonic transducer.
+    // REACTOR: shell -> chamber -> material -> heater -> ultrasonic transducer.
     const reactor = new THREE.Group();
     reactor.position.set(-4.1, 0.55, 0);
     scene.add(reactor);
@@ -168,7 +179,6 @@ export function ProcessMachine3D({ frame }: Props) {
     );
     top.position.y = 2.46;
     reactor.add(top);
-
     const bottom = top.clone();
     bottom.position.y = -2.46;
     reactor.add(bottom);
@@ -188,17 +198,15 @@ export function ProcessMachine3D({ frame }: Props) {
     ultrasonic.position.y = -1.68;
     reactor.add(ultrasonic);
 
-    // VACUUM HARDWARE
+    // VACUUM HARDWARE.
     const pump = new THREE.Group();
     pump.position.set(4.7, -0.55, 1.55);
     scene.add(pump);
-
     const pumpBody = new THREE.Mesh(
       new THREE.BoxGeometry(2.25, 1.5, 1.58),
       new THREE.MeshStandardMaterial({ color: 0x172033, metalness: 0.86, roughness: 0.24 }),
     );
     pump.add(pumpBody);
-
     const pumpRotor = new THREE.Mesh(
       new THREE.CylinderGeometry(0.44, 0.44, 0.16, 32),
       new THREE.MeshBasicMaterial({ color: 0x334155 }),
@@ -206,7 +214,6 @@ export function ProcessMachine3D({ frame }: Props) {
     pumpRotor.rotation.z = Math.PI / 2;
     pumpRotor.position.x = -1.07;
     pump.add(pumpRotor);
-
     const pumpInlet = new THREE.Mesh(
       new THREE.CylinderGeometry(0.22, 0.22, 0.28, 24),
       new THREE.MeshStandardMaterial({ color: 0x263b52, metalness: 0.85, roughness: 0.2 }),
@@ -215,12 +222,11 @@ export function ProcessMachine3D({ frame }: Props) {
     pumpInlet.position.x = -1.25;
     pump.add(pumpInlet);
 
-    // FOUR COLD TRAPS — one visual element per diagnostics tuple entry.
+    // COLD TRAPS: one visual element per diagnostics tuple entry.
     const trapGroups: THREE.Group[] = [];
     const trapBodies: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>[] = [];
     const trapCoils: THREE.Mesh<THREE.TorusGeometry, THREE.MeshBasicMaterial>[] = [];
     const trapPorts: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>[] = [];
-
     for (let i = 0; i < 4; i += 1) {
       const group = new THREE.Group();
       group.position.set(-1.9 + i * 2.45, 3.35, -1.55);
@@ -268,11 +274,12 @@ export function ProcessMachine3D({ frame }: Props) {
       trapPorts.push(port);
     }
 
-    // PROCESS PIPING
+    // PROCESS PIPING. Geometry is static; activation is driven only by effective frame commands.
     const vacuumLineMaterial = new THREE.MeshBasicMaterial({ color: 0x164e63 });
     const vaporLineMaterial = new THREE.MeshBasicMaterial({ color: 0x155e75 });
     const coolingLineMaterial = new THREE.MeshBasicMaterial({ color: 0x1e3a5f });
     const powerCableMaterial = new THREE.MeshBasicMaterial({ color: 0x334155 });
+    const manifoldMaterial = new THREE.MeshBasicMaterial({ color: 0x1f3b55 });
 
     const vacuumCurve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(-2.25, 0.15, 0.58),
@@ -302,38 +309,31 @@ export function ProcessMachine3D({ frame }: Props) {
       new THREE.Vector3(-3.42, 0.2, 0),
     ]);
 
-    const vacuumLine = tubeBetween(vacuumCurve, 0.1, vacuumLineMaterial);
-    const vaporLine = tubeBetween(vaporCurve, 0.088, vaporLineMaterial);
-    const coolingLine = tubeBetween(coolingCurve, 0.072, coolingLineMaterial);
-    const powerCable = tubeBetween(powerCurve, 0.036, powerCableMaterial);
-    scene.add(vacuumLine, vaporLine, coolingLine, powerCable);
+    scene.add(
+      tubeBetween(vacuumCurve, 0.1, vacuumLineMaterial),
+      tubeBetween(vaporCurve, 0.088, vaporLineMaterial),
+      tubeBetween(coolingCurve, 0.072, coolingLineMaterial),
+      tubeBetween(powerCurve, 0.036, powerCableMaterial),
+    );
 
-    // Particles show an EFFECTIVE PATH, not a measured flow rate.
-    const flowParticles = new THREE.Group();
+    // Explicit trap-to-trap manifold makes topology readable without inventing flow values.
+    for (let i = 0; i < 3; i += 1) {
+      const x1 = -1.9 + i * 2.45 + 0.78;
+      const x2 = -1.9 + (i + 1) * 2.45 - 0.78;
+      const curve = new THREE.LineCurve3(
+        new THREE.Vector3(x1, 3.65, -1.55),
+        new THREE.Vector3(x2, 3.65, -1.55),
+      );
+      scene.add(tubeBetween(curve, 0.055, manifoldMaterial));
+    }
+
+    const flowParticles = makeFlowParticles(28, 0.046, 0x67e8f9);
     scene.add(flowParticles);
-    for (let i = 0; i < 28; i += 1) {
-      const particle = new THREE.Mesh(
-        new THREE.SphereGeometry(0.046, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0x67e8f9 }),
-      );
-      particle.userData.offset = i / 28;
-      flowParticles.add(particle);
-    }
-
-    const chamberParticles = new THREE.Group();
+    const chamberParticles = makeFlowParticles(36, 0.036, 0x67e8f9);
     scene.add(chamberParticles);
-    for (let i = 0; i < 36; i += 1) {
-      const particle = new THREE.Mesh(
-        new THREE.SphereGeometry(0.036, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0x67e8f9 }),
-      );
-      particle.userData.offset = i / 36;
-      chamberParticles.add(particle);
-    }
 
     let raf = 0;
     let resizeObserver: ResizeObserver | undefined;
-
     const resize = () => {
       const width = Math.max(mount.clientWidth, 1);
       const height = Math.max(mount.clientHeight, 1);
@@ -365,9 +365,6 @@ export function ProcessMachine3D({ frame }: Props) {
       const cooling = commands?.cooling === true;
       const fault = visual.overTemperature === true;
       const activeProcess = Boolean(commands);
-
-      // These visual transforms are deterministic functions of the persisted frame.
-      // No wall-clock telemetry or synthetic sensor values are introduced here.
       const vacuumLevel = hasPressure ? Math.max(0, Math.min(1, 1 - pressure! / 1013.25)) : undefined;
       const thermal = hasTemperature ? Math.max(0, Math.min(1, (temperature! - 25) / 125)) : undefined;
       const ultrasonicActivity = finite(visual.ultrasonicActivityIndex)
@@ -377,9 +374,9 @@ export function ProcessMachine3D({ frame }: Props) {
         ? visual.ultrasonicEffectivePowerW! > 0
         : ultrasonicActivity !== undefined && ultrasonicActivity > 0;
 
+      // Deterministic animation derives only from persisted frame state/time. It is not telemetry.
       pumpRotor.rotation.x = vacuum ? timestamp * 18 : 0;
       reactor.rotation.y = activeProcess ? Math.sin(timestamp * 0.35) * 0.02 : 0;
-
       setHex(heaterRing.material, fault ? 0xef4444 : hot ? 0xf97316 : 0x334155);
       setEmissive(chamber.material, fault ? 0x5f1111 : hot ? 0x5a2108 : 0x07334a);
       setHex(ultrasonic.material, ultrasonicActive ? 0x8b5cf6 : 0x334155);
@@ -390,6 +387,7 @@ export function ProcessMachine3D({ frame }: Props) {
       setHex(vaporLineMaterial, extracting || condensing ? 0x38bdf8 : 0x155e75);
       setHex(coolingLineMaterial, cooling ? 0x60a5fa : 0x1e3a5f);
       setHex(powerCableMaterial, hot || vacuum || extracting || condensing || cooling ? 0xf59e0b : 0x334155);
+      setHex(manifoldMaterial, condensing ? 0x38bdf8 : 0x1f3b55);
 
       const materialInitial = visual.materialInitialKg;
       const materialRemaining = visual.materialRemainingKg;
@@ -402,7 +400,7 @@ export function ProcessMachine3D({ frame }: Props) {
         (materialZone.material as THREE.MeshStandardMaterial).opacity = 0.08 + materialFraction! * 0.22;
       }
 
-      const ultrasonicPulse = ultrasonicActivity === undefined ? 0 : ultrasonicActivity;
+      const ultrasonicPulse = ultrasonicActivity ?? 0;
       ultrasonic.scale.setScalar(1 + ultrasonicPulse * 0.2);
 
       trapGroups.forEach((group, index) => {
@@ -464,7 +462,6 @@ export function ProcessMachine3D({ frame }: Props) {
       cancelAnimationFrame(raf);
       resizeObserver?.disconnect();
       if (!resizeObserver) window.removeEventListener("resize", resize);
-
       scene.traverse(object => {
         if (object instanceof THREE.Mesh) {
           object.geometry.dispose();
@@ -489,7 +486,6 @@ export function ProcessMachine3D({ frame }: Props) {
   return (
     <div className="relative h-[590px] overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-950/90 shadow-2xl shadow-cyan-950/20">
       <div ref={mountRef} className="absolute inset-0" />
-
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between bg-gradient-to-b from-slate-950/95 via-slate-950/65 to-transparent p-4">
         <div>
           <div className="flex items-center gap-2 font-mono text-[10px] font-semibold tracking-[0.25em] text-cyan-300">
