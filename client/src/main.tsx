@@ -37,10 +37,16 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+// Production can run the complete IUVFES server (UI + tRPC) on one origin.
+// GitHub Pages can alternatively point the static UI at an independently
+// deployed backend by setting VITE_IUVFES_API_URL at build time.
+const configuredApiUrl = import.meta.env.VITE_IUVFES_API_URL?.trim().replace(/\/$/, "");
+const trpcUrl = configuredApiUrl ? `${configuredApiUrl}/api/trpc` : "/api/trpc";
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: trpcUrl,
       transformer: superjson,
       headers() {
         // Preview auto-login fallback: when the browser blocks iframe cookies
