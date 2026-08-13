@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { ClosedLoopSimulationEngine, type CausalFrame, type ClosedLoopSimulationConfig, type ClosedLoopSnapshot } from "./closedLoopSimulation";
+import { getClosedLoopSession, getClosedLoopSessionById } from "./closedLoopSessionStore";
 
 export type ClosedLoopRuntimeStatus = "created" | "running" | "paused" | "stopped" | "completed" | "fault";
 
@@ -24,6 +25,58 @@ function assertSession(sessionId: string): ClosedLoopRuntimeSession {
   const session = sessions.get(sessionId);
   if (!session) throw new Error(`Closed-loop session not found: ${sessionId}`);
   return session;
+}
+
+function mapPersistedStatus(status: "running" | "paused" | "completed" | "failed" | "stopped"): ClosedLoopRuntimeStatus {
+  if (status === "failed") return "fault";
+  return status;
+}
+
+function hydratePersistedSession(record: Awaited<ReturnType<typeof getClosedLoopSessionById>>): ClosedLoopRuntimeSession | null {
+  if (!record) return null;
+  const snapshot = record.snapshot;
+  const configuration = snapshot.configuration;
+  if (!configuration) throw new Error(`Persisted closed-loop session ${record.id} has no simulation configuration`);
+  const engine = new ClosedLoopSimulationEngine(configuration);
+  engine.restore(snapshot);
+  const timestamp = now();
+  const session: ClosedLoopRuntimeSession = {
+    sessionId: record.id,
+    experimentId: record.experimentId,
+    status: mapPersistedStatus(record.status),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    configuration: { ...configuration },
+    engine,
+  };
+  sessions.set(session.sessionId, session);
+  return session;
+}
+
+/**
+ * Rehydrates a persisted runtime before any control-room operation.
+ * The in-memory Map remains the hot path; DB lookup happens only on a cache miss.
+ */
+export async function ensureRuntimeSession(sessionId: string): Promise<ClosedLoopRuntimeSession> {
+  const cached = sessions.get(sessionId);
+  if (cached) return cached;
+
+  const byId = await getClosedLoopSessionById(sessionId);
+  if (byId) return hydratePersistedSession(byId) as ClosedLoopRuntimeSession;
+
+  // Recovery-friendly fallback: callers may provide the experimentId when the
+  // original runtime session id is unavailable. Keep both aliases in memory.
+  const byExperiment = await getClosedLoopSession(sessionId);
+  if (byExperiment) {
+    const hydrated = hydratePersistedSession({
+      ...byExperiment,
+      id: byExperiment.id,
+    }) as ClosedLoopRuntimeSession;
+    sessions.set(sessionId, hydrated);
+    return hydrated;
+  }
+
+  throw new Error(`Closed-loop session not found: ${sessionId}`);
 }
 
 function refreshStatus(session: ClosedLoopRuntimeSession): void {
