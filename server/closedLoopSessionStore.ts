@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
 import type { ClosedLoopSnapshot } from "./closedLoopSimulation";
@@ -36,7 +37,7 @@ export async function saveClosedLoopSession(
 ): Promise<ClosedLoopSessionRecord> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const id = sessionId ?? crypto.randomUUID();
+  const id = sessionId ?? randomUUID();
   const snapshotJson = JSON.stringify(snapshot);
   await db.execute(sql`
     INSERT INTO closedLoopSessions (id, experimentId, status, snapshot, frameCount, lastStep)
