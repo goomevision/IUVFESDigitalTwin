@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const dbMocks = vi.hoisted(() => ({
+const sessionStoreMocks = vi.hoisted(() => ({
   getClosedLoopSessionById: vi.fn(),
-  createClosedLoopSession: vi.fn(),
-  updateClosedLoopSession: vi.fn(),
+  getClosedLoopSession: vi.fn(),
 }));
 
-vi.mock("./researchDb", () => dbMocks);
+vi.mock("./closedLoopSessionStore", () => sessionStoreMocks);
 
 describe("closed-loop runtime recovery", () => {
   beforeEach(() => {
@@ -30,19 +29,6 @@ describe("closed-loop runtime recovery", () => {
       await import("./closedLoopRuntimeStore");
 
     const session = createRuntimeSession("experiment-recovery-test", configuration);
-    dbMocks.createClosedLoopSession.mockResolvedValue(undefined);
-    dbMocks.updateClosedLoopSession.mockResolvedValue(undefined);
-    dbMocks.getClosedLoopSessionById.mockResolvedValue({
-      id: session.sessionId,
-      experimentId: session.experimentId,
-      status: "running",
-      configuration,
-      snapshot: getRuntimeSnapshot(session.sessionId),
-      createdAt: session.createdAt,
-      startedAt: session.createdAt,
-      updatedAt: session.updatedAt,
-    });
-
     startRuntimeSession(session.sessionId);
     const firstFrame = stepRuntimeSession(session.sessionId);
     const persistedSnapshot = getRuntimeSnapshot(session.sessionId);
@@ -51,10 +37,21 @@ describe("closed-loop runtime recovery", () => {
     expect(persistedSnapshot.stepNumber).toBe(1);
     expect(persistedSnapshot.frames).toHaveLength(1);
 
+    sessionStoreMocks.getClosedLoopSessionById.mockResolvedValue({
+      id: session.sessionId,
+      experimentId: session.experimentId,
+      status: "running",
+      snapshot: persistedSnapshot,
+      frameCount: persistedSnapshot.frames.length,
+      lastStep: persistedSnapshot.stepNumber,
+    });
+
     // Simulate process-local memory loss by reloading the runtime module.
+    vi.resetModules();
     const recoveredModule = await import("./closedLoopRuntimeStore");
     const recovered = await recoveredModule.ensureRuntimeSession(session.sessionId);
 
+    expect(sessionStoreMocks.getClosedLoopSessionById).toHaveBeenCalledWith(session.sessionId);
     expect(recovered.sessionId).toBe(session.sessionId);
     expect(recovered.experimentId).toBe("experiment-recovery-test");
     expect(recovered.status).toBe("running");
