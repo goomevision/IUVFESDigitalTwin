@@ -85,3 +85,142 @@ export async function getMaterialById(id: number) {
   const result = await db.select().from(materials).where(eq(materials.id, id)).limit(1);
   return result.length > 0 ? result[0] : null;
 }
+
+export async function getMaterialByName(name: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(materials).where(eq(materials.name, name)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function createMaterial(data: {
+  name: string;
+  description?: string;
+  defaultWaterContent: number;
+  defaultOilContent: number;
+  oilComposition: Record<string, number>;
+  density?: number;
+  thermalProperties?: Record<string, number>;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  try {
+    await db.insert(materials).values({
+      name: data.name,
+      description: data.description,
+      defaultWaterContent: data.defaultWaterContent,
+      defaultOilContent: data.defaultOilContent,
+      oilComposition: data.oilComposition,
+      density: data.density,
+      thermalProperties: data.thermalProperties,
+    } as any);
+    return { success: true, message: "Material created successfully" };
+  } catch (error) {
+    console.error("Error creating material:", error);
+    throw error;
+  }
+}
+
+export async function createExperiment(data: {
+  userId: number;
+  materialId: number;
+  experimentName: string;
+  inputParameters: Record<string, any>;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const experimentId = randomUUID();
+  await db.insert(experiments).values({
+    id: experimentId,
+    userId: data.userId,
+    materialId: data.materialId,
+    experimentName: data.experimentName,
+    inputParameters: data.inputParameters,
+    status: "draft",
+  });
+  return experimentId;
+}
+
+export async function getExperiment(id: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(experiments).where(eq(experiments.id, id)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function listUserExperiments(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(experiments).where(eq(experiments.userId, userId)).orderBy(desc(experiments.createdAt));
+}
+
+export async function updateExperimentStatus(experimentId: string, status: "draft" | "running" | "paused" | "completed" | "failed") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const updateData: Record<string, any> = { status };
+  if (status === "running") updateData.startedAt = new Date();
+  if (status === "completed" || status === "failed") updateData.completedAt = new Date();
+  await db.update(experiments).set(updateData).where(eq(experiments.id, experimentId));
+}
+
+export async function createSimulationResult(data: {
+  experimentId: string;
+  finalYield: number;
+  oilComposition: Record<string, number> | null;
+  energyConsumed: number;
+  efficiency: number | null;
+  wasteComposition: Record<string, any> | null;
+  realTimeData: any[];
+  massBalance: Record<string, any>;
+  energyBalance: Record<string, any>;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const resultId = randomUUID();
+  try {
+    await db.insert(simulationResults).values({
+      id: resultId,
+      experimentId: data.experimentId,
+      finalYield: data.finalYield,
+      oilComposition: data.oilComposition,
+      energyConsumed: data.energyConsumed,
+      efficiency: data.efficiency,
+      wasteComposition: data.wasteComposition,
+      realTimeData: data.realTimeData,
+      massBalance: data.massBalance,
+      energyBalance: data.energyBalance,
+    } as any);
+  } catch (error) {
+    console.error("Error creating simulation result:", error);
+    throw error;
+  }
+  return resultId;
+}
+
+export async function getSimulationResult(experimentId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(simulationResults).where(eq(simulationResults.experimentId, experimentId)).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function logControlAction(data: {
+  experimentId: string;
+  action: "start" | "pause" | "resume" | "stop" | "parameter_change" | "emergency_stop" | "error";
+  parameterName?: string;
+  oldValue?: string;
+  newValue?: string;
+  operatorNotes?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(controlLogs).values({
+    id: randomUUID(),
+    experimentId: data.experimentId,
+    action: data.action,
+    parameterName: data.parameterName,
+    oldValue: data.oldValue,
+    newValue: data.newValue,
+    operatorNotes: data.operatorNotes,
+  });
+}
