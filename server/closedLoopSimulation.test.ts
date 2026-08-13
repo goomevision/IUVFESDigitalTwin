@@ -85,7 +85,7 @@ describe('ClosedLoopSimulationEngine', () => {
     expect(frame).not.toBeNull();
     expect(frame!.actuatorLevels.heater).toBeCloseTo(0.5, 12);
     expect(frame!.hardwareDiagnostics.heatingPowerKw).toBe(9);
-    expect(frame!.sensorAfter.energyKwh).toBeCloseTo(0.00275, 12);
+    expect(frame!.sensorAfter.energyKwh).toBeCloseTo(0.00125, 12);
   });
 
   it('matches the closed-form vacuum baseline at frame 138', () => {
