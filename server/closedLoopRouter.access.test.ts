@@ -17,6 +17,7 @@ const { db, runtime } = vi.hoisted(() => ({
     startRuntimeSession: vi.fn(),
     stepRuntimeSession: vi.fn(),
     stopRuntimeSession: vi.fn(),
+    ensureRuntimeSession: vi.fn(),
   },
 }));
 
@@ -54,6 +55,15 @@ function snapshot() {
 describe("closedLoopRouter reset access", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    runtime.ensureRuntimeSession.mockResolvedValue({
+      sessionId,
+      experimentId,
+      status: "created",
+      createdAt: "2026-08-12T00:00:00.000Z",
+      updatedAt: "2026-08-12T00:00:00.000Z",
+      configuration: {},
+      engine: { getSnapshot: snapshot },
+    });
     runtime.getRuntimeSession.mockReturnValue({
       sessionId,
       experimentId,
@@ -73,6 +83,7 @@ describe("closedLoopRouter reset access", () => {
 
     await caller.reset(sessionId);
 
+    expect(runtime.ensureRuntimeSession).toHaveBeenCalledWith(sessionId);
     expect(db.getExperiment).toHaveBeenCalledWith(experimentId);
     expect(db.getExperiment).not.toHaveBeenCalledWith(sessionId);
     expect(runtime.resetRuntimeSession).toHaveBeenCalledWith(sessionId);
