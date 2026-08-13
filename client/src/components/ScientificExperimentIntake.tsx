@@ -119,17 +119,36 @@ export function ScientificExperimentIntake({ onComplete, onCancel }: ScientificE
           notes: notes || null,
         },
       };
-
       const result = await createExperiment.mutateAsync({
         materialId: selectedMaterial!,
         experimentName,
         inputParameters,
       });
-      toast.success("Scientific experiment draft tersimpan.");
-      onComplete?.(result.experimentId);
+
+      // Database persistence has succeeded at this point.
+      toast.success("Eksperimen berhasil disimpan.");
+
+      // Post-save navigation is deliberately isolated from database persistence.
+      try {
+        onComplete?.(result.experimentId);
+      } catch (transitionError) {
+        console.error(
+          "Experiment saved, but post-save transition failed:",
+          transitionError
+        );
+        toast.error(
+          "Eksperimen sudah tersimpan, tetapi layar proses berikutnya gagal dibuka."
+        );
+      }
     } catch (error) {
-      console.error(error);
-      toast.error("Gagal menyimpan eksperimen.");
+      console.error("Experiment persistence failed:", error);
+
+      const detail =
+        error instanceof Error && error.message
+          ? error.message
+          : "Kesalahan server/database tidak diketahui.";
+
+      toast.error(`Gagal menyimpan eksperimen: ${detail}`);
     }
   };
 
