@@ -79,4 +79,26 @@ describe('closed-loop physics closure', () => {
     expect(frame!.actuatorLevels.heater).toBeCloseTo(0.25, 12);
     expect(frame!.sensorAfter.energyKwh).toBeCloseTo((0.25 * 9) / 3600, 12);
   });
+
+  it('preserves deterministic physics across snapshot and restore', () => {
+    const original = new ClosedLoopSimulationEngine({ ...config, hardware });
+    original.step();
+    original.step();
+    const snapshot = original.snapshot();
+
+    const restored = new ClosedLoopSimulationEngine({ ...config, hardware });
+    restored.restore(snapshot);
+
+    const expected = original.step();
+    const actual = restored.step();
+    expect(actual).toEqual(expected);
+  });
+
+  it('rejects non-physical configuration instead of silently clamping it', () => {
+    expect(() => new ClosedLoopSimulationEngine({ ...config, materialWeightKg: Number.NaN })).toThrow(/materialWeightKg/);
+    expect(() => new ClosedLoopSimulationEngine({ ...config, targetPressureMbar: 0 })).toThrow(/targetPressureMbar/);
+    expect(() => new ClosedLoopSimulationEngine({ ...config, waterContentPercent: 80, oilContentPercent: 30 })).toThrow(/waterContentPercent/);
+    expect(() => new ClosedLoopSimulationEngine({ ...config, dtSeconds: 0 })).toThrow(/dtSeconds/);
+    expect(() => new ClosedLoopSimulationEngine({ ...config, maxSteps: 1.5 })).toThrow(/maxSteps/);
+  });
 });
