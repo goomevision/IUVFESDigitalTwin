@@ -11,6 +11,15 @@ const config = {
   maxSteps: 1000,
 };
 
+const hardware = {
+  connectedVolumeL: 250,
+  pumpCapacityM3PerHour: 200,
+  thermalMassKjPerK: 250,
+  heatingPowerKw: 9,
+  coolingPowerKw: 3,
+  leakRateMbarPerSecond: 0,
+};
+
 describe('closed-loop physics closure', () => {
   it('closes the material inventory at every causal frame', () => {
     const engine = new ClosedLoopSimulationEngine(config);
@@ -37,13 +46,13 @@ describe('closed-loop physics closure', () => {
       const frame = engine.step();
       expect(frame).not.toBeNull();
 
-      const hardware = frame!.hardwareDiagnostics;
+      const diagnostics = frame!.hardwareDiagnostics;
       const levels = frame!.actuatorLevels;
       const expectedIncrementKwh = (
-        levels.heater * hardware.heatingPowerKw +
-        levels.vacuumPump * hardware.vacuumPumpPowerKw +
-        levels.cooling * hardware.coolingPowerKw +
-        hardware.ultrasonicEffectivePowerKw
+        levels.heater * diagnostics.heatingPowerKw +
+        levels.vacuumPump * diagnostics.vacuumPumpPowerKw +
+        levels.cooling * diagnostics.coolingPowerKw +
+        diagnostics.ultrasonicEffectivePowerKw
       ) / 3600;
       const actualIncrementKwh = frame!.sensorAfter.energyKwh - previousEnergyKwh;
 
@@ -55,7 +64,7 @@ describe('closed-loop physics closure', () => {
   it('uses operator heater limits as a physical power constraint', () => {
     const engine = new ClosedLoopSimulationEngine({
       ...config,
-      hardware: { heatingPowerKw: 9 },
+      hardware,
     });
     const snapshot = engine.snapshot();
     snapshot.state.stage = 'HEAT_UP';
