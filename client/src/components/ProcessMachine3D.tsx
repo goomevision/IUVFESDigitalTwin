@@ -9,6 +9,7 @@ export interface ProcessMachineVisualState {
   stage: CausalFrame["safety"]["stage"] | undefined;
   timestampSeconds: number | undefined;
   commands: CausalFrame["effectiveCommands"] | undefined;
+  actuatorLevels: CausalFrame["actuatorLevels"] | undefined;
   temperatureC: number | undefined;
   pressureMbar: number | undefined;
   overTemperature: boolean | undefined;
@@ -23,7 +24,7 @@ export interface ProcessMachineVisualState {
 
 export function getProcessMachineVisualState(frame?: CausalFrame): ProcessMachineVisualState {
   if (!frame) return {
-    hasFrame: false, stage: undefined, timestampSeconds: undefined, commands: undefined,
+    hasFrame: false, stage: undefined, timestampSeconds: undefined, commands: undefined, actuatorLevels: undefined,
     temperatureC: undefined, pressureMbar: undefined, overTemperature: undefined,
     vacuumAchieved: undefined, coldTrapTemperaturesC: undefined, condensedWaterKg: undefined,
     materialRemainingKg: undefined, materialInitialKg: undefined,
@@ -34,6 +35,7 @@ export function getProcessMachineVisualState(frame?: CausalFrame): ProcessMachin
     stage: frame.safety.stage,
     timestampSeconds: frame.timestampSeconds,
     commands: frame.effectiveCommands,
+    actuatorLevels: frame.actuatorLevels,
     temperatureC: frame.sensorAfter.temperatureC,
     pressureMbar: frame.sensorAfter.pressureMbar,
     overTemperature: frame.safety.overTemperature,
@@ -45,6 +47,10 @@ export function getProcessMachineVisualState(frame?: CausalFrame): ProcessMachin
     ultrasonicActivityIndex: frame.ultrasonic.activityIndex,
     ultrasonicEffectivePowerW: frame.ultrasonic.effectivePowerW,
   };
+}
+
+export function getActuatorVisualIntensity(level: number | undefined): number {
+  return typeof level === "number" && Number.isFinite(level) ? Math.max(0, Math.min(1, level)) : 0;
 }
 
 function finite(value: number | undefined): value is number {
@@ -169,7 +175,7 @@ export function ProcessMachine3D({ frame }: Props) {
     bottom.position.y = -2.46;
     reactor.add(bottom);
 
-    const heaterRing = new THREE.Mesh(new THREE.TorusGeometry(1.51, 0.09, 12, 48), new THREE.MeshBasicMaterial({ color: 0x334155 }));
+    const heaterRing = new THREE.Mesh(new THREE.TorusGeometry(1.51, 0.09, 12, 48), new THREE.MeshBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.2 }));
     heaterRing.rotation.x = Math.PI / 2;
     heaterRing.position.y = 1.04;
     reactor.add(heaterRing);
@@ -178,7 +184,6 @@ export function ProcessMachine3D({ frame }: Props) {
     ultrasonic.position.y = -1.68;
     reactor.add(ultrasonic);
 
-    // Process connectors are defined in world coordinates so routes can be checked.
     const reactorVapor = new THREE.Vector3(-2.72, 3.01, 0);
     const reactorVacuum = new THREE.Vector3(-2.38, 0.55, 0.58);
     const heaterPower = new THREE.Vector3(-4.1, 1.59, 1.58);
@@ -192,7 +197,7 @@ export function ProcessMachine3D({ frame }: Props) {
     pump.position.set(4.7, -0.55, 1.55);
     scene.add(pump);
     pump.add(new THREE.Mesh(new THREE.BoxGeometry(2.25, 1.5, 1.58), new THREE.MeshStandardMaterial({ color: 0x172033, metalness: 0.86, roughness: 0.24 })));
-    const pumpRotor = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.16, 32), new THREE.MeshBasicMaterial({ color: 0x334155 }));
+    const pumpRotor = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.16, 32), new THREE.MeshBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.2 }));
     pumpRotor.rotation.z = Math.PI / 2;
     pumpRotor.position.x = -1.07;
     pump.add(pumpRotor);
@@ -224,7 +229,7 @@ export function ProcessMachine3D({ frame }: Props) {
       group.add(shell);
       trapBodies.push(shell);
 
-      const coil = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.065, 10, 32), new THREE.MeshBasicMaterial({ color: 0x334155 }));
+      const coil = new THREE.Mesh(new THREE.TorusGeometry(0.47, 0.065, 10, 32), new THREE.MeshBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.2 }));
       coil.rotation.x = Math.PI / 2;
       coil.position.y = -0.15;
       group.add(coil);
@@ -254,11 +259,10 @@ export function ProcessMachine3D({ frame }: Props) {
       trapIndicators.push(indicator);
     }
 
-    // --------------------------- PROCESS GAS PATH --------------------------
-    const vacuumMaterial = new THREE.MeshBasicMaterial({ color: 0x164e63 });
-    const vaporMaterial = new THREE.MeshBasicMaterial({ color: 0x155e75 });
-    const coolingMaterial = new THREE.MeshBasicMaterial({ color: 0x1e3a5f });
-    const powerMaterial = new THREE.MeshBasicMaterial({ color: 0x334155 });
+    const vacuumMaterial = new THREE.MeshBasicMaterial({ color: 0x164e63, transparent: true, opacity: 0.2 });
+    const vaporMaterial = new THREE.MeshBasicMaterial({ color: 0x155e75, transparent: true, opacity: 0.2 });
+    const coolingMaterial = new THREE.MeshBasicMaterial({ color: 0x1e3a5f, transparent: true, opacity: 0.2 });
+    const powerMaterial = new THREE.MeshBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.2 });
 
     const vaporPaths: THREE.Vector3[][] = [];
     vaporPaths.push([
@@ -283,8 +287,6 @@ export function ProcessMachine3D({ frame }: Props) {
     ]);
     vaporPaths.forEach(path => scene.add(routedTube(path, 0.088, vaporMaterial)));
 
-    // Vacuum is the same sealed process manifold, but its authoritative terminal is
-    // the pump inlet. It is rendered as a separate state highlight, not a second pipe.
     const vacuumPath: THREE.Vector3[] = [
       reactorVacuum,
       new THREE.Vector3(-1.55, reactorVacuum.y, reactorVacuum.z),
@@ -293,8 +295,6 @@ export function ProcessMachine3D({ frame }: Props) {
     ];
     scene.add(routedTube(vacuumPath, 0.1, vacuumMaterial));
 
-    // ----------------------------- COOLING LOOP -----------------------------
-    // A real closed utility loop: manifold -> each trap inlet -> outlet -> return.
     const coolingSupply = new THREE.Vector3(6.45, 1.95, -2.5);
     const coolingReturn = new THREE.Vector3(6.45, 0.95, -2.5);
     connector(scene, coolingSupply, 0.08, 0.24);
@@ -314,7 +314,6 @@ export function ProcessMachine3D({ frame }: Props) {
       ], 0.062, coolingMaterial));
     }
 
-    // ---------------------------- ELECTRICAL BUS ----------------------------
     const powerBus = new THREE.Vector3(6.2, -1.7, 2.8);
     connector(scene, powerBus, 0.1, 0.3);
     scene.add(routedTube([powerBus, new THREE.Vector3(1.8, -1.7, 2.8), pumpPowerWorld], 0.036, powerMaterial));
@@ -327,7 +326,6 @@ export function ProcessMachine3D({ frame }: Props) {
     const powerParticles = createParticles(scene, 10, 0xf59e0b);
     const chamberParticles = createParticles(scene, 32, 0x67e8f9);
 
-    // Fixed utility point used only to make the four cooling branches evenly routed.
     function coolingInletsY(index: number) { return 1.0 + index * 0.35; }
 
     let raf = 0;
@@ -358,7 +356,13 @@ export function ProcessMachine3D({ frame }: Props) {
     const animate = () => {
       const visual = getProcessMachineVisualState(frameRef.current);
       const commands = visual.commands;
+      const levels = visual.actuatorLevels;
       const time = finite(visual.timestampSeconds) ? visual.timestampSeconds! : 0;
+      const heaterLevel = getActuatorVisualIntensity(levels?.heater);
+      const vacuumPumpLevel = getActuatorVisualIntensity(levels?.vacuumPump);
+      const extractorLevel = getActuatorVisualIntensity(levels?.extractor);
+      const condenserLevel = getActuatorVisualIntensity(levels?.condenser);
+      const coolingLevel = getActuatorVisualIntensity(levels?.cooling);
       const hot = commands?.heater === true;
       const vacuum = commands?.vacuumPump === true;
       const extracting = commands?.extractor === true;
@@ -374,17 +378,24 @@ export function ProcessMachine3D({ frame }: Props) {
       const stageColor = fault ? 0xef4444 : visual.stage === "CONDENSATION" ? 0x38bdf8 : visual.stage === "EXTRACTION" ? 0xfbbf24 : visual.stage === "HEAT_UP" ? 0xf97316 : visual.hasFrame ? 0x22d3ee : 0x334155;
       setColor(stageBand.material, stageColor);
       setColor(heaterRing.material, fault ? 0xef4444 : hot ? 0xf97316 : 0x334155);
+      heaterRing.material.opacity = fault ? 1 : 0.15 + heaterLevel * 0.85;
       setEmissive(chamber.material, fault ? 0x5f1111 : hot ? 0x5a2108 : 0x07334a);
       setColor(ultrasonic.material, ultrasonicOn ? 0x8b5cf6 : 0x334155);
       key.color.setHex(fault ? 0xef4444 : hot ? 0xfb923c : 0x22d3ee);
-      key.intensity = hot ? 30 : 18;
+      key.intensity = fault ? 30 : 18 + heaterLevel * 12;
       setColor(pumpRotor.material, vacuum ? 0x22d3ee : 0x334155);
+      pumpRotor.material.opacity = 0.15 + vacuumPumpLevel * 0.85;
       setColor(vacuumMaterial, vacuum ? 0x22d3ee : 0x164e63);
+      vacuumMaterial.opacity = 0.15 + vacuumPumpLevel * 0.85;
       setColor(vaporMaterial, extracting || condensing ? 0x38bdf8 : 0x155e75);
+      vaporMaterial.opacity = 0.15 + Math.max(extractorLevel, condenserLevel) * 0.85;
       setColor(coolingMaterial, cooling ? 0x60a5fa : 0x1e3a5f);
-      setColor(powerMaterial, hot || vacuum || extracting || condensing || cooling || ultrasonicOn ? 0xf59e0b : 0x334155);
+      coolingMaterial.opacity = 0.15 + coolingLevel * 0.85;
+      const powerLevel = Math.max(heaterLevel, vacuumPumpLevel, extractorLevel, condenserLevel, coolingLevel, ultrasonicOn ? 1 : 0);
+      setColor(powerMaterial, powerLevel > 0 ? 0xf59e0b : 0x334155);
+      powerMaterial.opacity = 0.15 + powerLevel * 0.85;
 
-      pumpRotor.rotation.x = vacuum ? time * 18 : 0;
+      pumpRotor.rotation.x = vacuum ? time * (4 + vacuumPumpLevel * 18) : 0;
       reactor.rotation.y = active ? Math.sin(time * 0.35) * 0.02 : 0;
       const materialFraction = finite(visual.materialInitialKg) && finite(visual.materialRemainingKg) && visual.materialInitialKg! > 0
         ? Math.max(0, Math.min(1, visual.materialRemainingKg! / visual.materialInitialKg!)) : undefined;
@@ -403,26 +414,29 @@ export function ProcessMachine3D({ frame }: Props) {
         const hasTemperature = finite(trapTemperature);
         const hasCondensate = finite(condensate) && condensate! > 0;
         const coldFactor = hasTemperature ? Math.max(0, Math.min(1, (25 - trapTemperature!) / 105)) : 0;
+        const trapLevel = Math.max(condenserLevel, coolingLevel);
         setEmissive(trapBodies[index].material, hasTemperature && (condensing || cooling) ? (coldFactor > 0.65 ? 0x082f49 : 0x10243a) : 0x061522);
         setColor(trapCoils[index].material, hasTemperature ? (cooling || condensing ? (coldFactor > 0.65 ? 0x60a5fa : 0x38bdf8) : 0x2563eb) : 0x334155);
+        trapCoils[index].material.opacity = 0.15 + trapLevel * 0.85;
         setColor(trapIndicators[index].material, hasCondensate ? 0x38bdf8 : hasTemperature ? 0x2563eb : 0x334155);
-        trapIndicators[index].material.opacity = hasCondensate ? 0.9 : hasTemperature ? 0.7 : 0.45;
+        trapIndicators[index].material.opacity = hasCondensate ? 0.9 : hasTemperature ? 0.45 + trapLevel * 0.45 : 0.45;
         group.position.y = 3.35 + (active ? Math.sin(time * 0.5 + index) * 0.015 : 0);
       });
 
-      updateParticles(vacuumParticles, vacuumPath, vacuum, time, 0.18, 0.8 + vacuumLevel * 0.35);
-      updateParticles(vaporParticles, vaporPaths[0], extracting || condensing, time, 0.1, 0.8 + thermal * 0.3);
-      updateParticles(coolingParticles, [coolingSupply, trapCoolingInlets[0], trapCoolingOutlets[0], coolingReturn], cooling, time, 0.12, 0.7);
-      updateParticles(powerParticles, [powerBus, heaterPower], hot || ultrasonicOn || vacuum, time, 0.2, 0.65);
+      updateParticles(vacuumParticles, vacuumPath, vacuum, time, 0.18, 0.35 + vacuumPumpLevel * 0.9 + vacuumLevel * 0.35);
+      updateParticles(vaporParticles, vaporPaths[0], extracting || condensing, time, 0.1, 0.35 + Math.max(extractorLevel, condenserLevel) * 0.9 + thermal * 0.3);
+      updateParticles(coolingParticles, [coolingSupply, trapCoolingInlets[0], trapCoolingOutlets[0], coolingReturn], cooling, time, 0.12, 0.35 + coolingLevel * 0.8);
+      updateParticles(powerParticles, [powerBus, heaterPower], hot || ultrasonicOn || vacuum, time, 0.2, 0.35 + powerLevel * 0.7);
 
       chamberParticles.children.forEach((child, index) => {
         const p = child as THREE.Mesh;
+        const processLevel = Math.max(vacuumPumpLevel, extractorLevel, heaterLevel);
         const visible = active && finite(visual.pressureMbar) && (vacuum || extracting || hot);
         const offset = p.userData.offset as number;
         const t = visible ? (time * (vacuum || extracting ? 0.09 : 0.015) + offset) % 1 : 0;
         p.visible = visible;
         p.position.set(-1.0 + t * 1.9, -1.35 + ((index * 0.47) % 2.7), 0.4 + Math.sin(index * 1.7 + time) * 0.5);
-        p.scale.setScalar(visible ? 0.45 + vacuumLevel * 0.9 + thermal * 0.5 : 0);
+        p.scale.setScalar(visible ? 0.25 + processLevel * 0.8 + vacuumLevel * 0.5 + thermal * 0.5 : 0);
       });
 
       renderer.render(scene, camera);
