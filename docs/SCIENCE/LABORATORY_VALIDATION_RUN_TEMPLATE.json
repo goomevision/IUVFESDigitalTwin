@@ -1,0 +1,58 @@
+{
+  "experimentId": "EXP-YYYYMMDD-NNN",
+  "status": "NOT_VALIDATED",
+  "experiment": {
+    "dateTimeStart": "",
+    "dateTimeEnd": "",
+    "operator": "",
+    "apparatusId": "",
+    "configurationId": "",
+    "sampleId": "",
+    "materialContext": ""
+  },
+  "instrumentation": [
+    {
+      "instrumentId": "",
+      "measurement": "",
+      "unit": "",
+      "calibrationId": "",
+      "calibrationValidUntil": "",
+      "uncertainty": null
+    }
+  ],
+  "sampling": {
+    "intervalSeconds": null,
+    "timeBasis": "",
+    "alignmentMethod": ""
+  },
+  "laboratory": {
+    "rawDataReferences": [],
+    "ambientConditions": {},
+    "initialMassKg": null,
+    "finalRecoveredMassKg": null,
+    "accountedLossKg": null,
+    "measuredEnergyKWh": null,
+    "processDurationSeconds": null
+  },
+  "simulation": {
+    "runId": "",
+    "modelVersion": "",
+    "commitSha": "",
+    "inputSnapshotReference": "",
+    "parameterSetReference": ""
+  },
+  "comparison": {
+    "signals": [],
+    "metrics": {},
+    "acceptanceCriteriaReference": "",
+    "uncertaintyMethod": ""
+  },
+  "validation": {
+    "holdoutRun": false,
+    "reviewer": "",
+    "reviewDate": "",
+    "result": "NOT_VALIDATED",
+    "limitations": [],
+    "deviations": []
+  }
+}
