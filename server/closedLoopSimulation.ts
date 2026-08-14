@@ -9,8 +9,7 @@ import { ProcessStateEngine, type MachineSensors, type ProcessState } from './pr
 import { evaluateUltrasonic, type UltrasonicConfig, type UltrasonicExperimentalFrame } from './ultrasonicExperimentalModel';
 
 export interface ClosedLoopSimulationConfig {
-  targetPressureMbar:number; targetTemperatureC:number; coolingTemperatureC?:number; materialWeightKg:number; waterContentPercent:number; oilContentPercent:
-  number;
+  targetPressureMbar:number; targetTemperatureC:number; coolingTemperatureC?:number; materialWeightKg:number; waterContentPercent:number; oilContentPercent:number;
   dtSeconds?:number; maxSteps?:number; ultrasonic?:UltrasonicConfig; hardware?:VirtualHardwareDynamicsConfig; hardwareProfileId?:string;
 }
 export interface MaterialInventory { initialMassKg:number; remainingMassKg:number; waterInitialKg:number; waterRemovedKg:number; waterRemainingKg:number; oilPotentialKg:number; oilRecoveredKg:number; oilRemainingPotentialKg:number; recoveryPercent:number; }
