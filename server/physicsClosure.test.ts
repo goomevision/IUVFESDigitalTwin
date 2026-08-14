@@ -43,7 +43,7 @@ describe('closed-loop physics closure', () => {
         levels.heater * hardware.heatingPowerKw +
         levels.vacuumPump * hardware.vacuumPumpPowerKw +
         levels.cooling * hardware.coolingPowerKw +
-        levels.extractor * hardware.ultrasonicEffectivePowerKw
+        hardware.ultrasonicEffectivePowerKw
       ) / 3600;
       const actualIncrementKwh = frame!.sensorAfter.energyKwh - previousEnergyKwh;
 
