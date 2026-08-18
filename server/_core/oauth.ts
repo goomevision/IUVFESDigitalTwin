@@ -5,6 +5,24 @@ import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+function getOAuthStateCookieName(req: Request) {
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const secure = req.protocol === "https" ||
+    (typeof forwardedProto === "string" && forwardedProto.split(",").some(p => p.trim().toLowerCase() === "https"));
+  if (!secure && LOCAL_HOSTS.has(req.hostname)) return "oauth_state";
+  return OAUTH_STATE_COOKIE;
+}
+
+function getOAuthStateCookieOptions(req: Request) {
+  const secure = req.protocol === "https" ||
+    (typeof req.headers["x-forwarded-proto"] === "string" && req.headers["x-forwarded-proto"].split(",").some(p => p.trim().toLowerCase() === "https"));
+  return secure
+    ? { path: "/", secure: true, sameSite: "none" as const }
+    : { path: "/", secure: false, sameSite: "lax" as const };
+}
+
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
   return typeof value === "string" ? value : undefined;
@@ -21,15 +39,16 @@ export function registerOAuthRoutes(app: Express) {
     }
 
     // CSRF guard: the nonce in `state` must match the one-time cookie that
-    // startLogin set in the browser that began this login. An attacker can
-    // forge `state`, but cannot plant this cookie in the victim's browser.
+    // startLogin set in the browser that began this login. Local HTTP uses a
+    // non-__Host cookie because browsers reject Secure/__Host cookies on HTTP.
     const { nonce } = decodeOAuthState(state);
-    const expectedNonce = parseCookieHeader(req.headers.cookie ?? "")[OAUTH_STATE_COOKIE];
+    const stateCookieName = getOAuthStateCookieName(req);
+    const expectedNonce = parseCookieHeader(req.headers.cookie ?? "")[stateCookieName];
     if (!nonce || nonce !== expectedNonce) {
       res.status(403).json({ error: "invalid oauth state" });
       return;
     }
-    res.clearCookie(OAUTH_STATE_COOKIE, { path: "/", secure: true, sameSite: "none" });
+    res.clearCookie(stateCookieName, getOAuthStateCookieOptions(req));
 
     try {
       const tokenResponse = await sdk.exchangeCodeForToken(code, state);
