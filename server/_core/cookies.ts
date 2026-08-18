@@ -1,13 +1,5 @@
 import type { CookieOptions, Request } from "express";
 
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
-
-function isIpAddress(host: string) {
-  // Basic IPv4 check and IPv6 presence detection.
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return true;
-  return host.includes(":");
-}
-
 function isSecureRequest(req: Request) {
   if (req.protocol === "https") return true;
 
@@ -24,16 +16,14 @@ function isSecureRequest(req: Request) {
 export function getSessionCookieOptions(
   req: Request
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  const hostname = req.hostname;
   const secure = isSecureRequest(req);
-  const isLocalHttp = !secure && LOCAL_HOSTS.has(hostname) && !isIpAddress(hostname);
 
   return {
     httpOnly: true,
     path: "/",
-    // SameSite=None requires Secure in modern browsers. Local HTTP cannot set a
-    // Secure cookie, so use Lax for the local development origin only.
-    sameSite: isLocalHttp ? "lax" : "none",
+    // SameSite=None requires Secure in modern browsers. Use Lax whenever the
+    // current origin is HTTP (including localhost), and retain None for HTTPS.
+    sameSite: secure ? "none" : "lax",
     secure,
   };
 }
