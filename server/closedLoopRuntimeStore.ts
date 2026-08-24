@@ -43,7 +43,7 @@ function hydratePersistedSession(record: Awaited<ReturnType<typeof getClosedLoop
   const session: ClosedLoopRuntimeSession = {
     sessionId: record.id,
     experimentId: record.experimentId,
-    status: mapPersistedStatus(record.status),
+    status: record.status === "stopped" && snapshot.stepNumber === 0 ? "created" : mapPersistedStatus(record.status),
     createdAt: timestamp,
     updatedAt: timestamp,
     configuration: { ...configuration },

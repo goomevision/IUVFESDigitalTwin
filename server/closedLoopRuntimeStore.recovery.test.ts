@@ -62,4 +62,40 @@ describe("closed-loop runtime recovery", () => {
     expect(recoveredSnapshot.sensors).toEqual(persistedSnapshot.sensors);
     expect(recoveredSnapshot.frames.at(-1)?.step).toBe(persistedSnapshot.frames.at(-1)?.step);
   });
+
+  it("resolves a persisted session by experimentId after process-local memory loss", async () => {
+    const configuration = {
+      targetPressureMbar: 100,
+      targetTemperatureC: 60,
+      coolingTemperatureC: 35,
+      materialWeightKg: 10,
+      waterContentPercent: 45,
+      oilContentPercent: 3.5,
+      dtSeconds: 1,
+      maxSteps: 20,
+    };
+
+    const { createRuntimeSession, getRuntimeSnapshot } = await import("./closedLoopRuntimeStore");
+    const session = createRuntimeSession("experiment-refresh-test", configuration);
+    const persistedSnapshot = getRuntimeSnapshot(session.sessionId);
+
+    sessionStoreMocks.getClosedLoopSession.mockResolvedValue({
+      id: session.sessionId,
+      experimentId: session.experimentId,
+      status: "stopped",
+      snapshot: persistedSnapshot,
+      frameCount: persistedSnapshot.frames.length,
+      lastStep: persistedSnapshot.stepNumber,
+    });
+
+    vi.resetModules();
+    const recoveredModule = await import("./closedLoopRuntimeStore");
+    const recovered = await recoveredModule.ensureRuntimeSession("experiment-refresh-test");
+
+    expect(sessionStoreMocks.getClosedLoopSession).toHaveBeenCalledWith("experiment-refresh-test");
+    expect(recovered.sessionId).toBe(session.sessionId);
+    expect(recovered.experimentId).toBe("experiment-refresh-test");
+    expect(recovered.status).toBe("created");
+    expect(recoveredModule.getRuntimeSnapshot(recovered.sessionId).stepNumber).toBe(0);
+  });
 });
