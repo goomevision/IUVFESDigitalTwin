@@ -319,3 +319,8 @@
 - [x] Regression suite passed (20 test files, 53 tests).
 - [x] Production build passed (`pnpm build`); non-blocking bundle-size warning documented.
 - [x] GitHub Actions IUVFES Quality Gate passed for commit `ea3f7a0`.
+
+## GITHUB DEVELOPMENT REVIEW — 2026-08-12
+
+- [x] Review latest remote development, PR, and Quality Gate status with the project owner.
+- [ ] Agree the next implementation priority after reviewing current engineering gaps.
