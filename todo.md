@@ -337,3 +337,13 @@
 - [ ] Complete authenticated browser interaction and WebGL lifecycle verification using a real persisted experiment; OAuth preview session is currently blocked.
 - [x] Complete TypeScript, full test, diff, and production build verification before commit.
 - [x] Record the implemented interactive 3D Twin capability and browser-verification boundary in the Buku Besar.
+
+## MASTER AUTONOMOUS QUALITY & COMPLETION
+
+- [ ] Perform non-destructive Git/GitHub forensics and record source-of-truth evidence.
+- [ ] Create the targeted master read map and evidence-backed IUVFES Gap Registry.
+- [ ] Create the Requirement Registry with implementation, test, runtime, and evidence status.
+- [ ] Verify session lifecycle, persistence, replay evidence, reports, material boundary, and 3D causal mapping.
+- [ ] Resolve only actionable gaps supported by the existing architecture and contracts.
+- [ ] Run all available static, test, build, CI, and authenticated browser gates; record blockers honestly.
+- [ ] Publish a final completion matrix with VERIFIED, PENDING, BLOCKED, and OUT_OF_SCOPE states.
