@@ -323,4 +323,16 @@
 ## GITHUB DEVELOPMENT REVIEW — 2026-08-12
 
 - [x] Review latest remote development, PR, and Quality Gate status with the project owner.
-- [ ] Agree the next implementation priority after reviewing current engineering gaps.
+- [x] Agree the next implementation priority after reviewing current engineering gaps.
+
+## P10 — INTERACTIVE SCIENTIFIC 3D DIGITAL TWIN (MASTER COMMAND)
+
+- [x] Preserve the established 3D topology while exposing a single CausalFrame-derived visual state contract.
+- [x] Bind heater, vacuum pump, extractor, condenser, and cooling visuals continuously to `frame.actuatorLevels`.
+- [x] Add camera navigation, scientific presets, reset view, and non-engine-affecting view modes.
+- [x] Add selection, focus, and a compact component inspector that distinguishes command, actuator, sensor, provenance, time, and UNKNOWN data.
+- [x] Add equipment, piping, flow, particle, material, label, electrical, and diagnostics layer controls without altering engine state.
+- [x] Preserve simulation time semantics and mark derived process animation as non-measured flow.
+- [x] Add focused client-side regression tests and include them in the Quality Gate.
+- [ ] Complete authenticated browser interaction and WebGL lifecycle verification using a real persisted experiment; OAuth preview session is currently blocked.
+- [x] Complete TypeScript, full test, diff, and production build verification before commit.
