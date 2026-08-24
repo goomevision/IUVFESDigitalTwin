@@ -338,6 +338,26 @@
 - [x] Complete TypeScript, full test, diff, and production build verification before commit.
 - [x] Record the implemented interactive 3D Twin capability and browser-verification boundary in the Buku Besar.
 
+## P10-RUNTIME-001 — AUTHENTICATED OPERATOR VERIFICATION
+
+- [ ] Authenticate as an authorized IUVFES operator without bypassing OAuth.
+- [ ] Open an existing persisted experiment and record its experimentId and canonical sessionId.
+- [ ] Verify lifecycle continuity: Play, Pause, Resume, Refresh, Play Again without duplicate session creation.
+- [ ] Verify camera rotation, zoom, pan, reset, and all declared presets.
+- [ ] Verify selection, focus, and inspector coverage for all requested equipment targets.
+- [ ] Verify Realistic, X-Ray, Wireframe, and all declared visual-layer controls.
+- [ ] Verify distinct CausalFrame actuator visual states at LOW/MEDIUM/HIGH where existing real frames provide those levels.
+- [ ] Verify simulation timestamp source, DOM/canvas uniqueness, WebGL health, and browser console.
+- [ ] Record real browser evidence for every PASS; otherwise classify P10 as BLOCKED or FAIL.
+
+## DEPLOYED INTAKE MATERIAL LIST DEFECT
+
+- [ ] Diagnose why the deployed Material / Batch selector returns no selectable material records.
+- [ ] Restore the existing material-list query path without seeding or fabricating material data.
+- [ ] Verify the deployed selector reports available data, a loading state, or an explicit empty-data state.
+- [ ] Deploy the existing GitHub CORS policy to the active Manus API service for the GitHub Pages origin.
+- [ ] Configure the GitHub Pages build with the verified public IUVFES API URL.
+
 ## MASTER AUTONOMOUS QUALITY & COMPLETION
 
 - [x] Perform non-destructive Git/GitHub forensics and record source-of-truth evidence.

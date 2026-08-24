@@ -17,7 +17,7 @@ type FieldStatus = "USER_INPUT" | "UNKNOWN";
 
 export function ScientificExperimentIntake({ onComplete, onCancel }: ScientificExperimentIntakeProps) {
   const { user } = useAuth();
-  const { data: materials = [] } = trpc.materials.list.useQuery();
+  const { data: materials = [], isLoading: materialsLoading, error: materialsError } = trpc.materials.list.useQuery();
   const createExperiment = trpc.experiments.create.useMutation();
 
   const [experimentName, setExperimentName] = useState("");
@@ -159,7 +159,7 @@ export function ScientificExperimentIntake({ onComplete, onCancel }: ScientificE
             </Panel>
 
             <Panel icon={<Database />} title="B. BAHAN / BATCH">
-              <Field label="Jenis bahan" required><Select value={selectedMaterial?.toString() ?? ""} onValueChange={v => setSelectedMaterial(Number(v))}><SelectTrigger><SelectValue placeholder="Pilih material yang tersedia" /></SelectTrigger><SelectContent>{materials.map(m => <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>)}</SelectContent></Select><Status value={selectedMaterial} /></Field>
+              <Field label="Jenis bahan" required><Select value={selectedMaterial?.toString() ?? ""} onValueChange={v => setSelectedMaterial(Number(v))}><SelectTrigger><SelectValue placeholder="Pilih material yang tersedia" /></SelectTrigger><SelectContent>{materialsLoading ? <SelectItem value="loading" disabled>Memuat daftar bahan…</SelectItem> : materialsError ? <SelectItem value="unavailable" disabled>Daftar bahan tidak dapat dimuat</SelectItem> : materials.length === 0 ? <SelectItem value="empty" disabled>Belum ada bahan terdaftar</SelectItem> : materials.map(m => <SelectItem key={m.id} value={String(m.id)}>{m.name}</SelectItem>)}</SelectContent></Select>{materialsError ? <p className="mt-2 text-xs text-amber-300">Daftar bahan tidak dapat dimuat dari API. Periksa koneksi layanan lalu muat ulang halaman.</p> : null}<Status value={selectedMaterial} /></Field>
               <div className="grid grid-cols-2 gap-3"><NumberField label="Massa awal" value={materialWeight} setValue={setMaterialWeight} unit="kg" required /><NumberField label="Kadar air" value={waterContent} setValue={setWaterContent} unit="%" required /></div>
               <div className="grid grid-cols-2 gap-3"><NumberField label="Kadar minyak" value={oilContent} setValue={setOilContent} unit="%" required /><Field label="Batch / kode lot"><Input value={batchId} onChange={e => setBatchId(e.target.value)} /><Status value={batchId} /></Field></div>
               <div className="grid grid-cols-2 gap-3"><Field label="Asal / origin"><Input value={materialOrigin} onChange={e => setMaterialOrigin(e.target.value)} /><Status value={materialOrigin} /></Field><Field label="Tanggal panen"><Input type="date" value={harvestDate} onChange={e => setHarvestDate(e.target.value)} /><Status value={harvestDate} /></Field></div>

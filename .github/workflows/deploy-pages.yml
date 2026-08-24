@@ -14,9 +14,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Set GitHub Actions secret IUVFES_API_URL after the backend receives
-  # its public Railway domain. Empty keeps same-origin behavior for local/full-server deploys.
-  VITE_IUVFES_API_URL: ${{ secrets.IUVFES_API_URL }}
+  # A repository secret can override this endpoint for a future dedicated API host.
+  # The fallback is intentionally public: it is the verified IUVFES API consumed by
+  # the public GitHub Pages frontend, not a credential.
+  VITE_IUVFES_API_URL: ${{ secrets.IUVFES_API_URL || 'https://iuvfeslab-4eacvnnf.manus.space' }}
 
 jobs:
   build-and-publish:
