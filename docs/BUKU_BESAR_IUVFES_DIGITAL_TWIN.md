@@ -1257,6 +1257,44 @@ Gunakan authenticated session yang valid dan experiment persisted yang telah dis
 
 ---
 
+## 2026-08-25 — Master Quality session, replay, and identity hardening
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**PR:** open; no merge performed
+
+### Temuan
+
+Audit menemukan bahwa runtime store telah dapat menghidrasi persisted session melalui session id maupun experiment id, tetapi Control Room belum memiliki discovery API/UI untuk mengadopsi session tersebut setelah refresh. Replay ilmiah masih membaca legacy batch result stream, checksum evidence memasukkan waktu ekspor yang volatil, dan recorder memakai sample identity sintetis alih-alih mempertahankan identity eksperimen sumber.
+
+### Perubahan
+
+`closedLoop.getForExperiment` kini menyediakan lookup session persisted yang terautorisasi, dan `ProcessSimulator` mengadopsi canonical session id yang dikembalikan tanpa membuat session baru. `closedLoop.replayForExperiment` menjadi batas replay ilmiah; `ExperimentReplay` membaca CausalFrame persisted dari closed-loop dan secara eksplisit mengecualikan legacy batch result dari evidence.
+
+Canonical replay body kini tidak menyertakan `exportedAt`; SHA-256 dihitung atas tubuh evidence yang stabil, sementara waktu ekspor disimpan sebagai metadata di luar payload canonical. Recorder mempertahankan original IUVFES experiment id sebagai research provenance key dan menampilkan `UNKNOWN` apabila sample id tidak tersedia.
+
+### Data flow affected
+
+`Experiment → persisted closed-loop session → authorized getForExperiment / replayForExperiment → ProcessSimulator / ExperimentReplay → CausalFrame evidence`. Legacy `simulation.run` tetap tersedia untuk kompatibilitas, tetapi bukan sumber authoritative untuk scientific causal replay.
+
+### Scientific impact
+
+Tidak ada formula physics, PID, safety kernel, material model, atau klaim laboratory validation yang diubah. Perubahan memperketat provenance, menghindari sample identifier buatan, dan membuat checksum replay reproducible untuk frame range yang sama.
+
+### Tests / Quality Gate
+
+Focused identity, replay-canonical-body, runtime-recovery, dan router-access tests lulus. Validasi lokal terakhir: `pnpm check` PASS; `pnpm test` PASS, 28 file / 71 tests; `pnpm build` PASS. Warning ukuran bundle tetap non-blocking. Browser/WebGL interaction masih belum verified karena preview OAuth tidak menyediakan session operator yang valid.
+
+### Status
+
+🟢 Server contract recovery, replay source boundary, evidence canonicalization, dan experiment identity telah diuji secara lokal. 🟡 Browser refresh/resume dan 3D interaction masih pending runtime verification dengan experiment persisted yang sah. 🔴 Tidak ada klaim bahwa replay atau visual telah laboratory-validated.
+
+### Next action
+
+Push branch setelah final Quality Gate, kemudian lakukan authenticated browser verification. Sesudah itu, optimasi bundle dan evaluasi coverage WebGL/browser lifecycle tanpa mengubah causal engine.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:

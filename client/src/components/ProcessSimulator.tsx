@@ -96,6 +96,7 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
   const [condenserLimit, setCondenserLimit] = useState(1);
   const [coolingLimit, setCoolingLimit] = useState(1);
 
+  const recoveredSession = trpc.closedLoop.getForExperiment.useQuery(experimentId, { enabled: Boolean(experimentId), refetchInterval: sessionId ? false : 2000 });
   const session = trpc.closedLoop.get.useQuery(sessionId ?? "", { enabled: Boolean(sessionId), refetchInterval: sessionId ? 1000 : false });
   const sessionFrames = trpc.closedLoop.frames.useQuery(sessionId ?? "", { enabled: Boolean(sessionId), refetchInterval: sessionId ? 1000 : false });
   const busy = useRef(false);
@@ -111,6 +112,14 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
     setPressure(previous => numberValue(parameters.targetPressure) ?? previous);
     setCooling(previous => numberValue(parameters.coolingTemperature) ?? previous);
   }, [experiment.data]);
+  useEffect(() => {
+    const recovered = recoveredSession.data;
+    if (!recovered || sessionId) return;
+    setSessionId(recovered.sessionId);
+    setRunning(recovered.status === "running");
+    setPaused(recovered.status === "paused");
+    setCompleted(recovered.status === "completed");
+  }, [recoveredSession.data, sessionId]);
   useEffect(() => {
     const persisted = sessionFrames.data?.frames as Frame[] | undefined;
     if (!persisted) return;

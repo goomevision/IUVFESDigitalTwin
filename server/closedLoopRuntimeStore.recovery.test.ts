@@ -79,6 +79,7 @@ describe("closed-loop runtime recovery", () => {
     const session = createRuntimeSession("experiment-refresh-test", configuration);
     const persistedSnapshot = getRuntimeSnapshot(session.sessionId);
 
+    sessionStoreMocks.getClosedLoopSessionById.mockResolvedValue(null);
     sessionStoreMocks.getClosedLoopSession.mockResolvedValue({
       id: session.sessionId,
       experimentId: session.experimentId,

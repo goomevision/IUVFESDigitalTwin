@@ -274,10 +274,10 @@
 
 ---
 
-**Status:** Control Room causal-data and replay-evidence baseline complete; persisted-session lookup remains pending.
+**Status:** Master Quality corrections complete locally; authenticated browser verification remains pending.
 **Current Phase:** Quality Gate green; ready for review on `feature/control-room-ui`.
-**Last Updated:** 12 August 2026
-**Implementation Strategy:** Closed-loop causal frames, engine-bound visual telemetry, explicit simulation provenance, and evidence-first replay.
+**Last Updated:** 25 August 2026
+**Implementation Strategy:** Closed-loop causal frames, engine-bound visual telemetry, explicit simulation provenance, deterministic evidence, and experiment-identity preservation.
 
 ### UI Fixes (Reported 31 Jul 2026)
 - [x] Fix Tailwind CSS px-4 error breaking all styling
@@ -296,7 +296,7 @@
 - [x] Fix closed-loop reset authorization to validate the parent experiment rather than the session identifier.
 - [x] Replace the ProcessSimulator's duplicated frame contract with tRPC-inferred closed-loop API types.
 - [x] Poll and reconcile the known active Process Simulator session from the session API without fabricating telemetry.
-- [ ] Add a lifecycle API to discover a persisted session by experiment after a full browser reload.
+- [x] Add a lifecycle API to discover a persisted session by experiment after a full browser reload.
 - [x] Guard ProcessMachine3D renderer cleanup so React never removes a detached canvas node.
 
 ## PROCESS SIMULATOR — LIVING MACHINE REDESIGN (ACTIVE)
@@ -340,10 +340,19 @@
 
 ## MASTER AUTONOMOUS QUALITY & COMPLETION
 
-- [ ] Perform non-destructive Git/GitHub forensics and record source-of-truth evidence.
-- [ ] Create the targeted master read map and evidence-backed IUVFES Gap Registry.
-- [ ] Create the Requirement Registry with implementation, test, runtime, and evidence status.
-- [ ] Verify session lifecycle, persistence, replay evidence, reports, material boundary, and 3D causal mapping.
-- [ ] Resolve only actionable gaps supported by the existing architecture and contracts.
-- [ ] Run all available static, test, build, CI, and authenticated browser gates; record blockers honestly.
+- [x] Perform non-destructive Git/GitHub forensics and record source-of-truth evidence.
+- [x] Create the targeted master read map and evidence-backed IUVFES Gap Registry.
+- [x] Create the Requirement Registry with implementation, test, runtime, and evidence status.
+- [x] Verify session lifecycle, persistence, replay evidence, reports, material boundary, and 3D causal mapping.
+- [x] Resolve only actionable gaps supported by the existing architecture and contracts.
+- [x] Run all available static, test, build, CI, and authenticated browser gates; record blockers honestly.
 - [ ] Publish a final completion matrix with VERIFIED, PENDING, BLOCKED, and OUT_OF_SCOPE states.
+
+## AUDIT-DISCOVERED DATA CONTRACT GAPS
+
+- [x] Define one authorized handoff from a completed live closed-loop session to persisted causal replay/evidence data.
+- [x] Quarantine or explicitly separate the legacy batch `simulation.run` output from the authoritative closed-loop replay contract.
+- [x] Preserve the original IUVFES experiment identity when the scientific recorder creates research records and dataset manifests.
+- [x] Remove the synthetic default sample identifier from scientific recording; require user input or preserve UNKNOWN.
+- [x] Make canonical replay evidence checksums stable by excluding volatile export timestamps from the hashed body.
+- [x] Make runtime recovery tests explicitly isolate id and experiment lookup mocks between cases.

@@ -39,7 +39,8 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
-function normalizeCausalFrame(raw: Record<string, unknown>): ReplayFrame | null {
+function normalizeCausalFrame(rawValue: unknown): ReplayFrame | null {
+  const raw = record(rawValue);
   const sensorBefore = record(raw.sensorBefore);
   const controller = record(raw.controller);
   const effectiveCommands = record(raw.effectiveCommands);
@@ -80,6 +81,19 @@ async function sha256(payload: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map(value => value.toString(16).padStart(2, "0")).join("");
 }
 
+export function buildReplayEvidenceCanonicalBody(experimentId: string, evidenceFrames: ReplayFrame[]) {
+  return {
+    schema: "IUVFES-REPLAY-EVIDENCE-1",
+    evidenceType: "SIMULATION_REPLAY",
+    experimentId,
+    source: "SIMULATION",
+    sourceContract: "ClosedLoopSimulationEngine.CausalFrame",
+    frameRange: { start: evidenceFrames[0]?.step, end: evidenceFrames.at(-1)?.step, count: evidenceFrames.length },
+    scientificBoundary: "Simulation-derived evidence only. This package contains no laboratory measurement or experimental validation claim.",
+    causalFrames: evidenceFrames.map(item => item.raw),
+  };
+}
+
 function downloadJson(filename: string, data: unknown) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
   const anchor = document.createElement("a");
@@ -92,14 +106,14 @@ function downloadJson(filename: string, data: unknown) {
 export default function ExperimentReplay() {
   const { experimentId } = useParams<{ experimentId: string }>();
   const experiment = trpc.experiments.get.useQuery(experimentId ?? "", { enabled: Boolean(experimentId) });
-  const results = trpc.simulation.getResults.useQuery(experimentId ?? "", { enabled: Boolean(experimentId) });
+  const replay = trpc.closedLoop.replayForExperiment.useQuery(experimentId ?? "", { enabled: Boolean(experimentId) });
   const [playing, setPlaying] = useState(false);
   const [cursor, setCursor] = useState(0);
   const [speed, setSpeed] = useState(1);
   const [rangeStart, setRangeStart] = useState(0);
   const [rangeEnd, setRangeEnd] = useState(0);
 
-  const rawFrames = useMemo(() => Array.isArray(results.data?.realTimeData) ? results.data.realTimeData.filter((value): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value))) : [], [results.data]);
+  const rawFrames = useMemo(() => Array.isArray(replay.data?.frames) ? replay.data.frames : [], [replay.data]);
   const frames = useMemo(() => rawFrames.map(normalizeCausalFrame).filter((frame): frame is ReplayFrame => frame !== null), [rawFrames]);
   const unsupportedFrames = rawFrames.length - frames.length;
 
@@ -129,27 +143,17 @@ export default function ExperimentReplay() {
 
   const exportEvidence = async () => {
     if (!experimentId || !evidenceFrames.length) return;
-    const evidence = {
-      schema: "IUVFES-REPLAY-EVIDENCE-1",
-      evidenceType: "SIMULATION_REPLAY",
-      experimentId,
-      source: "SIMULATION",
-      sourceContract: "ClosedLoopSimulationEngine.CausalFrame",
-      frameRange: { start: evidenceFrames[0].step, end: evidenceFrames.at(-1)?.step, count: evidenceFrames.length },
-      generatedAt: new Date().toISOString(),
-      scientificBoundary: "Simulation-derived evidence only. This package contains no laboratory measurement or experimental validation claim.",
-      causalFrames: evidenceFrames.map(item => item.raw),
-    };
-    const canonicalPayload = JSON.stringify(evidence);
-    downloadJson(`IUVFES-EVIDENCE-${experimentId}-${evidenceFrames[0].step}-${evidenceFrames.at(-1)?.step}.json`, { ...evidence, canonicalPayloadSha256: await sha256(canonicalPayload) });
+    const canonicalBody = buildReplayEvidenceCanonicalBody(experimentId, evidenceFrames);
+    const canonicalPayload = JSON.stringify(canonicalBody);
+    downloadJson(`IUVFES-EVIDENCE-${experimentId}-${evidenceFrames[0].step}-${evidenceFrames.at(-1)?.step}.json`, { ...canonicalBody, exportedAt: new Date().toISOString(), canonicalPayloadSha256: await sha256(canonicalPayload) });
   };
 
   return <div className="min-h-screen bg-[radial-gradient(circle_at_top,#10263a_0%,#050912_45%,#02040a_100%)] p-4 text-slate-100 md:p-6"><div className="mx-auto max-w-[1500px] space-y-4">
     <header className="rounded-2xl border border-cyan-500/20 bg-slate-950/70 p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-mono text-xs tracking-[0.35em] text-cyan-400">IUVFES // EXPERIMENT REPLAY</p><h1 className="mt-2 text-2xl font-bold">SCIENTIFIC EXPERIMENT REPLAY</h1><p className="font-mono text-xs text-slate-500">{experiment.data?.experimentName ?? experimentId ?? "UNKNOWN EXPERIMENT"}</p></div><Button variant="outline" className="border-slate-700 bg-transparent" onClick={() => window.history.back()}><ArrowLeft className="mr-2 h-4 w-4" />Back</Button></div></header>
 
-    {!frames.length && !results.isLoading && <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-yellow-200">No structurally valid CausalFrame is available for this experiment. Replay will not substitute or invent missing telemetry.</div>}
-    {unsupportedFrames > 0 && <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-200">{unsupportedFrames} persisted result frame(s) use an unsupported legacy format and are excluded from scientific replay evidence.</div>}
-    {results.isError && <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-200">Replay data could not be loaded.</div>}
+    {!frames.length && !replay.isLoading && <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 text-sm text-yellow-200">No persisted closed-loop CausalFrame is available for this experiment. Legacy batch results are intentionally excluded from scientific replay evidence.</div>}
+    {unsupportedFrames > 0 && <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-200">{unsupportedFrames} persisted frame(s) are structurally unsupported and excluded from scientific replay evidence.</div>}
+    {replay.isError && <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-200">Closed-loop replay data could not be loaded.</div>}
 
     {frame && <>
       <section className="rounded-2xl border border-cyan-500/20 bg-slate-950/60 p-4"><div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-9">{stages.map((stage, index) => <div key={stage.id} className={`rounded-lg border p-3 ${index === stageIndex ? "border-cyan-400/70 bg-cyan-400/10" : index < stageIndex ? "border-emerald-500/30 bg-emerald-500/5" : "border-slate-800"}`}><div className="font-mono text-[10px] text-slate-600">0{index + 1}</div><div className="mt-1 text-[11px] font-semibold tracking-wider">{stage.label}</div></div>)}</div><div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full bg-cyan-400 transition-all" style={{ width: `${Math.max(0, Math.min(100, progress * 100))}%` }} /></div></section>
