@@ -1216,6 +1216,45 @@ Audit dan implementasikan data persistence/lookup session bila evidence harus da
 7. Calibration.
 8. Experimental validation.
 
+## 2026-08-24 — Interactive CausalFrame-driven 3D Digital Twin
+
+**AI/Worker:** Manus AI  
+**Branch:** `feature/control-room-ui`  
+**Commit:** `b5b83c62b3deb2f6a2a9baf5532c9033398a907e`  
+**PR:** #8 (open, target `develop`)
+
+### Temuan
+
+Audit 3D menemukan bahwa `CausalFrame.actuatorLevels` sudah tersedia untuk heater, vacuum pump, extractor, condenser, dan cooling, tetapi visual machine sebelumnya terutama membaca command boolean. Client-side ProcessMachine3D regression tests juga belum dijalankan oleh konfigurasi Vitest.
+
+### Perubahan
+
+`ProcessMachine3D` tetap mempertahankan topologi reactor, cold trap, pump, piping, particles, dan connector yang telah ada. Renderer kini memakai intensitas kontinu `actuatorLevels` untuk visual heater, pump, extractor, condenser, dan cooling. Ditambahkan OrbitControls, preset camera, reset view, realistic/X-ray/wireframe modes, visual-layer controls, flow/particle toggles, raycast selection, serta component inspector. Inspector hanya menampilkan command, actuator, sensor, simulation time, provenance, dan `UNKNOWN` dari CausalFrame; kontrol visual tidak menulis ke engine.
+
+### Data flow affected
+
+`ClosedLoopSimulationEngine → CausalFrame.actuatorLevels / effectiveCommands / sensorAfter / diagnostics → ProcessMachine3D visual state → Three.js`. `requestAnimationFrame` dipertahankan hanya sebagai scheduler render; phase animasi tetap mengikuti `timestampSeconds` frame.
+
+### Scientific impact
+
+Tidak ada perubahan pada physics, PID, safety kernel, intended command, effective command, atau material model. Particle flow tetap diberi label sebagai derived activity; flow rate tetap `UNKNOWN` bila engine tidak menyediakannya. Data visual tetap simulation-derived, bukan observasi laboratorium.
+
+### Simulation/Lab boundary impact
+
+Tidak berubah. Inspector menampilkan provenance `SIMULATION`; tidak ada data measured atau claim laboratory validation baru.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS, 26 test files dan 67 tests. `pnpm build`: PASS. `git diff --check`: PASS. Client-side ProcessMachine3D tests sekarang termasuk Quality Gate dan memverifikasi mapping continuous actuator levels tanpa telemetry sintetis. GitHub Actions Quality Gate untuk commit ini: PASS (run #587 / 32767029650). Warning ukuran JS bundle lebih dari 500 kB tetap non-blocking.
+
+### Status
+
+🟢 Interactive 3D Twin dan local/GitHub quality gates verified. 🟡 Browser interaction dan WebGL lifecycle belum dapat diverifikasi end-to-end menggunakan experiment sah karena preview OAuth session menghasilkan `invalid auth state` / `Auth Missing`; tidak ada experiment atau telemetry sintetis yang dibuat untuk menggantikan verifikasi tersebut.
+
+### Next action
+
+Gunakan authenticated session yang valid dan experiment persisted yang telah disetujui untuk memverifikasi Play, Pause, Resume, Stop, Reset, selection, camera controls, layer toggles, dan cleanup canvas di browser. Setelah itu audit bundle splitting dan lifecycle session recovery lintas browser refresh.
+
 ---
 
 # 29. TEMPLATE UPDATE BERIKUTNYA

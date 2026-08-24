@@ -336,3 +336,4 @@
 - [x] Add focused client-side regression tests and include them in the Quality Gate.
 - [ ] Complete authenticated browser interaction and WebGL lifecycle verification using a real persisted experiment; OAuth preview session is currently blocked.
 - [x] Complete TypeScript, full test, diff, and production build verification before commit.
+- [x] Record the implemented interactive 3D Twin capability and browser-verification boundary in the Buku Besar.
