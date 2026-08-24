@@ -14,6 +14,7 @@
 | 3D actuator mapping | **VERIFIED** | Continuous actuator-level mapper and focused client tests. | Browser/WebGL interaction remains separately pending. |
 | 3D navigation, selection, modes, layers | **PENDING** | Local visual state and controls are implemented. | Requires authenticated browser verification with an existing persisted experiment. |
 | Session lifecycle and recovery | **VERIFIED** | Runtime snapshot/recovery tests and typed `getForExperiment` path. | Browser refresh/resume remains pending runtime observation. |
+| Authenticated P10 runtime handoff | **BLOCKED** | On 25 August 2026, `auth.me` returned an authenticated admin identity and the preview displayed existing experiment `fcb89fbb-0f85-4d60-8cde-1ecb3c747d46`; the non-mutating `closedLoop.getForExperiment` lookup returned HTTP 404, `No procedure found on path "closedLoop.getForExperiment"`. | The active preview serves an older Live Control Room runtime rather than the GitHub closed-loop router. Deploy or open the matching authoritative runtime with the existing persisted ClosedLoop session before repeating P10. |
 | Replay source authority | **VERIFIED** | Replay consumes `closedLoop.replayForExperiment`; legacy batch results are excluded from causal evidence. | Existing legacy outputs remain for compatibility outside scientific replay. |
 | Replay checksum canonicalization | **VERIFIED** | Canonical body excludes `exportedAt`; deterministic evidence unit test passes. | Server-side signing and immutable storage remain future work. |
 | Scientific record identity | **VERIFIED** | Original experiment provenance key is preserved; absent sample identity is `UNKNOWN`. | Does not establish a laboratory sample or validation. |
@@ -34,7 +35,7 @@
 | GitHub Actions: IUVFES Quality Gate | PASS — run `32771858416` |
 | GitHub Actions: Control Room Phase 1 Validation | PASS — run `32771852180` |
 | GitHub Pages deploy workflow | PASS — run `32771852187` |
-| Authenticated browser acceptance | BLOCKED — preview OAuth returned `invalid auth state` and `Auth Missing` |
+| Authenticated browser acceptance | BLOCKED — 25 August 2026 admin OAuth succeeds, but the authenticated preview lacks the GitHub branch's `closedLoop.getForExperiment` procedure required to discover the canonical session. |
 
 ## Scientific Boundary
 
@@ -42,4 +43,4 @@ All Control Room, replay, and evidence values remain **SIMULATION** or **DERIVED
 
 ## Required Next Gate
 
-Use an authenticated operator session and an existing persisted experiment to verify browser refresh/recovery, Start/Pause/Resume/Stop/Reset, camera presets, pointer selection, view modes, layers, and WebGL cleanup. Record those observations before changing any `PENDING` 3D/runtime status to `VERIFIED`.
+Use an authenticated operator session on the **same deployed runtime as the GitHub closed-loop router**, then open an existing persisted experiment and canonical session to verify browser refresh/recovery, Start/Pause/Resume/Stop/Reset, camera presets, pointer selection, view modes, layers, and WebGL cleanup. Record those observations before changing any `PENDING` 3D/runtime status to `VERIFIED`.

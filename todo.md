@@ -349,6 +349,7 @@
 - [ ] Verify distinct CausalFrame actuator visual states at LOW/MEDIUM/HIGH where existing real frames provide those levels.
 - [ ] Verify simulation timestamp source, DOM/canvas uniqueness, WebGL health, and browser console.
 - [ ] Record real browser evidence for every PASS; otherwise classify P10 as BLOCKED or FAIL.
+- [x] Record the 25 August 2026 authenticated P10 attempt: admin OAuth is valid and an existing experiment is open, but the active preview has no `closedLoop.getForExperiment` procedure, so no canonical ClosedLoop session can be verified there.
 
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
