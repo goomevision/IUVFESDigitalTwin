@@ -352,11 +352,12 @@
 
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
-- [ ] Diagnose why the deployed Material / Batch selector returns no selectable material records.
-- [ ] Restore the existing material-list query path without seeding or fabricating material data.
-- [ ] Verify the deployed selector reports available data, a loading state, or an explicit empty-data state.
-- [ ] Deploy the existing GitHub CORS policy to the active Manus API service for the GitHub Pages origin.
-- [ ] Configure the GitHub Pages build with the verified public IUVFES API URL.
+- [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.
+- [x] Restore the existing material-list query path without seeding or fabricating material data.
+- [x] Verify the deployed selector reports available data, a loading state, or an explicit empty-data state.
+- [x] Deploy the existing GitHub CORS policy to the active Manus API service for the GitHub Pages origin.
+- [x] Configure the GitHub Pages build with the verified public IUVFES API URL.
+- [x] Ensure an environment CORS override cannot remove the required GitHub Pages origin from the production API allowlist.
 
 ## MASTER AUTONOMOUS QUALITY & COMPLETION
 

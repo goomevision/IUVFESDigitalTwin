@@ -31,14 +31,15 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 function configureCors(app: express.Express) {
-  const configuredOrigins = (process.env.IUVFES_WEB_ORIGINS ?? DEFAULT_WEB_ORIGIN)
+  const configuredOrigins = (process.env.IUVFES_WEB_ORIGINS ?? "")
     .split(",")
     .map(origin => origin.trim())
     .filter(Boolean);
+  const allowedOrigins = Array.from(new Set([DEFAULT_WEB_ORIGIN, ...configuredOrigins]));
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin && configuredOrigins.includes(origin)) {
+    if (origin && allowedOrigins.includes(origin)) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Vary", "Origin");
       res.setHeader("Access-Control-Allow-Credentials", "true");
@@ -47,7 +48,7 @@ function configureCors(app: express.Express) {
     }
 
     if (req.method === "OPTIONS") {
-      if (origin && configuredOrigins.includes(origin)) {
+      if (origin && allowedOrigins.includes(origin)) {
         res.status(204).end();
       } else {
         res.status(403).end();
