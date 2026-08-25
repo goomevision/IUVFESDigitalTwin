@@ -1659,6 +1659,49 @@ Jangan mengisi budget P19 sebelum tersedia records nyata yang evidence-backed un
 
 ---
 
+## 2026-08-26 — P20 Laboratory Evidence & Data Ingestion Foundation source publication
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Commit:** Source-publication commit for this entry
+**PR:** open; no merge performed
+
+### Temuan
+
+P17–P19 telah menyediakan instrument, traceability, dan uncertainty contracts, tetapi belum memiliki surface penerimaan evidence nyata yang dapat membedakan absence of laboratory records dari zero values, simulation fields, atau verification claim. Tanpa Evidence Center, future ingestion berisiko mencampurkan contract metadata dengan laboratory observation.
+
+### Perubahan
+
+P20 menambahkan Laboratory Evidence Center dan Evidence Inspector dalam Control Room. Evidence Record contract mendeklarasikan `evidenceId`, `experimentId`, `sampleId`, `instrumentId`, `measurementId`, `datasetId`, source/timestamp/unit/value/uncertainty fields, calibration/laboratory/reference-standard references, provenance, verification status, dan interpretation limit. Registry evidence nyata tetap kosong; tidak ada identifier, sample, data laboratory, measurement, certificate, calibration result, uncertainty, atau evidence yang dibuat.
+
+Lifecycle contract mencakup `RECEIVED`, `PARSED`, `IDENTIFIED`, `TRACEABILITY_PENDING`, `CALIBRATION_PENDING`, `UNCERTAINTY_PENDING`, `VERIFICATION_PENDING`, `VERIFIED`, dan `REJECTED`. Dengan tidak adanya record, seluruh lifecycle berstatus `NOT LOADED`, Evidence Completeness berstatus `NOT READY`, dan verifier tidak dapat menghasilkan `VERIFIED`. UI juga menampilkan flow **Sample → Measurement → Instrument → Calibration → Traceability → Uncertainty → Evidence → Verification** beserta contextual link ke P17 Instrument Registry, P18 Traceability Chain, P19 Uncertainty Budget, dan Knowledge Center.
+
+### Data flow affected
+
+P20 adalah client-side UI/contract dan tidak membuat persistence, database migration, API call, experiment, session, atau telemetry. Tidak ada perubahan pada `CausalFrame`, `timestampSeconds`, `sensorAfter`, `effectiveCommands`, atau `actuatorLevels`. Existing Control Room values tetap simulation/derived seperti sebelum P20; Evidence Center tidak mengonversinya menjadi measurement.
+
+### Scientific impact
+
+Tidak ada perubahan physics, PID, safety, CausalFrame, actuator authority, OAuth, backend, database, migration, certificate, calibration value, uncertainty value, measurement result, sample, atau evidence nyata. `NOT LOADED` digunakan untuk absence of evidence dan bukan zero. `VERIFIED` hanya dapat muncul untuk record yang memenuhi gate evidence; tidak ada record default yang memenuhi gate tersebut. Tidak ada claim ISO/IEC 17025 compliance.
+
+### Simulation/Lab boundary impact
+
+`SIMULATION ≠ MEASURED`, `DERIVED ≠ MEASURED`, `UNKNOWN ≠ ZERO`, dan `COMPLETE ≠ VERIFIED` dinyatakan pada UI dan contract. Measurement timestamp tidak digantikan oleh simulation time; CausalFrame provenance tetap traceability simulation, bukan laboratory evidence. Evidence Completeness bukan scientific confidence score.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS — 38 files / 103 tests, termasuk `server/laboratoryEvidence.p20.test.ts`. `pnpm build`: PASS. `git diff --check`: PASS. Warning ukuran JavaScript bundle lebih dari 500 kB tetap non-blocking.
+
+### Status
+
+🟢 P20 **source publication** tervalidasi secara statis pada branch fitur tanpa merge. 🟡 Laboratory Evidence Center adalah UI/contract foundation dengan zero loaded records; ini bukan data ingestion maupun evidence verification. 🟡 Authenticated WebGL smoke tetap **BLOCKED** oleh OAuth/session/full backend deployment dan P10 tidak berubah.
+
+### Next action
+
+Sebelum evidence record nyata dapat diingest, sediakan governance dan approved persistence untuk source, sample identity, instrument identity, measurement, uncertainty, calibration, traceability, evidence, verification, ownership, validation, and retention. Jangan mengisi contract dengan synthetic record dan jangan menjalankan P10/browser acceptance sebelum runtime prerequisite yang legitimate tersedia.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:

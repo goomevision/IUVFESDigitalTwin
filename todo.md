@@ -464,6 +464,13 @@
 - [x] Add a readable uncertainty budget, scientific status, and Instrument → Calibration → Traceability → Uncertainty Budget → Measurement Result relationship to the Instrument Inspector.
 - [x] Add P19 regression coverage, run validation once, document, commit, and push while retaining the authenticated WebGL blocker.
 
+## P20 — LABORATORY EVIDENCE & DATA INGESTION FOUNDATION
+
+- [x] Map P14–P19 knowledge, instrument, traceability, uncertainty, and Control Room surfaces while preserving all scientific/runtime boundaries.
+- [x] Define a source-safe Evidence Record contract, lifecycle, completeness model, and verification gate without records, persistence, or synthetic identifiers.
+- [x] Implement a Laboratory Evidence Center and Evidence Inspector with contextual links and an explicit sample-to-verification flow.
+- [x] Add P20 evidence-bound regression coverage, run static validation once, document, commit, and push while retaining P10/WebGL blockers.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.

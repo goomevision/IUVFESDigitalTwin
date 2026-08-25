@@ -12,6 +12,7 @@ import { ProcessRunReplay } from "@/components/ProcessRunReplay";
 import { ControlRoomObservabilityPanel } from "@/components/ControlRoomObservabilityPanel";
 import { WhyThisValue, type WhyThisValueProps } from "@/components/WhyThisValue";
 import { InstrumentRegistry } from "@/components/InstrumentRegistry";
+import { LaboratoryEvidenceCenter } from "@/components/LaboratoryEvidenceCenter";
 import { recordControlRoomEvent, toFrameReference, toOperatorReference } from "@/lib/controlRoomObservability";
 import { useAuth } from "@/_core/hooks/useAuth";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -305,6 +306,7 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
         </section>
 
         <InstrumentRegistry selectedInstrumentId={focusedInstrumentId} />
+        <LaboratoryEvidenceCenter />
 
         <section className="grid gap-3 xl:grid-cols-[1.15fr_.85fr]"><LiveProcessTrend frames={recent} /><CausalFrameInspector frames={replayFrames} /></section>
         <ControlRoomObservabilityPanel />
