@@ -428,6 +428,13 @@
 
 - [x] Record the verified Infrastructure Blocker in Buku Besar and push the documentation-only commit to feature/control-room-ui without changing application source or technical state.
 
+## P15 — MODERN 3D CONTROL ROOM
+
+- [x] Audit ProcessMachine3D and Control Room visual authority boundaries before visual-only refinement.
+- [x] Modernize authoritative 3D equipment, piping, lighting, materials, spatial hierarchy, inspector, layers, and scientific legend without changing engine or scientific state.
+- [ ] Run P15 code, test, build, diff, and authenticated browser visual smoke checks without creating runtime data; document, commit, and push only if all checks pass. Static checks pass, but ProcessMachine3D cannot mount during unauthenticated browser smoke.
+- [x] Re-run P15 static validation and publish the existing visual-only source changes while documenting authenticated WebGL smoke as BLOCKED by OAuth/session.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.

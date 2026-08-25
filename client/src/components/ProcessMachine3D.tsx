@@ -14,10 +14,10 @@ interface Props {
 type ViewMode = "REALISTIC" | "X_RAY" | "WIREFRAME";
 type CameraPreset = "DEFAULT" | "FRONT" | "TOP" | "LEFT" | "RIGHT" | "PROCESS_PATH" | "REACTOR" | "COLD_TRAPS" | "VACUUM" | "COOLING";
 type ComponentId = "REACTOR" | "HEATER" | "ULTRASONIC" | "VACUUM_PUMP" | "EXTRACTOR" | "CONDENSER" | "COOLING" | "COLD_TRAP_1" | "COLD_TRAP_2" | "COLD_TRAP_3" | "COLD_TRAP_4" | "VAPOR_PIPE" | "VACUUM_PIPE" | "COOLING_PIPE";
-type LayerKey = "equipment" | "piping" | "flow" | "particle" | "material" | "label" | "instrument" | "electrical" | "diagnostics";
+type LayerKey = "equipment" | "piping" | "flow" | "particle" | "material" | "label" | "instrument" | "electrical" | "structure" | "diagnostics";
 type LayerState = Record<LayerKey, boolean>;
 
-const DEFAULT_LAYERS: LayerState = { equipment: true, piping: true, flow: true, particle: true, material: true, label: true, instrument: true, electrical: true, diagnostics: true };
+const DEFAULT_LAYERS: LayerState = { equipment: true, piping: true, flow: true, particle: true, material: true, label: true, instrument: true, electrical: true, structure: true, diagnostics: true };
 const CAMERA_PRESETS: Record<CameraPreset, { position: [number, number, number]; target: [number, number, number] }> = {
   DEFAULT: { position: [11.8, 7.6, 17.5], target: [0.4, 0.9, -0.3] },
   FRONT: { position: [0.4, 3.8, 19], target: [0.4, 1.0, -0.8] },
@@ -178,6 +178,7 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
     particle: THREE.Group;
     material: THREE.Group;
     electrical: THREE.Group;
+    structure: THREE.Group;
     selectables: Map<ComponentId, THREE.Object3D[]>;
   } | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("REALISTIC");
@@ -242,6 +243,7 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
     runtime.particle.visible = layers.particle && particlesEnabled;
     runtime.material.visible = layers.material;
     runtime.electrical.visible = layers.electrical;
+    runtime.structure.visible = layers.structure;
     observabilityRef.current?.({ event: "LAYER_CHANGE", result: "SUCCESS", detail: { layers } });
   }, [layers, particlesEnabled]);
 
@@ -270,6 +272,7 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
     const scene = new THREE.Scene();
     observabilityRef.current?.({ event: "THREE_SCENE_INIT", result: "SUCCESS" });
     scene.background = new THREE.Color(0x020712);
+    scene.fog = new THREE.FogExp2(0x020712, 0.018);
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
     camera.position.set(11.8, 7.6, 17.5);
     camera.lookAt(0.4, 0.9, -0.3);
@@ -299,13 +302,15 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
     const flowLayer = new THREE.Group();
     const particleLayer = new THREE.Group();
     const electricalLayer = new THREE.Group();
+    const structureLayer = new THREE.Group();
     equipmentLayer.name = "EQUIPMENT";
     pipingLayer.name = "PIPING";
     flowLayer.name = "FLOW";
     particleLayer.name = "PARTICLE";
     electricalLayer.name = "ELECTRICAL";
+    structureLayer.name = "STRUCTURE";
     flowLayer.add(particleLayer);
-    scene.add(equipmentLayer, pipingLayer, flowLayer, electricalLayer);
+    scene.add(structureLayer, equipmentLayer, pipingLayer, flowLayer, electricalLayer);
 
     const selectables = new Map<ComponentId, THREE.Object3D[]>();
     const selectableMeshes = new Map<THREE.Object3D, ComponentId>();
@@ -327,19 +332,47 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
     const rim = new THREE.DirectionalLight(0x7dd3fc, 2.6);
     rim.position.set(-9, 7, -9);
     scene.add(rim);
+    const overhead = new THREE.SpotLight(0xc7f9ff, 30, 28, Math.PI * 0.22, 0.5, 1.5);
+    overhead.position.set(1, 14, 4);
+    overhead.target.position.set(0, 0, -0.5);
+    structureLayer.add(overhead, overhead.target);
     const floor = new THREE.Mesh(new THREE.CircleGeometry(11, 64), new THREE.MeshBasicMaterial({ color: 0x06101c, transparent: true, opacity: 0.94 }));
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -2.25;
-    scene.add(floor);
+    structureLayer.add(floor);
     const grid = new THREE.GridHelper(20, 20, 0x1e5d7a, 0x0b2637);
     grid.position.y = -2.23;
     grid.material.transparent = true;
     grid.material.opacity = 0.28;
-    scene.add(grid);
+    structureLayer.add(grid);
     const deckRing = new THREE.Mesh(new THREE.RingGeometry(8.5, 8.56, 96), new THREE.MeshBasicMaterial({ color: 0x1d84a8, transparent: true, opacity: 0.32, side: THREE.DoubleSide }));
     deckRing.rotation.x = -Math.PI / 2;
     deckRing.position.y = -2.2;
-    scene.add(deckRing);
+    structureLayer.add(deckRing);
+    const platformMaterial = new THREE.MeshStandardMaterial({ color: 0x102237, metalness: 0.78, roughness: 0.3 });
+    const railingMaterial = new THREE.MeshStandardMaterial({ color: 0x3d6680, metalness: 0.86, roughness: 0.2 });
+    const platform = new THREE.Mesh(new THREE.CylinderGeometry(8.35, 8.35, 0.24, 96), platformMaterial);
+    platform.position.y = -2.34;
+    structureLayer.add(platform);
+    const maintenanceDeck = new THREE.Mesh(new THREE.BoxGeometry(5.35, 0.13, 2.1), platformMaterial);
+    maintenanceDeck.position.set(-1.05, -2.05, 2.75);
+    structureLayer.add(maintenanceDeck);
+    [-3.55, -1.85, -0.15, 1.55, 3.25].forEach(x => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.85, 10), railingMaterial);
+      post.position.set(x, -1.63, 3.67);
+      structureLayer.add(post);
+    });
+    const topRail = new THREE.Mesh(new THREE.BoxGeometry(7.1, 0.05, 0.05), railingMaterial);
+    topRail.position.set(-0.15, -1.22, 3.67);
+    structureLayer.add(topRail);
+    [-7.5, 7.5].forEach(x => {
+      const column = new THREE.Mesh(new THREE.BoxGeometry(0.22, 6.9, 0.22), railingMaterial);
+      column.position.set(x, 1.15, -4.8);
+      structureLayer.add(column);
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 16), new THREE.MeshStandardMaterial({ color: 0x164e63, emissive: 0x22d3ee, emissiveIntensity: 0.7 }));
+      beacon.position.set(x, 4.67, -4.8);
+      structureLayer.add(beacon);
+    });
 
     // -----------------------------------------------------------------------
     // AUTHORITATIVE VISUAL TOPOLOGY
@@ -376,6 +409,15 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
     const bottom = top.clone();
     bottom.position.y = -2.46;
     reactor.add(bottom);
+    for (let index = 0; index < 12; index += 1) {
+      const angle = (index / 12) * Math.PI * 2;
+      [-1, 1].forEach(side => {
+        const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.12, 12), new THREE.MeshStandardMaterial({ color: 0x6b8ca4, metalness: 0.95, roughness: 0.14 }));
+        bolt.rotation.x = Math.PI / 2;
+        bolt.position.set(Math.cos(angle) * 1.54, side * 2.63, Math.sin(angle) * 1.54);
+        reactor.add(bolt);
+      });
+    }
     [-1.25, 0, 1.25].forEach(y => {
       const rib = new THREE.Mesh(new THREE.TorusGeometry(1.76, 0.035, 8, 48), new THREE.MeshStandardMaterial({ color: 0x34516c, metalness: 0.92, roughness: 0.16 }));
       rib.rotation.x = Math.PI / 2;
@@ -423,6 +465,16 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
     const pumpSkid = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.16, 2.08), new THREE.MeshStandardMaterial({ color: 0x203149, metalness: 0.78, roughness: 0.25 }));
     pumpSkid.position.set(0, -0.87, 0);
     pump.add(pumpSkid);
+    const motorShroud = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.48, 0.94, 32), new THREE.MeshStandardMaterial({ color: 0x263b52, metalness: 0.84, roughness: 0.18 }));
+    motorShroud.rotation.z = Math.PI / 2;
+    motorShroud.position.set(0.46, 0.18, 0);
+    pump.add(motorShroud);
+    [-0.08, 0.16, 0.4, 0.64, 0.88].forEach(x => {
+      const fin = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.022, 8, 24), new THREE.MeshStandardMaterial({ color: 0x486b83, metalness: 0.88, roughness: 0.16 }));
+      fin.rotation.y = Math.PI / 2;
+      fin.position.set(x, 0.18, 0);
+      pump.add(fin);
+    });
     const pumpInletWorld = pumpInletLocal.clone().add(pump.position);
     const pumpPowerWorld = new THREE.Vector3(5.82, -1.3, 2.35);
     connector(electricalLayer, pumpPowerWorld, 0.08, 0.24);
@@ -455,6 +507,9 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
       const base = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.12, 32), new THREE.MeshStandardMaterial({ color: 0x203149, metalness: 0.85, roughness: 0.2 }));
       base.position.y = -1.04;
       group.add(base);
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.57, 0.57, 0.11, 28), new THREE.MeshStandardMaterial({ color: 0x365872, metalness: 0.9, roughness: 0.16 }));
+      crown.position.y = 1.02;
+      group.add(crown);
 
       const inlet = new THREE.Vector3(group.position.x - 0.84, group.position.y, group.position.z);
       const outlet = new THREE.Vector3(group.position.x + 0.84, group.position.y, group.position.z);
@@ -601,6 +656,7 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
       particle: particleLayer,
       material: materialLayer,
       electrical: electricalLayer,
+      structure: structureLayer,
       selectables,
     };
 
@@ -809,22 +865,29 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
   const toggleLayer = (key: LayerKey) => setLayers(previous => ({ ...previous, [key]: !previous[key] }));
 
   return (
-    <div className="relative h-[590px] overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-950/90 shadow-2xl shadow-cyan-950/20">
+    <div className="relative h-[660px] overflow-hidden rounded-2xl border border-cyan-400/25 bg-slate-950/90 shadow-[0_28px_90px_rgba(2,132,199,0.16)]">
       <div ref={mountRef} className="absolute inset-0" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_28%_15%,rgba(34,211,238,0.08),transparent_34%),radial-gradient(circle_at_76%_70%,rgba(59,130,246,0.08),transparent_28%)]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between bg-gradient-to-b from-slate-950/95 via-slate-950/70 to-transparent p-4">
         <div>
-          <div className="flex items-center gap-2 font-mono text-[10px] font-semibold tracking-[0.25em] text-cyan-300"><span className={`h-2 w-2 rounded-full ${fault ? "bg-red-400" : hasFrame ? "bg-emerald-400" : "bg-slate-500"}`} />3D PROCESS MACHINE</div>
-          <div className="mt-1 text-[10px] text-slate-500">CAUSAL FRAME → VALIDATED PHYSICAL TOPOLOGY</div>
+          <div className="flex items-center gap-2 font-mono text-[10px] font-semibold tracking-[0.25em] text-cyan-300"><span className={`h-2 w-2 rounded-full shadow-[0_0_12px_currentColor] ${fault ? "bg-red-400 text-red-400" : hasFrame ? "bg-emerald-400 text-emerald-400" : "bg-slate-500 text-slate-500"}`} />3D PROCESS MACHINE</div>
+          <div className="mt-1 text-[10px] text-slate-500">CAUSAL FRAME → AUTHORITATIVE PHYSICAL TOPOLOGY</div>
+          <div className="mt-2 flex flex-wrap gap-1 font-mono text-[7px] tracking-[0.12em]">
+            <span className="rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-violet-200">SIMULATION / FRAME</span>
+            <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-amber-200">DERIVED / FLOW ACTIVITY</span>
+            <span className="rounded border border-slate-700 bg-slate-900/70 px-1.5 py-0.5 text-slate-400">MEASURED / NOT LOADED</span>
+            <span className="rounded border border-slate-700 bg-slate-900/70 px-1.5 py-0.5 text-slate-500">UNKNOWN / DATA GAP</span>
+          </div>
         </div>
-        <div className={`rounded-lg border px-3 py-2 font-mono text-[9px] ${fault ? "border-red-500/30 bg-red-500/10 text-red-300" : hasFrame ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300" : "border-slate-700 bg-slate-950/80 text-slate-500"}`}>{fault ? "SAFETY TRIP" : hasFrame ? visual.stage : "UNKNOWN / NO FRAME"}</div>
+        <div className={`rounded-lg border px-3 py-2 font-mono text-[9px] shadow-lg ${fault ? "border-red-500/30 bg-red-500/10 text-red-300" : hasFrame ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300" : "border-slate-700 bg-slate-950/80 text-slate-500"}`}><div className="text-[7px] tracking-[0.14em] opacity-70">AUTHORITATIVE STATUS</div><div className="mt-1">{fault ? "SAFETY TRIP" : hasFrame ? visual.stage : "UNKNOWN / NO FRAME"}</div></div>
       </div>
 
-      {layers.label && <div className="pointer-events-none absolute left-4 top-20 space-y-1.5 font-mono text-[9px]">
-        <div className="rounded bg-slate-950/75 px-2 py-1 text-slate-400">REACTOR / CHAMBER</div>
-        <div className="rounded bg-slate-950/75 px-2 py-1 text-slate-400">VAPOR → TRAP 1 → TRAP 2 → TRAP 3 → TRAP 4</div>
-        <div className="rounded bg-slate-950/75 px-2 py-1 text-slate-400">TRAP 4 → VACUUM PUMP</div>
-        <div className="rounded bg-slate-950/75 px-2 py-1 text-slate-400">COOLING SUPPLY → TRAPS → RETURN</div>
-        <div className="rounded bg-slate-950/75 px-2 py-1 text-amber-200">FLOW ANIMATION = DERIVED ACTIVITY</div>
+      {layers.label && <div className="pointer-events-none absolute left-4 top-28 space-y-1.5 font-mono text-[9px]">
+        <div className="rounded border border-white/10 bg-slate-950/75 px-2 py-1 text-slate-300 shadow-lg">01 / REACTOR + CHAMBER</div>
+        <div className="rounded border border-white/10 bg-slate-950/75 px-2 py-1 text-slate-400">02 / VAPOR → TRAP 1 → TRAP 2 → TRAP 3 → TRAP 4</div>
+        <div className="rounded border border-white/10 bg-slate-950/75 px-2 py-1 text-slate-400">03 / TRAP 4 → VACUUM PUMP</div>
+        <div className="rounded border border-white/10 bg-slate-950/75 px-2 py-1 text-slate-400">04 / COOLING SUPPLY → TRAPS → RETURN</div>
+        <div className="rounded border border-amber-500/20 bg-amber-500/5 px-2 py-1 text-amber-200">FLOW ANIMATION = DERIVED ACTIVITY</div>
       </div>}
 
       {layers.diagnostics && <div className="pointer-events-none absolute right-4 top-20 rounded-xl border border-white/10 bg-slate-950/85 p-3 font-mono text-[9px] shadow-xl backdrop-blur">
@@ -837,7 +900,7 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
           <div><span className={connection(Boolean(commands?.vacuumPump))}>●</span> POWER → PUMP</div>
           <div><span className={connection(Boolean(visual.ultrasonicEffectivePowerW && visual.ultrasonicEffectivePowerW > 0))}>●</span> POWER → ULTRASONIC</div>
         </div>
-        <div className="mt-2 border-t border-white/10 pt-2 text-[8px] text-slate-600">ALL VISUAL PATHS TERMINATE AT EXPLICIT CONNECTORS.</div>
+        <div className="mt-2 border-t border-white/10 pt-2 text-[8px] text-slate-600">VISUAL PATHS TERMINATE AT EXPLICIT CONNECTORS. STRUCTURE LAYER IS VISUAL ONLY.</div>
       </div>}
 
       <div className="pointer-events-auto absolute right-4 top-48 w-52 rounded-xl border border-cyan-500/20 bg-slate-950/90 p-3 font-mono text-[9px] shadow-xl backdrop-blur">
@@ -851,12 +914,12 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
         <div className="mt-3 text-[8px] tracking-[0.2em] text-slate-500">VISUAL LAYERS</div>
         <div className="mt-1 grid grid-cols-2 gap-1">{(Object.keys(layers) as LayerKey[]).map(key => <button key={key} onClick={() => toggleLayer(key)} className={`rounded border px-1 py-1 text-[7px] ${layers[key] ? "border-emerald-500/35 text-emerald-200" : "border-slate-700 text-slate-500"}`}>{key.toUpperCase()}</button>)}</div>
         <div className="mt-2 grid grid-cols-2 gap-1"><button onClick={() => { setFlowEnabled(value => !value); observabilityRef.current?.({ event: "LAYER_CHANGE", result: "SUCCESS", detail: { layer: "flow" } }); }} className={`rounded border px-1 py-1 text-[7px] ${flowEnabled ? "border-amber-500/40 text-amber-200" : "border-slate-700 text-slate-500"}`}>FLOW {flowEnabled ? "ON" : "OFF"}</button><button onClick={() => { setParticlesEnabled(value => !value); observabilityRef.current?.({ event: "LAYER_CHANGE", result: "SUCCESS", detail: { layer: "particle" } }); }} className={`rounded border px-1 py-1 text-[7px] ${particlesEnabled ? "border-amber-500/40 text-amber-200" : "border-slate-700 text-slate-500"}`}>PARTICLE {particlesEnabled ? "ON" : "OFF"}</button></div>
-        <div className="mt-2 text-[7px] leading-relaxed text-slate-600">Camera, layers, flow, and particles do not alter the simulation engine. Flow rate remains UNKNOWN.</div>
+        <div className="mt-2 rounded border border-slate-800 bg-slate-900/50 p-2 text-[7px] leading-relaxed text-slate-500">DRAG: ROTATE · SHIFT + DRAG: PAN · WHEEL: ZOOM · SELECT: FOCUS. Camera, layers, flow, and particles do not alter the simulation engine. Flow rate remains UNKNOWN.</div>
       </div>
 
       <div className="pointer-events-auto absolute bottom-28 left-4 w-60 rounded-xl border border-violet-500/20 bg-slate-950/90 p-3 font-mono text-[9px] shadow-xl backdrop-blur">
         <div className="flex items-center justify-between gap-2"><span className="text-[8px] tracking-[0.2em] text-violet-300">COMPONENT INSPECTOR</span><select aria-label="Select 3D component" value={selectedComponent ?? ""} onChange={event => setSelectedComponent((event.target.value || null) as ComponentId | null)} className="max-w-32 rounded border border-slate-700 bg-slate-900 px-1 py-0.5 text-[8px] text-slate-200"><option value="">SELECT</option>{(Object.keys(COMPONENT_LABELS) as ComponentId[]).map(id => <option value={id} key={id}>{COMPONENT_LABELS[id]}</option>)}</select></div>
-        {selectedComponent ? <div className="mt-2 space-y-1.5 text-slate-400"><div className="text-xs text-violet-200">{COMPONENT_LABELS[selectedComponent]}</div><div className="grid grid-cols-2 gap-x-3 gap-y-1"><span>STATE</span><span className="text-right text-slate-200">{visual.stage ?? "UNKNOWN"}</span><span>COMMAND</span><span className="text-right text-slate-200">{commandFor(selectedComponent) === undefined ? "UNKNOWN" : commandFor(selectedComponent) ? "ON" : "OFF"}</span><span>ACTUATOR</span><span className="text-right text-cyan-200">{actuatorFor(selectedComponent) === undefined ? "UNKNOWN" : normalizedLevel(actuatorFor(selectedComponent)).toFixed(2)}</span><span>SENSOR</span><span className="text-right text-slate-200">{selectedSensor}</span><span>FLOW RATE</span><span className="text-right text-amber-200">UNKNOWN</span><span>SIM TIME</span><span className="text-right text-slate-200">{displayNumber(visual.timestampSeconds, 1, "s")}</span><span>PROVENANCE</span><span className="text-right text-violet-200">SIMULATION</span></div></div> : <div className="mt-2 text-slate-500">Click a major 3D component or choose it here to focus the camera and inspect its authoritative frame values.</div>}
+        {selectedComponent ? <div className="mt-2 space-y-1.5 text-slate-400"><div className="text-xs text-violet-200">{COMPONENT_LABELS[selectedComponent]}</div><div className="grid grid-cols-2 gap-x-3 gap-y-1"><span>STATE</span><span className="text-right text-slate-200">{visual.stage ?? "UNKNOWN"}</span><span>COMMAND</span><span className="text-right text-slate-200">{commandFor(selectedComponent) === undefined ? "UNKNOWN" : commandFor(selectedComponent) ? "ON" : "OFF"}</span><span>ACTUATOR</span><span className="text-right text-cyan-200">{actuatorFor(selectedComponent) === undefined ? "UNKNOWN" : normalizedLevel(actuatorFor(selectedComponent)).toFixed(2)}</span><span>SENSOR</span><span className="text-right text-slate-200">{selectedSensor}</span><span>FLOW RATE</span><span className="text-right text-amber-200">UNKNOWN</span><span>SIM TIME</span><span className="text-right text-slate-200">{displayNumber(visual.timestampSeconds, 1, "s")}</span><span>PROVENANCE</span><span className="text-right text-violet-200">SIMULATION</span><span>MEASURED</span><span className="text-right text-slate-500">NOT LOADED</span></div></div> : <div className="mt-2 text-slate-500">Click a major 3D component or choose it here to focus the camera and inspect its authoritative frame values.</div>}
       </div>
 
       {layers.instrument && <div className="absolute bottom-3 left-3 right-3 grid grid-cols-2 gap-2 md:grid-cols-6">

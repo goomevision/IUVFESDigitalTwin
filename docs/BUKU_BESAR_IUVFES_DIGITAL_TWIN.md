@@ -1454,6 +1454,47 @@ No migration, database mutation, backend deployment, OAuth, experiment/session/t
 
 ---
 
+## 2026-08-26 — P15 Modern 3D Control Room source publication
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Commit:** Source-publication commit for this entry
+**PR:** open; no merge performed
+
+### Temuan
+
+`ProcessMachine3D` sudah menjadi consumer `CausalFrame`; P15 membatasi pekerjaan pada presentasi renderer dan Control Room tanpa mengubah authority scientific. Browser runtime yang benar tetap memerlukan OAuth operator yang sah serta persisted experiment dan canonical session yang sudah ada. Kondisi tersebut belum tersedia, sehingga authenticated WebGL smoke tidak dapat dilakukan tanpa melanggar batas no-bypass/no-data-creation.
+
+### Perubahan
+
+P15 menambah lapisan struktur industrial visual, maintenance platform/rail/column/beacon, fog dan overhead lighting, detail flange reactor, shroud/motor/fins vacuum pump, detail crown cold trap, serta hierarchy overlay yang lebih kuat. Guidance navigasi, layer `structure`, legenda status `SIMULATION`/`DERIVED`/`MEASURED`/`UNKNOWN`, dan wording provenance inspector diperjelas. Kamera OrbitControls, rotate, zoom, pan, focus, preset, selection, inspector, view mode, layer control, topology piping, dan safe canvas cleanup dipertahankan.
+
+### Data flow affected
+
+Tetap `CausalFrame → getProcessMachineVisualState() → Three.js presentation`. Waktu visual berasal dari `frame.timestampSeconds`; `effectiveCommands` tetap authority command/interlock; `actuatorLevels` tetap intensitas visual kontinu; particle flow tetap ditandai sebagai aktivitas `DERIVED`, bukan measured flow rate. Tidak ada route, API, persistence, atau contract scientific yang diubah.
+
+### Scientific impact
+
+Tidak ada perubahan physics, PID, safety, engine, CausalFrame, database, migration, OAuth, backend, experiment, session, lifecycle P10, atau perhitungan sensor. Field yang tidak tersedia tetap `UNKNOWN`; P15 tidak membuat atau mengimputasi data ilmiah, telemetry, experiment, ataupun session.
+
+### Simulation/Lab boundary impact
+
+Tidak berubah. `SIMULATION`, `DERIVED`, `MEASURED`, dan `UNKNOWN` ditampilkan secara eksplisit agar presentasi visual tidak terlihat sebagai pengukuran laboratorium. Status `MEASURED` tetap tidak dimuat jika tidak ada sumber measurement authoritative.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS — 33 files / 88 tests, termasuk `server/processMachine3D.p15.test.ts`. `pnpm build`: PASS. `git diff --check`: PASS. Warning ukuran JavaScript bundle lebih dari 500 kB tetap non-blocking.
+
+### Status
+
+🟢 P15 **source publication** tervalidasi secara statis dan dipublikasikan pada branch fitur tanpa merge. 🟡 Authenticated visual smoke untuk WebGL/Control Room tetap **BLOCKED** oleh OAuth/session yang sah dan deployment backend yang lengkap. Status ini bukan hasil P10 dan tidak mengubah blocker infrastruktur yang sudah tercatat.
+
+### Next action
+
+Jangan melakukan P10 atau browser 3D acceptance sampai external infrastructure configuration menyediakan full GitHub backend deployment, governance migration/recovery yang disetujui, release identity terverifikasi, OAuth operator sah, serta persisted experiment/canonical session yang sudah ada. Saat kondisi tersebut tersedia, jalankan smoke yang legitimate tanpa membuat data baru.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:
