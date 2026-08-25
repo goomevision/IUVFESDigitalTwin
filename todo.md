@@ -450,6 +450,13 @@
 - [x] Connect the 3D sensor inspector to the instrument information layer without creating measurement data or changing frame contracts.
 - [x] Add P17 regression coverage, run static quality gates, document, commit, and push while retaining the authenticated WebGL blocker.
 
+## P18 — METROLOGICAL TRACEABILITY FOUNDATION
+
+- [x] Map the P17 Instrument Registry contract and preserve its unloaded measurement boundary.
+- [x] Define traceability chain nodes and source-safe statuses for instrument, certificate, reference standard, laboratory, measurement result, and evidence/provenance.
+- [x] Add a readable traceability-chain visual to the Instrument Inspector without claiming metrological traceability.
+- [x] Add P18 regression coverage, run static quality gates, document, commit, and push while retaining the authenticated WebGL blocker.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.

@@ -1577,6 +1577,47 @@ Sebelum mengisi metadata instrument nyata, sediakan governance terpisah untuk in
 
 ---
 
+## 2026-08-26 — P18 Metrological Traceability Foundation source publication
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Commit:** Source-publication commit for this entry
+**PR:** open; no merge performed
+
+### Temuan
+
+P17 telah menyediakan contract field traceability pada Instrument Registry, tetapi belum menyediakan visual chain yang memperlihatkan kelengkapan atau ketidaklengkapan hubungan instrument, certificate, reference standard, calibration laboratory, measurement result, dan evidence/provenance. Tanpa chain eksplisit, UI berisiko membuat simulation provenance terlihat sebagai metrological traceability.
+
+### Perubahan
+
+P18 menambahkan Metrological Traceability Chain pada Instrument Inspector. Setiap selected instrument membentuk enam node: **Instrument → Calibration Certificate → Reference Standard → Calibration Laboratory → Measurement Result → Evidence / Provenance**. Setiap node memuat status, identifier/reference, source, provenance, dan interpretation limit. Status saat ini memakai `NOT LOADED` atau `NOT APPLICABLE` sesuai evidence yang tersedia; `VERIFIED` hanya tersedia sebagai contract status dan tidak digunakan oleh registry saat ini.
+
+### Data flow affected
+
+Chain dibentuk secara deterministik dari P17 `InstrumentRegistryEntry` dan hanya mereferensikan instrument ID, existing CausalFrame field, serta provenance yang sudah dideklarasikan. Tidak ada perubahan pada `CausalFrame`, nilai sensor, engine, component geometry, API, persistence, atau request backend. Measurement Result dan Evidence / Provenance node menegaskan bahwa channel active adalah `SIMULATION`, bukan measurement.
+
+### Scientific impact
+
+Tidak ada perubahan physics, PID, safety, CausalFrame contract, database, migration, OAuth, backend, experiment/session, P10 lifecycle, scientific journal, telemetry, certificate, laboratory, reference standard, uncertainty, measurement, maupun evidence. P18 tidak membuat identifier fisik baru; `NOT LOADED` dipakai jika record belum ada dan `UNKNOWN` tetap dipertahankan jika data tidak diketahui.
+
+### Simulation/Lab boundary impact
+
+`SIMULATION ≠ MEASURED` dan `DERIVED ≠ MEASURED` diperlihatkan pada UI chain. CausalFrame provenance mendukung traceability simulation saja dan secara eksplisit bukan metrological evidence. Chain diberi status **CHAIN NOT VERIFIED** hingga records physical instrument, certificate, standard, laboratory, measurement result, dan evidence/provenance benar-benar dimuat serta diverifikasi.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS — 36 files / 97 tests, termasuk `server/metrologicalTraceability.p18.test.ts`. `pnpm build`: PASS. `git diff --check`: PASS. Warning ukuran JavaScript bundle lebih dari 500 kB tetap non-blocking.
+
+### Status
+
+🟢 P18 **source publication** tervalidasi secara statis pada branch fitur tanpa merge. 🟡 Metrological Traceability Chain adalah UI/contract foundation, bukan claim of metrological traceability. 🟡 Authenticated WebGL smoke tetap **BLOCKED** oleh OAuth/session/full backend deployment; P10 tidak berubah.
+
+### Next action
+
+Jangan mengisi node P18 sebelum tersedia evidence-backed records dan governance yang disetujui untuk instrument identity, calibration certificate, reference standard, laboratory, measurement result, uncertainty, evidence/provenance, ownership, dan persistence. Jangan menjalankan P10 atau browser acceptance sampai prasyarat runtime legitimate tersedia.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:
