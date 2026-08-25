@@ -2,8 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { CausalFrame } from "../../../server/closedLoopSimulation";
+import type { ControlRoomEventName, ControlRoomEventResult, FrameReference } from "@/lib/controlRoomObservability";
 
-interface Props { frame?: CausalFrame; }
+type MachineObservabilityEvent = Extract<ControlRoomEventName, "THREE_SCENE_INIT" | "THREE_RENDERER_INIT" | "THREE_DISPOSE" | "WEBGL_ERROR" | "FRAME_RENDERED" | "SELECT_COMPONENT" | "FOCUS_COMPONENT" | "CAMERA_PRESET" | "ZOOM" | "RESET_VIEW" | "LAYER_CHANGE" | "VIEW_MODE_CHANGE">;
+
+interface Props {
+  frame?: CausalFrame;
+  onObservabilityEvent?: (input: { event: MachineObservabilityEvent; result: ControlRoomEventResult; componentId?: string; detail?: Record<string, unknown>; frameRef?: FrameReference }) => void;
+}
 
 type ViewMode = "REALISTIC" | "X_RAY" | "WIREFRAME";
 type CameraPreset = "DEFAULT" | "FRONT" | "TOP" | "LEFT" | "RIGHT" | "PROCESS_PATH" | "REACTOR" | "COLD_TRAPS" | "VACUUM" | "COOLING";
@@ -160,7 +166,7 @@ function createParticles(parent: THREE.Object3D, count: number, color: number) {
   return group;
 }
 
-export function ProcessMachine3D({ frame }: Props) {
+export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<CausalFrame | undefined>(frame);
   const sceneRuntimeRef = useRef<{
@@ -183,10 +189,13 @@ export function ProcessMachine3D({ frame }: Props) {
   const flowEnabledRef = useRef(flowEnabled);
   const particlesEnabledRef = useRef(particlesEnabled);
   const viewModeRef = useRef<ViewMode>(viewMode);
+  const observabilityRef = useRef(onObservabilityEvent);
+  const lastRenderedFrameStep = useRef<number | null>(null);
   selectedComponentRef.current = selectedComponent;
   flowEnabledRef.current = flowEnabled;
   particlesEnabledRef.current = particlesEnabled;
   viewModeRef.current = viewMode;
+  observabilityRef.current = onObservabilityEvent;
   frameRef.current = frame;
 
   const applyPreset = useCallback((preset: CameraPreset) => {
@@ -196,6 +205,7 @@ export function ProcessMachine3D({ frame }: Props) {
     runtime.camera.position.set(...next.position);
     runtime.controls.target.set(...next.target);
     runtime.controls.update();
+    observabilityRef.current?.({ event: "CAMERA_PRESET", result: "SUCCESS", detail: { preset } });
   }, []);
 
   useEffect(() => {
@@ -216,7 +226,11 @@ export function ProcessMachine3D({ frame }: Props) {
         if (Array.isArray(material)) material.forEach(apply); else apply(material);
       }));
     });
-    if (selectedObjects.length) applyPreset(COMPONENT_PRESETS[selectedComponent as ComponentId]);
+    if (selectedComponent) observabilityRef.current?.({ event: "SELECT_COMPONENT", result: "SUCCESS", componentId: selectedComponent });
+    if (selectedObjects.length) {
+      applyPreset(COMPONENT_PRESETS[selectedComponent as ComponentId]);
+      observabilityRef.current?.({ event: "FOCUS_COMPONENT", result: "SUCCESS", componentId: selectedComponent ?? undefined });
+    }
   }, [selectedComponent, applyPreset]);
 
   useEffect(() => {
@@ -228,6 +242,7 @@ export function ProcessMachine3D({ frame }: Props) {
     runtime.particle.visible = layers.particle && particlesEnabled;
     runtime.material.visible = layers.material;
     runtime.electrical.visible = layers.electrical;
+    observabilityRef.current?.({ event: "LAYER_CHANGE", result: "SUCCESS", detail: { layers } });
   }, [layers, particlesEnabled]);
 
   useEffect(() => {
@@ -245,6 +260,7 @@ export function ProcessMachine3D({ frame }: Props) {
       };
       if (Array.isArray(object.material)) object.material.forEach(update); else update(object.material);
     });
+    observabilityRef.current?.({ event: "VIEW_MODE_CHANGE", result: "SUCCESS", detail: { viewMode } });
   }, [viewMode]);
 
   useEffect(() => {
@@ -252,6 +268,7 @@ export function ProcessMachine3D({ frame }: Props) {
     if (!mount) return;
 
     const scene = new THREE.Scene();
+    observabilityRef.current?.({ event: "THREE_SCENE_INIT", result: "SUCCESS" });
     scene.background = new THREE.Color(0x020712);
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 100);
     camera.position.set(11.8, 7.6, 17.5);
@@ -264,6 +281,9 @@ export function ProcessMachine3D({ frame }: Props) {
     renderer.toneMappingExposure = 1.05;
     renderer.setSize(mount.clientWidth, mount.clientHeight);
     mount.appendChild(renderer.domElement);
+    observabilityRef.current?.({ event: "THREE_RENDERER_INIT", result: "SUCCESS" });
+    const onContextLost = () => observabilityRef.current?.({ event: "WEBGL_ERROR", result: "ERROR", detail: { type: "webglcontextlost" } });
+    renderer.domElement.addEventListener("webglcontextlost", onContextLost);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0.4, 0.9, -0.3);
@@ -297,16 +317,29 @@ export function ProcessMachine3D({ frame }: Props) {
     };
 
     scene.add(new THREE.HemisphereLight(0x9ee7ff, 0x07111f, 1.5));
+    scene.add(new THREE.AmbientLight(0x14324a, 0.42));
     const key = new THREE.PointLight(0x22d3ee, 18, 34);
     key.position.set(-4, 8, 7);
     scene.add(key);
     const fill = new THREE.PointLight(0x2563eb, 7, 30);
     fill.position.set(6, 4, -6);
     scene.add(fill);
+    const rim = new THREE.DirectionalLight(0x7dd3fc, 2.6);
+    rim.position.set(-9, 7, -9);
+    scene.add(rim);
     const floor = new THREE.Mesh(new THREE.CircleGeometry(11, 64), new THREE.MeshBasicMaterial({ color: 0x06101c, transparent: true, opacity: 0.94 }));
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -2.25;
     scene.add(floor);
+    const grid = new THREE.GridHelper(20, 20, 0x1e5d7a, 0x0b2637);
+    grid.position.y = -2.23;
+    grid.material.transparent = true;
+    grid.material.opacity = 0.28;
+    scene.add(grid);
+    const deckRing = new THREE.Mesh(new THREE.RingGeometry(8.5, 8.56, 96), new THREE.MeshBasicMaterial({ color: 0x1d84a8, transparent: true, opacity: 0.32, side: THREE.DoubleSide }));
+    deckRing.rotation.x = -Math.PI / 2;
+    deckRing.position.y = -2.2;
+    scene.add(deckRing);
 
     // -----------------------------------------------------------------------
     // AUTHORITATIVE VISUAL TOPOLOGY
@@ -343,6 +376,17 @@ export function ProcessMachine3D({ frame }: Props) {
     const bottom = top.clone();
     bottom.position.y = -2.46;
     reactor.add(bottom);
+    [-1.25, 0, 1.25].forEach(y => {
+      const rib = new THREE.Mesh(new THREE.TorusGeometry(1.76, 0.035, 8, 48), new THREE.MeshStandardMaterial({ color: 0x34516c, metalness: 0.92, roughness: 0.16 }));
+      rib.rotation.x = Math.PI / 2;
+      rib.position.y = y;
+      reactor.add(rib);
+    });
+    [-1, 1].forEach(x => {
+      const support = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.9, 0.22), new THREE.MeshStandardMaterial({ color: 0x27435d, metalness: 0.84, roughness: 0.22 }));
+      support.position.set(x * 1.28, -2.9, 0.62);
+      reactor.add(support);
+    });
 
     const heaterRing = new THREE.Mesh(new THREE.TorusGeometry(1.51, 0.09, 12, 48), new THREE.MeshStandardMaterial({ color: 0x334155, emissive: 0x000000, emissiveIntensity: 0 }));
     heaterRing.rotation.x = Math.PI / 2;
@@ -376,6 +420,9 @@ export function ProcessMachine3D({ frame }: Props) {
     pumpInlet.rotation.z = Math.PI / 2;
     pumpInlet.position.copy(pumpInletLocal);
     pump.add(pumpInlet);
+    const pumpSkid = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.16, 2.08), new THREE.MeshStandardMaterial({ color: 0x203149, metalness: 0.78, roughness: 0.25 }));
+    pumpSkid.position.set(0, -0.87, 0);
+    pump.add(pumpSkid);
     const pumpInletWorld = pumpInletLocal.clone().add(pump.position);
     const pumpPowerWorld = new THREE.Vector3(5.82, -1.3, 2.35);
     connector(electricalLayer, pumpPowerWorld, 0.08, 0.24);
@@ -428,6 +475,17 @@ export function ProcessMachine3D({ frame }: Props) {
       group.add(indicator);
       trapIndicators.push(indicator);
     }
+    const condenserRack = new THREE.Group();
+    const rackMaterial = new THREE.MeshStandardMaterial({ color: 0x27435d, metalness: 0.82, roughness: 0.22 });
+    const rackBeam = new THREE.Mesh(new THREE.BoxGeometry(10.1, 0.14, 0.42), rackMaterial);
+    rackBeam.position.set(1.78, 2.13, -1.55);
+    condenserRack.add(rackBeam);
+    [0, 3].forEach(index => {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.15, 0.3), rackMaterial);
+      leg.position.set(trapGroups[index].position.x, 1.58, -1.55);
+      condenserRack.add(leg);
+    });
+    equipmentLayer.add(condenserRack);
 
     // --------------------------- PROCESS GAS PATH --------------------------
     const vacuumMaterial = new THREE.MeshBasicMaterial({ color: 0x164e63 });
@@ -590,6 +648,11 @@ export function ProcessMachine3D({ frame }: Props) {
 
     const animate = () => {
       const visual = getProcessMachineVisualState(frameRef.current);
+      const currentFrame = frameRef.current;
+      if (currentFrame && currentFrame.step !== lastRenderedFrameStep.current) {
+        lastRenderedFrameStep.current = currentFrame.step;
+        observabilityRef.current?.({ event: "FRAME_RENDERED", result: "INFO", frameRef: { step: currentFrame.step, timestampSeconds: currentFrame.timestampSeconds, provenance: "SIMULATION" } });
+      }
       const commands = visual.commands;
       const time = finite(visual.timestampSeconds) ? visual.timestampSeconds! : 0;
       const actuatorVisualLevels = getProcessMachineActuatorVisualLevels(frameRef.current);
@@ -694,6 +757,7 @@ export function ProcessMachine3D({ frame }: Props) {
       cancelAnimationFrame(raf);
       renderer.domElement.removeEventListener("pointerdown", onPointerDown);
       renderer.domElement.removeEventListener("pointerup", onPointerUp);
+      renderer.domElement.removeEventListener("webglcontextlost", onContextLost);
       resizeObserver?.disconnect();
       if (!resizeObserver) window.removeEventListener("resize", resize);
       const geometries = new Set<THREE.BufferGeometry>();
@@ -709,6 +773,7 @@ export function ProcessMachine3D({ frame }: Props) {
       renderer.dispose();
       if (sceneRuntimeRef.current?.camera === camera) sceneRuntimeRef.current = null;
       if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
+      observabilityRef.current?.({ event: "THREE_DISPOSE", result: "SUCCESS" });
     };
   }, []);
 
@@ -780,12 +845,12 @@ export function ProcessMachine3D({ frame }: Props) {
         <div className="grid grid-cols-3 gap-1">
           {(["DEFAULT", "FRONT", "TOP", "LEFT", "RIGHT", "PROCESS_PATH", "REACTOR", "COLD_TRAPS", "VACUUM", "COOLING"] as CameraPreset[]).map(preset => <button key={preset} onClick={() => applyPreset(preset)} className="rounded border border-slate-700 px-1 py-1 text-[7px] text-slate-300 hover:border-cyan-400 hover:text-cyan-200">{preset.replace("_", " ")}</button>)}
         </div>
-        <button onClick={() => { setSelectedComponent(null); applyPreset("DEFAULT"); }} className="mt-2 w-full rounded border border-cyan-500/30 px-2 py-1 text-cyan-200 hover:bg-cyan-500/10">RESET VIEW</button>
+        <button onClick={() => { setSelectedComponent(null); applyPreset("DEFAULT"); observabilityRef.current?.({ event: "RESET_VIEW", result: "SUCCESS" }); }} className="mt-2 w-full rounded border border-cyan-500/30 px-2 py-1 text-cyan-200 hover:bg-cyan-500/10">RESET VIEW</button>
         <div className="mt-3 text-[8px] tracking-[0.2em] text-slate-500">VIEW MODE</div>
         <div className="mt-1 grid grid-cols-3 gap-1">{(["REALISTIC", "X_RAY", "WIREFRAME"] as ViewMode[]).map(mode => <button key={mode} onClick={() => setViewMode(mode)} className={`rounded border px-1 py-1 text-[7px] ${viewMode === mode ? "border-cyan-400 bg-cyan-500/15 text-cyan-200" : "border-slate-700 text-slate-400"}`}>{mode.replace("_", " ")}</button>)}</div>
         <div className="mt-3 text-[8px] tracking-[0.2em] text-slate-500">VISUAL LAYERS</div>
         <div className="mt-1 grid grid-cols-2 gap-1">{(Object.keys(layers) as LayerKey[]).map(key => <button key={key} onClick={() => toggleLayer(key)} className={`rounded border px-1 py-1 text-[7px] ${layers[key] ? "border-emerald-500/35 text-emerald-200" : "border-slate-700 text-slate-500"}`}>{key.toUpperCase()}</button>)}</div>
-        <div className="mt-2 grid grid-cols-2 gap-1"><button onClick={() => setFlowEnabled(value => !value)} className={`rounded border px-1 py-1 text-[7px] ${flowEnabled ? "border-amber-500/40 text-amber-200" : "border-slate-700 text-slate-500"}`}>FLOW {flowEnabled ? "ON" : "OFF"}</button><button onClick={() => setParticlesEnabled(value => !value)} className={`rounded border px-1 py-1 text-[7px] ${particlesEnabled ? "border-amber-500/40 text-amber-200" : "border-slate-700 text-slate-500"}`}>PARTICLE {particlesEnabled ? "ON" : "OFF"}</button></div>
+        <div className="mt-2 grid grid-cols-2 gap-1"><button onClick={() => { setFlowEnabled(value => !value); observabilityRef.current?.({ event: "LAYER_CHANGE", result: "SUCCESS", detail: { layer: "flow" } }); }} className={`rounded border px-1 py-1 text-[7px] ${flowEnabled ? "border-amber-500/40 text-amber-200" : "border-slate-700 text-slate-500"}`}>FLOW {flowEnabled ? "ON" : "OFF"}</button><button onClick={() => { setParticlesEnabled(value => !value); observabilityRef.current?.({ event: "LAYER_CHANGE", result: "SUCCESS", detail: { layer: "particle" } }); }} className={`rounded border px-1 py-1 text-[7px] ${particlesEnabled ? "border-amber-500/40 text-amber-200" : "border-slate-700 text-slate-500"}`}>PARTICLE {particlesEnabled ? "ON" : "OFF"}</button></div>
         <div className="mt-2 text-[7px] leading-relaxed text-slate-600">Camera, layers, flow, and particles do not alter the simulation engine. Flow rate remains UNKNOWN.</div>
       </div>
 
