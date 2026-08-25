@@ -1495,6 +1495,47 @@ Jangan melakukan P10 atau browser 3D acceptance sampai external infrastructure c
 
 ---
 
+## 2026-08-26 — P16 Scientific Interactive Presentation source publication
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Commit:** Source-publication commit for this entry
+**PR:** open; no merge performed
+
+### Temuan
+
+P15 telah menyediakan renderer 3D modern yang authoritative terhadap `CausalFrame`, tetapi tampilan masih membutuhkan jalur pembelajaran yang lebih eksplisit untuk membedakan topology proses, fungsi komponen, source value, provenance, dan batas interpretasi. P16 menyelesaikan kebutuhan presentation tersebut di dalam Control Room tanpa mengubah cara scientific state dibentuk atau dipersist.
+
+### Perubahan
+
+3D Twin tetap menjadi pusat Control Room dan sekarang menyediakan mode **SIMPLE**, **SCIENTIFIC**, serta **EXPERT**. Process Flow menampilkan chamber → vapor path → cold traps → vacuum → cooling dengan penjelasan source yang sesuai mode. Component Inspector kini menjelaskan function, method, authoritative input, visual output, provenance, dan interpretation limit untuk setiap component yang dapat dipilih. Scientific status legend `SIMULATION` / `DERIVED` / `MEASURED` / `UNKNOWN`, `Why This Value`, dan contextual link ke Knowledge Center ditambahkan pada presentation layer.
+
+### Data flow affected
+
+Tetap `CausalFrame → getProcessMachineVisualState() → ProcessMachine3D presentation`. `frame.timestampSeconds` tetap satu-satunya simulation time; `frame.sensorAfter` tetap nilai proses; `frame.effectiveCommands` tetap authority command/interlock; dan `frame.actuatorLevels` tetap intensitas visual kontinu. Process Flow hanya menjelaskan topology/source yang sudah ada dan tidak menghitung flow rate atau nilai proses baru.
+
+### Scientific impact
+
+Tidak ada perubahan physics, PID, safety, CausalFrame contract, database, migration, OAuth, backend, experiment/session, lifecycle P10, scientific journal, atau telemetry. Status `MEASURED` menyatakan **NOT LOADED** ketika tidak ada dataset measurement. `UNKNOWN` tidak diisi dengan default, estimasi, atau angka sintetis.
+
+### Simulation/Lab boundary impact
+
+Boundary dipertegas. `SIMULATION` menunjuk nilai dari active CausalFrame; `DERIVED` menunjuk presentasi aktivitas yang diturunkan dari state authoritative; `MEASURED` tidak diklaim tanpa dataset; dan `UNKNOWN` tetap menandai data gap. Particle flow secara eksplisit bukan measured vapor/cooling/vacuum flow rate maupun proof laboratorium.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS — 34 files / 91 tests, termasuk `server/processMachine3D.p16.test.ts`. `pnpm build`: PASS. `git diff --check`: PASS. Warning ukuran JavaScript bundle lebih dari 500 kB tetap non-blocking.
+
+### Status
+
+🟢 P16 **source publication** tervalidasi secara statis pada branch fitur tanpa merge. 🟡 Authenticated WebGL smoke tetap **BLOCKED** karena OAuth operator/session sah serta full backend deployment untuk runtime P10 belum tersedia. Status ini tidak mengubah P10 atau blocker infrastruktur yang telah dicatat.
+
+### Next action
+
+Pertahankan P16 sebagai layer presentasi dan pendidikan. Jangan melakukan P10 atau browser 3D acceptance sampai prasyarat runtime legitimate tersedia: full GitHub backend deployment, governance migration/recovery yang disetujui, verifiable release identity, OAuth operator sah, dan persisted experiment/canonical session yang sudah ada.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:

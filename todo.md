@@ -435,6 +435,14 @@
 - [ ] Run P15 code, test, build, diff, and authenticated browser visual smoke checks without creating runtime data; document, commit, and push only if all checks pass. Static checks pass, but ProcessMachine3D cannot mount during unauthenticated browser smoke.
 - [x] Re-run P15 static validation and publish the existing visual-only source changes while documenting authenticated WebGL smoke as BLOCKED by OAuth/session.
 
+## P16 — SCIENTIFIC INTERACTIVE PRESENTATION
+
+- [x] Map existing P15 Control Room presentation surfaces and preserve the CausalFrame-only authority boundary.
+- [x] Make the 3D Twin the central learning surface with an accessible process-flow presentation.
+- [x] Expand the component inspector with function, method, input, output, provenance, and interpretation-limit explanations without creating values.
+- [x] Add explicit SIMULATION / DERIVED / MEASURED / UNKNOWN presentation, contextual Knowledge Center / Why This Value links, and SIMPLE / SCIENTIFIC / EXPERT modes.
+- [x] Run P16 code, test, build, diff, documentation, commit, and push checks; keep authenticated WebGL smoke explicitly BLOCKED by OAuth/session when unavailable.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.

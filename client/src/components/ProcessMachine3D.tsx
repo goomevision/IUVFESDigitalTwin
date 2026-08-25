@@ -3,6 +3,8 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { CausalFrame } from "../../../server/closedLoopSimulation";
 import type { ControlRoomEventName, ControlRoomEventResult, FrameReference } from "@/lib/controlRoomObservability";
+import { WhyThisValue } from "@/components/WhyThisValue";
+import { Link } from "wouter";
 
 type MachineObservabilityEvent = Extract<ControlRoomEventName, "THREE_SCENE_INIT" | "THREE_RENDERER_INIT" | "THREE_DISPOSE" | "WEBGL_ERROR" | "FRAME_RENDERED" | "SELECT_COMPONENT" | "FOCUS_COMPONENT" | "CAMERA_PRESET" | "ZOOM" | "RESET_VIEW" | "LAYER_CHANGE" | "VIEW_MODE_CHANGE">;
 
@@ -16,6 +18,17 @@ type CameraPreset = "DEFAULT" | "FRONT" | "TOP" | "LEFT" | "RIGHT" | "PROCESS_PA
 type ComponentId = "REACTOR" | "HEATER" | "ULTRASONIC" | "VACUUM_PUMP" | "EXTRACTOR" | "CONDENSER" | "COOLING" | "COLD_TRAP_1" | "COLD_TRAP_2" | "COLD_TRAP_3" | "COLD_TRAP_4" | "VAPOR_PIPE" | "VACUUM_PIPE" | "COOLING_PIPE";
 type LayerKey = "equipment" | "piping" | "flow" | "particle" | "material" | "label" | "instrument" | "electrical" | "structure" | "diagnostics";
 type LayerState = Record<LayerKey, boolean>;
+export type PresentationMode = "SIMPLE" | "SCIENTIFIC" | "EXPERT";
+type PresentationClassification = "SIMULATION" | "DERIVED" | "UNKNOWN";
+
+export interface ProcessMachineComponentExplanation {
+  function: string;
+  method: string;
+  authoritativeInput: string;
+  visualOutput: string;
+  classification: PresentationClassification;
+  interpretationLimit: string;
+}
 
 const DEFAULT_LAYERS: LayerState = { equipment: true, piping: true, flow: true, particle: true, material: true, label: true, instrument: true, electrical: true, structure: true, diagnostics: true };
 const CAMERA_PRESETS: Record<CameraPreset, { position: [number, number, number]; target: [number, number, number] }> = {
@@ -37,6 +50,38 @@ const COMPONENT_PRESETS: Record<ComponentId, CameraPreset> = {
 
 const COMPONENT_LABELS: Record<ComponentId, string> = {
   REACTOR: "EXTRACTION CHAMBER", HEATER: "HEATER", ULTRASONIC: "ULTRASONIC", VACUUM_PUMP: "VACUUM PUMP", EXTRACTOR: "EXTRACTOR", CONDENSER: "MULTI-STAGE CONDENSER", COOLING: "COOLING LOOP", COLD_TRAP_1: "COLD TRAP 1", COLD_TRAP_2: "COLD TRAP 2", COLD_TRAP_3: "COLD TRAP 3", COLD_TRAP_4: "COLD TRAP 4", VAPOR_PIPE: "VAPOR PIPE", VACUUM_PIPE: "VACUUM PIPE", COOLING_PIPE: "COOLING PIPE",
+};
+
+export const SCIENTIFIC_STATUS_LEGEND = [
+  { label: "SIMULATION", description: "Value read from the active CausalFrame.", tone: "violet" },
+  { label: "DERIVED", description: "Visual activity inferred from authoritative frame state; not a measured flow rate.", tone: "amber" },
+  { label: "MEASURED", description: "No measurement dataset is loaded in this renderer.", tone: "slate" },
+  { label: "UNKNOWN", description: "No authoritative value is available; the UI does not estimate one.", tone: "slate" },
+] as const;
+
+export const PROCESS_FLOW_PRESENTATION = [
+  { id: "CHAMBER", label: "CHAMBER", detail: "Material / thermal process volume", source: "sensorAfter + materialInventory" },
+  { id: "VAPOR", label: "VAPOR PATH", detail: "Derived process-path activity", source: "effectiveCommands + actuatorLevels" },
+  { id: "TRAPS", label: "COLD TRAPS", detail: "Multi-stage condensation topology", source: "hardwareDiagnostics" },
+  { id: "VACUUM", label: "VACUUM", detail: "Pump-terminal pressure path", source: "sensorAfter.pressureMbar" },
+  { id: "COOLING", label: "COOLING", detail: "Closed utility-loop activity", source: "effectiveCommands + actuatorLevels" },
+] as const;
+
+export const PROCESS_MACHINE_COMPONENT_EXPLANATIONS: Record<ComponentId, ProcessMachineComponentExplanation> = {
+  REACTOR: { function: "Contains the modelled extraction process volume.", method: "Rendered as the authoritative chamber topology.", authoritativeInput: "sensorAfter.temperatureC, sensorAfter.pressureMbar, materialInventory", visualOutput: "Chamber state, material zone, and thermal presentation.", classification: "SIMULATION", interpretationLimit: "This is a digital-twin process representation, not a laboratory vessel measurement." },
+  HEATER: { function: "Presents the heat-input actuator at the chamber.", method: "Maps the continuous heater actuator level to emissive intensity.", authoritativeInput: "effectiveCommands.heater and actuatorLevels.heater", visualOutput: "Heater ring intensity and thermal lighting.", classification: "SIMULATION", interpretationLimit: "Visual intensity is not a calibrated heater-power measurement." },
+  ULTRASONIC: { function: "Presents the ultrasonic process interface.", method: "Maps available ultrasonic activity and power into a bounded visual cue.", authoritativeInput: "ultrasonic.activityIndex and ultrasonic.effectivePowerW", visualOutput: "Ultrasonic emitter colour and scale.", classification: "SIMULATION", interpretationLimit: "The visual cue does not measure cavitation or laboratory acoustic field strength." },
+  VACUUM_PUMP: { function: "Represents the terminal vacuum-pump assembly.", method: "Maps pump command and actuator intensity to motor/piping presentation.", authoritativeInput: "effectiveCommands.vacuumPump, actuatorLevels.vacuumPump, sensorAfter.pressureMbar", visualOutput: "Rotor motion, pump intensity, and vacuum-path highlight.", classification: "SIMULATION", interpretationLimit: "The renderer does not infer pump flow rate when no authoritative rate exists." },
+  EXTRACTOR: { function: "Represents the modelled vapor-transfer path from chamber to condenser.", method: "Uses extractor authority to emphasize the existing sealed piping topology.", authoritativeInput: "effectiveCommands.extractor and actuatorLevels.extractor", visualOutput: "Vapor-path colour and derived activity particles.", classification: "DERIVED", interpretationLimit: "Particles indicate derived activity only; they are not measured vapor flow." },
+  CONDENSER: { function: "Represents multi-stage condensation equipment.", method: "Maps condenser intensity and available cold-trap diagnostics into the existing rack topology.", authoritativeInput: "effectiveCommands.condenser, actuatorLevels.condenser, hardwareDiagnostics", visualOutput: "Trap coil, shell, and indicator presentation.", classification: "SIMULATION", interpretationLimit: "A coloured trap is not evidence of laboratory condensation performance." },
+  COOLING: { function: "Represents the closed cooling utility loop.", method: "Maps cooling command and actuator intensity to the routed utility loop.", authoritativeInput: "effectiveCommands.cooling and actuatorLevels.cooling", visualOutput: "Cooling-path colour and derived activity particles.", classification: "DERIVED", interpretationLimit: "The renderer does not create a cooling flow or utility measurement." },
+  COLD_TRAP_1: { function: "Represents cold-trap stage 1.", method: "Uses the first available diagnostics entry for visual state.", authoritativeInput: "hardwareDiagnostics.coldTrapTemperaturesC[0] and coldTrapStageCondensedWaterKg[0]", visualOutput: "Stage 1 shell, coil, and indicator presentation.", classification: "SIMULATION", interpretationLimit: "Unavailable diagnostics remain UNKNOWN; no stage value is estimated." },
+  COLD_TRAP_2: { function: "Represents cold-trap stage 2.", method: "Uses the second available diagnostics entry for visual state.", authoritativeInput: "hardwareDiagnostics.coldTrapTemperaturesC[1] and coldTrapStageCondensedWaterKg[1]", visualOutput: "Stage 2 shell, coil, and indicator presentation.", classification: "SIMULATION", interpretationLimit: "Unavailable diagnostics remain UNKNOWN; no stage value is estimated." },
+  COLD_TRAP_3: { function: "Represents cold-trap stage 3.", method: "Uses the third available diagnostics entry for visual state.", authoritativeInput: "hardwareDiagnostics.coldTrapTemperaturesC[2] and coldTrapStageCondensedWaterKg[2]", visualOutput: "Stage 3 shell, coil, and indicator presentation.", classification: "SIMULATION", interpretationLimit: "Unavailable diagnostics remain UNKNOWN; no stage value is estimated." },
+  COLD_TRAP_4: { function: "Represents cold-trap stage 4.", method: "Uses the fourth available diagnostics entry for visual state.", authoritativeInput: "hardwareDiagnostics.coldTrapTemperaturesC[3] and coldTrapStageCondensedWaterKg[3]", visualOutput: "Stage 4 shell, coil, and indicator presentation.", classification: "SIMULATION", interpretationLimit: "Unavailable diagnostics remain UNKNOWN; no stage value is estimated." },
+  VAPOR_PIPE: { function: "Shows the sealed vapor route between chamber, traps, and pump terminal.", method: "Renders the fixed process topology and derived activation highlight.", authoritativeInput: "effectiveCommands.extractor, effectiveCommands.condenser, actuatorLevels", visualOutput: "Piping emphasis and derived vapor particles.", classification: "DERIVED", interpretationLimit: "This does not report measured vapor composition, rate, or pressure drop." },
+  VACUUM_PIPE: { function: "Shows the sealed vacuum manifold to the pump inlet.", method: "Renders the fixed process topology with pump-authority highlight.", authoritativeInput: "effectiveCommands.vacuumPump, actuatorLevels.vacuumPump, sensorAfter.pressureMbar", visualOutput: "Vacuum piping emphasis and derived particles.", classification: "DERIVED", interpretationLimit: "Particles are visual activity only; pressure remains the authoritative process value when present." },
+  COOLING_PIPE: { function: "Shows the supply-and-return utility topology for the trap rack.", method: "Renders the closed cooling loop with cooling-authority highlight.", authoritativeInput: "effectiveCommands.cooling and actuatorLevels.cooling", visualOutput: "Cooling piping emphasis and derived particles.", classification: "DERIVED", interpretationLimit: "No cooling-flow measurement is generated by this renderer." },
 };
 
 export interface ProcessMachineVisualState {
@@ -94,6 +139,10 @@ export function getProcessMachineActuatorVisualLevels(frame?: CausalFrame) {
     condenser: normalizedLevel(frame?.actuatorLevels.condenser),
     cooling: normalizedLevel(frame?.actuatorLevels.cooling),
   };
+}
+
+export function getProcessMachineComponentExplanation(component: ComponentId): ProcessMachineComponentExplanation {
+  return PROCESS_MACHINE_COMPONENT_EXPLANATIONS[component];
 }
 
 function finite(value: number | undefined): value is number {
@@ -182,6 +231,7 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
     selectables: Map<ComponentId, THREE.Object3D[]>;
   } | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("REALISTIC");
+  const [presentationMode, setPresentationMode] = useState<PresentationMode>("SCIENTIFIC");
   const [layers, setLayers] = useState<LayerState>(DEFAULT_LAYERS);
   const [selectedComponent, setSelectedComponent] = useState<ComponentId | null>(null);
   const [flowEnabled, setFlowEnabled] = useState(true);
@@ -862,6 +912,12 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
     : selectedComponent === "VACUUM_PUMP" || selectedComponent === "VACUUM_PIPE"
       ? displayNumber(visual.pressureMbar, 1, "mbar")
       : displayNumber(visual.temperatureC, 1, "°C");
+  const selectedExplanation = selectedComponent ? getProcessMachineComponentExplanation(selectedComponent) : undefined;
+  const presentationCopy: Record<PresentationMode, { title: string; detail: string }> = {
+    SIMPLE: { title: "OPERATOR OVERVIEW", detail: "Select equipment to learn what it does. Values remain tied to the active frame." },
+    SCIENTIFIC: { title: "SCIENTIFIC CONTEXT", detail: "Trace the process topology, authoritative source, provenance, and interpretation boundary." },
+    EXPERT: { title: "EXPERT TRACE", detail: "Inspect command authority, continuous actuator intensity, process value source, and data gap boundary." },
+  };
   const toggleLayer = (key: LayerKey) => setLayers(previous => ({ ...previous, [key]: !previous[key] }));
 
   return (
@@ -873,21 +929,18 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
           <div className="flex items-center gap-2 font-mono text-[10px] font-semibold tracking-[0.25em] text-cyan-300"><span className={`h-2 w-2 rounded-full shadow-[0_0_12px_currentColor] ${fault ? "bg-red-400 text-red-400" : hasFrame ? "bg-emerald-400 text-emerald-400" : "bg-slate-500 text-slate-500"}`} />3D PROCESS MACHINE</div>
           <div className="mt-1 text-[10px] text-slate-500">CAUSAL FRAME → AUTHORITATIVE PHYSICAL TOPOLOGY</div>
           <div className="mt-2 flex flex-wrap gap-1 font-mono text-[7px] tracking-[0.12em]">
-            <span className="rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-violet-200">SIMULATION / FRAME</span>
-            <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-amber-200">DERIVED / FLOW ACTIVITY</span>
-            <span className="rounded border border-slate-700 bg-slate-900/70 px-1.5 py-0.5 text-slate-400">MEASURED / NOT LOADED</span>
-            <span className="rounded border border-slate-700 bg-slate-900/70 px-1.5 py-0.5 text-slate-500">UNKNOWN / DATA GAP</span>
+            {SCIENTIFIC_STATUS_LEGEND.map(item => <span key={item.label} title={item.description} className={`rounded border px-1.5 py-0.5 ${item.tone === "violet" ? "border-violet-500/30 bg-violet-500/10 text-violet-200" : item.tone === "amber" ? "border-amber-500/30 bg-amber-500/10 text-amber-200" : "border-slate-700 bg-slate-900/70 text-slate-400"}`}>{item.label}{item.label === "MEASURED" ? " / NOT LOADED" : item.label === "UNKNOWN" ? " / DATA GAP" : ""}</span>)}
           </div>
         </div>
         <div className={`rounded-lg border px-3 py-2 font-mono text-[9px] shadow-lg ${fault ? "border-red-500/30 bg-red-500/10 text-red-300" : hasFrame ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-300" : "border-slate-700 bg-slate-950/80 text-slate-500"}`}><div className="text-[7px] tracking-[0.14em] opacity-70">AUTHORITATIVE STATUS</div><div className="mt-1">{fault ? "SAFETY TRIP" : hasFrame ? visual.stage : "UNKNOWN / NO FRAME"}</div></div>
       </div>
 
-      {layers.label && <div className="pointer-events-none absolute left-4 top-28 space-y-1.5 font-mono text-[9px]">
-        <div className="rounded border border-white/10 bg-slate-950/75 px-2 py-1 text-slate-300 shadow-lg">01 / REACTOR + CHAMBER</div>
-        <div className="rounded border border-white/10 bg-slate-950/75 px-2 py-1 text-slate-400">02 / VAPOR → TRAP 1 → TRAP 2 → TRAP 3 → TRAP 4</div>
-        <div className="rounded border border-white/10 bg-slate-950/75 px-2 py-1 text-slate-400">03 / TRAP 4 → VACUUM PUMP</div>
-        <div className="rounded border border-white/10 bg-slate-950/75 px-2 py-1 text-slate-400">04 / COOLING SUPPLY → TRAPS → RETURN</div>
-        <div className="rounded border border-amber-500/20 bg-amber-500/5 px-2 py-1 text-amber-200">FLOW ANIMATION = DERIVED ACTIVITY</div>
+      {layers.label && <div className="pointer-events-none absolute left-4 top-28 w-[22rem] rounded-xl border border-white/10 bg-slate-950/85 p-3 font-mono text-[9px] shadow-xl backdrop-blur">
+        <div className="flex items-center justify-between gap-3"><span className="text-[8px] tracking-[0.2em] text-cyan-300">PROCESS FLOW</span><span className="text-[7px] tracking-[0.12em] text-slate-600">TOPOLOGY · NOT A RATE</span></div>
+        <div className="mt-2 flex flex-wrap items-stretch gap-1.5">
+          {PROCESS_FLOW_PRESENTATION.map((step, index) => <div key={step.id} className="flex items-center gap-1.5"><div className="min-w-[4.8rem] rounded border border-slate-800 bg-slate-900/65 px-2 py-1.5"><div className="text-[7px] text-cyan-200">{String(index + 1).padStart(2, "0")} / {step.label}</div>{presentationMode !== "SIMPLE" ? <div className="mt-1 text-[7px] leading-relaxed text-slate-500">{step.detail}</div> : null}{presentationMode === "EXPERT" ? <div className="mt-1 text-[6px] text-violet-300">{step.source}</div> : null}</div>{index < PROCESS_FLOW_PRESENTATION.length - 1 ? <span className="text-cyan-500/70">→</span> : null}</div>)}
+        </div>
+        <p className="mt-2 text-[7px] leading-relaxed text-amber-200">Flow particles are DERIVED ACTIVITY. Flow rate remains UNKNOWN unless an authoritative source provides it.</p>
       </div>}
 
       {layers.diagnostics && <div className="pointer-events-none absolute right-4 top-20 rounded-xl border border-white/10 bg-slate-950/85 p-3 font-mono text-[9px] shadow-xl backdrop-blur">
@@ -904,6 +957,7 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
       </div>}
 
       <div className="pointer-events-auto absolute right-4 top-48 w-52 rounded-xl border border-cyan-500/20 bg-slate-950/90 p-3 font-mono text-[9px] shadow-xl backdrop-blur">
+        <div className="mb-3"><div className="text-[8px] tracking-[0.2em] text-violet-300">PRESENTATION MODE</div><div className="mt-1 grid grid-cols-3 gap-1">{(["SIMPLE", "SCIENTIFIC", "EXPERT"] as PresentationMode[]).map(mode => <button key={mode} onClick={() => setPresentationMode(mode)} className={`rounded border px-1 py-1 text-[7px] ${presentationMode === mode ? "border-violet-400 bg-violet-500/15 text-violet-100" : "border-slate-700 text-slate-400"}`}>{mode}</button>)}</div><p className="mt-1.5 text-[7px] leading-relaxed text-slate-500">{presentationCopy[presentationMode].title}: {presentationCopy[presentationMode].detail}</p></div>
         <div className="mb-2 text-[8px] tracking-[0.2em] text-cyan-300">3D NAVIGATION</div>
         <div className="grid grid-cols-3 gap-1">
           {(["DEFAULT", "FRONT", "TOP", "LEFT", "RIGHT", "PROCESS_PATH", "REACTOR", "COLD_TRAPS", "VACUUM", "COOLING"] as CameraPreset[]).map(preset => <button key={preset} onClick={() => applyPreset(preset)} className="rounded border border-slate-700 px-1 py-1 text-[7px] text-slate-300 hover:border-cyan-400 hover:text-cyan-200">{preset.replace("_", " ")}</button>)}
@@ -917,9 +971,9 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
         <div className="mt-2 rounded border border-slate-800 bg-slate-900/50 p-2 text-[7px] leading-relaxed text-slate-500">DRAG: ROTATE · SHIFT + DRAG: PAN · WHEEL: ZOOM · SELECT: FOCUS. Camera, layers, flow, and particles do not alter the simulation engine. Flow rate remains UNKNOWN.</div>
       </div>
 
-      <div className="pointer-events-auto absolute bottom-28 left-4 w-60 rounded-xl border border-violet-500/20 bg-slate-950/90 p-3 font-mono text-[9px] shadow-xl backdrop-blur">
+      <div className="pointer-events-auto absolute bottom-28 left-4 w-[22rem] rounded-xl border border-violet-500/20 bg-slate-950/90 p-3 font-mono text-[9px] shadow-xl backdrop-blur">
         <div className="flex items-center justify-between gap-2"><span className="text-[8px] tracking-[0.2em] text-violet-300">COMPONENT INSPECTOR</span><select aria-label="Select 3D component" value={selectedComponent ?? ""} onChange={event => setSelectedComponent((event.target.value || null) as ComponentId | null)} className="max-w-32 rounded border border-slate-700 bg-slate-900 px-1 py-0.5 text-[8px] text-slate-200"><option value="">SELECT</option>{(Object.keys(COMPONENT_LABELS) as ComponentId[]).map(id => <option value={id} key={id}>{COMPONENT_LABELS[id]}</option>)}</select></div>
-        {selectedComponent ? <div className="mt-2 space-y-1.5 text-slate-400"><div className="text-xs text-violet-200">{COMPONENT_LABELS[selectedComponent]}</div><div className="grid grid-cols-2 gap-x-3 gap-y-1"><span>STATE</span><span className="text-right text-slate-200">{visual.stage ?? "UNKNOWN"}</span><span>COMMAND</span><span className="text-right text-slate-200">{commandFor(selectedComponent) === undefined ? "UNKNOWN" : commandFor(selectedComponent) ? "ON" : "OFF"}</span><span>ACTUATOR</span><span className="text-right text-cyan-200">{actuatorFor(selectedComponent) === undefined ? "UNKNOWN" : normalizedLevel(actuatorFor(selectedComponent)).toFixed(2)}</span><span>SENSOR</span><span className="text-right text-slate-200">{selectedSensor}</span><span>FLOW RATE</span><span className="text-right text-amber-200">UNKNOWN</span><span>SIM TIME</span><span className="text-right text-slate-200">{displayNumber(visual.timestampSeconds, 1, "s")}</span><span>PROVENANCE</span><span className="text-right text-violet-200">SIMULATION</span><span>MEASURED</span><span className="text-right text-slate-500">NOT LOADED</span></div></div> : <div className="mt-2 text-slate-500">Click a major 3D component or choose it here to focus the camera and inspect its authoritative frame values.</div>}
+        {selectedComponent && selectedExplanation ? <div className="mt-2 space-y-2 text-slate-400"><div><div className="text-xs text-violet-200">{COMPONENT_LABELS[selectedComponent]}</div><div className="mt-0.5 text-[8px] text-slate-500">{selectedExplanation.function}</div></div><div className="grid grid-cols-2 gap-x-3 gap-y-1"><span>STATE</span><span className="text-right text-slate-200">{visual.stage ?? "UNKNOWN"}</span><span>COMMAND</span><span className="text-right text-slate-200">{commandFor(selectedComponent) === undefined ? "UNKNOWN" : commandFor(selectedComponent) ? "ON" : "OFF"}</span><span>ACTUATOR</span><span className="text-right text-cyan-200">{actuatorFor(selectedComponent) === undefined ? "UNKNOWN" : normalizedLevel(actuatorFor(selectedComponent)).toFixed(2)}</span><span>SENSOR</span><span className="text-right text-slate-200">{selectedSensor}</span><span>FLOW RATE</span><span className="text-right text-amber-200">UNKNOWN</span><span>SIM TIME</span><span className="text-right text-slate-200">{displayNumber(visual.timestampSeconds, 1, "s")}</span><span>PROVENANCE</span><span className="text-right text-violet-200">{selectedExplanation.classification}</span><span>MEASURED</span><span className="text-right text-slate-500">NOT LOADED</span></div><div className="border-t border-slate-800 pt-2 text-[8px] leading-relaxed"><div><span className="text-slate-600">METHOD:</span> {selectedExplanation.method}</div><div className="mt-1"><span className="text-slate-600">VISUAL OUTPUT:</span> {selectedExplanation.visualOutput}</div>{presentationMode !== "SIMPLE" ? <div className="mt-1"><span className="text-slate-600">AUTHORITATIVE INPUT:</span> {selectedExplanation.authoritativeInput}</div> : null}{presentationMode === "EXPERT" ? <div className="mt-1 text-amber-200"><span className="text-amber-300/70">LIMIT:</span> {selectedExplanation.interpretationLimit}</div> : null}</div><WhyThisValue source="Active CausalFrame" field={selectedExplanation.authoritativeInput} classification={selectedExplanation.classification} meaning={selectedExplanation.visualOutput} notMeaning={selectedExplanation.interpretationLimit} frameLabel={hasFrame ? `Frame simulation time ${displayNumber(visual.timestampSeconds, 1, "s")}` : "UNKNOWN — no active frame"} /><Link href="/knowledge"><span className="mt-2 inline-flex cursor-pointer border border-cyan-500/30 px-2 py-1 text-[7px] tracking-[0.12em] text-cyan-200 hover:bg-cyan-500/10">OPEN KNOWLEDGE CENTER →</span></Link></div> : <div className="mt-2 text-slate-500">Click a major 3D component or choose it here to focus the camera and inspect its authoritative frame values.</div>}
       </div>
 
       {layers.instrument && <div className="absolute bottom-3 left-3 right-3 grid grid-cols-2 gap-2 md:grid-cols-6">
