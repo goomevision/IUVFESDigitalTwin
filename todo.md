@@ -365,6 +365,13 @@
 - [x] Add and run regression tests for event shape, sensitive-data redaction, auth state, frame references, technical errors, and 3D interaction logging.
 - [x] Document P13 architecture, limitations, and P10 authentication boundary; commit and push validated changes to feature/control-room-ui.
 
+## P14 — SCIENTIFIC KNOWLEDGE & METHOD CENTER
+
+- [x] Read the P14 master command, audit compatibility with existing scientific contracts, and define an evidence-safe implementation plan before making changes.
+- [x] Implement a public Knowledge Center route, searchable source-grounded methods/glossary/FAQ, scientific-literacy presentation modes, and a runtime-safe Why-this-value affordance without changing scientific state.
+- [x] Run P14 static, regression, production-build, diff, and browser documentation-ui checks; preserve P10 as AUTH BLOCKED.
+- [ ] Record the CI-verified P14 result in Buku Besar and push the validated P14 commit to feature/control-room-ui.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.

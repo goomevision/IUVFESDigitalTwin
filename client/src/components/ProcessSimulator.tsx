@@ -10,10 +10,12 @@ import { LiveProcessTrend } from "@/components/LiveProcessTrend";
 import { CausalFrameInspector } from "@/components/CausalFrameInspector";
 import { ProcessRunReplay } from "@/components/ProcessRunReplay";
 import { ControlRoomObservabilityPanel } from "@/components/ControlRoomObservabilityPanel";
+import { WhyThisValue, type WhyThisValueProps } from "@/components/WhyThisValue";
 import { recordControlRoomEvent, toFrameReference, toOperatorReference } from "@/lib/controlRoomObservability";
 import { useAuth } from "@/_core/hooks/useAuth";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../server/routers";
+import { Link } from "wouter";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type Frame = RouterOutputs["closedLoop"]["frames"]["frames"][number];
@@ -54,11 +56,12 @@ function ControlSlider({ label, value, min, max, step, unit, Icon, onChange, onA
   </label>;
 }
 
-function Instrument({ label, value, unit, tone = "cyan", source = "CAUSAL FRAME" }: { label: string; value: string; unit: string; tone?: keyof typeof metricTone; source?: string }) {
+function Instrument({ label, value, unit, tone = "cyan", source = "CAUSAL FRAME", why }: { label: string; value: string; unit: string; tone?: keyof typeof metricTone; source?: string; why?: WhyThisValueProps }) {
   return <div className={`border-l bg-slate-950/65 px-3 py-2 ${metricTone[tone]}`}>
     <div className="text-[8px] font-medium tracking-[0.18em] text-slate-500">{label}</div>
     <div className="mt-1 flex items-end gap-1 font-mono"><span className="text-lg leading-none">{value}</span><span className="text-[9px] text-slate-500">{unit}</span></div>
     <div className="mt-1 text-[7px] tracking-[0.12em] text-slate-600">{source}</div>
+    {why ? <WhyThisValue {...why} /> : null}
   </div>;
 }
 
@@ -269,7 +272,7 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
         <header className="grid gap-3 border-y border-cyan-500/25 bg-slate-950/80 px-4 py-3 backdrop-blur xl:grid-cols-[1fr_auto_1fr] xl:items-center">
           <div><div className="font-mono text-[9px] tracking-[0.32em] text-cyan-400">IUVFES // INTEGRATED ULTRASONIC VACUUM FRYING EXTRACTION SYSTEM</div><h1 className="mt-1 text-xl font-semibold tracking-[0.08em] text-slate-100">PROCESS SIMULATOR</h1><p className="mt-1 text-[9px] tracking-[0.2em] text-slate-500">LIVE PROCESS VISUALIZATION · ENGINE-BACKED CAUSAL TELEMETRY</p></div>
           <div className="text-center"><div className="font-mono text-[9px] tracking-[0.16em] text-slate-500">EXPERIMENT / RUN</div><div className="mt-1 font-mono text-sm text-cyan-200">{experimentId}</div><div className="mt-1 text-[8px] tracking-[0.14em] text-slate-600">{sessionId ? `SESSION ${sessionId.slice(0, 8)}` : "NO ACTIVE SESSION"}</div></div>
-          <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end"><span className={`inline-flex items-center gap-2 border px-3 py-2 font-mono text-[10px] tracking-[0.14em] ${statusTone}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{runtimeStatus}</span><span className="border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-[10px] text-slate-400">T+{format(displayFrame?.timestampSeconds, 1)} s</span><span className="border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-[10px] text-slate-400">{frames.length} FRAMES</span></div>
+          <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end"><span className={`inline-flex items-center gap-2 border px-3 py-2 font-mono text-[10px] tracking-[0.14em] ${statusTone}`}><span className="h-1.5 w-1.5 rounded-full bg-current" />{runtimeStatus}</span><span className="border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-[10px] text-slate-400">T+{format(displayFrame?.timestampSeconds, 1)} s</span><span className="border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-[10px] text-slate-400">{frames.length} FRAMES</span><Link href="/knowledge"><span className="inline-flex cursor-pointer border border-cyan-500/30 px-3 py-2 font-mono text-[10px] tracking-[0.12em] text-cyan-200 transition hover:bg-cyan-500/10">KNOWLEDGE CENTER</span></Link></div>
         </header>
 
         <section className="grid gap-3 xl:grid-cols-[280px_minmax(0,1fr)_300px]">
@@ -285,7 +288,7 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
 
           <main className="min-w-0 space-y-3">
             <section className="border border-cyan-500/25 bg-slate-950/70 p-3 shadow-[0_0_55px_rgba(14,116,144,0.12)]"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><div className="text-[9px] tracking-[0.24em] text-cyan-300">PROCESS TWIN</div><h2 className="mt-1 text-lg font-semibold tracking-wide">REACTOR → VAPOR → MULTI-STAGE CONDENSATION → RECOVERY</h2></div><div className="flex items-center gap-3"><ProgressRing progress={engineProgress} /><div className="font-mono text-[10px]"><div className="text-slate-500">ENGINE STAGE</div><div className="mt-1 text-cyan-200">{state?.stage ?? "WAITING"}</div><div className="mt-1 max-w-[220px] text-[9px] text-slate-500">{safety?.transitionReason ?? "Waiting for the first CausalFrame."}</div></div></div></div><ProcessMachine3D frame={displayFrame} onObservabilityEvent={onMachineObservabilityEvent} /></section>
-            <section className="grid divide-x divide-slate-800 border border-slate-800 bg-slate-950/65 sm:grid-cols-3 xl:grid-cols-6"><Instrument label="TEMPERATURE" value={format(sensor?.temperatureC, 1)} unit="°C" /><Instrument label="PRESSURE" value={format(sensor?.pressureMbar, 1)} unit="mbar" tone="sky" /><Instrument label="YIELD" value={format(sensor?.yieldPercent, 2)} unit="%" tone="emerald" /><Instrument label="OIL RECOVERED" value={format(sensor?.oilRecoveredKg, 3)} unit="kg" tone="amber" /><Instrument label="WATER REMOVED" value={format(sensor?.waterRemovedKg, 3)} unit="kg" tone="sky" /><Instrument label="ENERGY" value={format(sensor?.energyKwh, 3)} unit="kWh" tone="amber" /></section>
+            <section className="grid divide-x divide-slate-800 border border-slate-800 bg-slate-950/65 sm:grid-cols-3 xl:grid-cols-6"><Instrument label="TEMPERATURE" value={format(sensor?.temperatureC, 1)} unit="°C" why={{ source: "CausalFrame", field: "sensorAfter.temperatureC", classification: "SIMULATION", meaning: "Active-frame temperature presented by the Control Room.", notMeaning: "A laboratory measurement unless a separate MEASURED dataset says so.", frameLabel: displayFrame ? `Frame #${displayFrame.step} at ${format(displayFrame.timestampSeconds, 1)} s` : "UNKNOWN — no active frame" }} /><Instrument label="PRESSURE" value={format(sensor?.pressureMbar, 1)} unit="mbar" tone="sky" why={{ source: "CausalFrame", field: "sensorAfter.pressureMbar", classification: "SIMULATION", meaning: "Active-frame pressure presented by the Control Room.", notMeaning: "A laboratory measurement unless a separate MEASURED dataset says so.", frameLabel: displayFrame ? `Frame #${displayFrame.step} at ${format(displayFrame.timestampSeconds, 1)} s` : "UNKNOWN — no active frame" }} /><Instrument label="YIELD" value={format(sensor?.yieldPercent, 2)} unit="%" tone="emerald" /><Instrument label="OIL RECOVERED" value={format(sensor?.oilRecoveredKg, 3)} unit="kg" tone="amber" /><Instrument label="WATER REMOVED" value={format(sensor?.waterRemovedKg, 3)} unit="kg" tone="sky" /><Instrument label="ENERGY" value={format(sensor?.energyKwh, 3)} unit="kWh" tone="amber" /></section>
           </main>
 
           <aside className="space-y-3 border border-slate-800 bg-slate-950/70 p-3 backdrop-blur">
