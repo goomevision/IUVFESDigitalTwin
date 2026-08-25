@@ -540,6 +540,24 @@
 - [x] Write the minimal external full-backend deployment specification for source, build, runtime, secrets, database, HTTPS API, release identity, health, and rollback.
 - [x] Validate and publish only the P29 documentation/tracker changes without application patch, deployment, migration, login, data creation, or merge.
 
+## LOCAL FULL-STACK RUNTIME PREFLIGHT
+
+- [x] Verify the latest published source checkout, lockfile, scripts, and frontend/backend entry points without modifying source.
+- [x] Assess existing local database and migration-rehearsal configuration without creating a database or running migration.
+- [x] Run only safe local smoke checks permitted by existing configuration and report local backend, health, closed-loop, frontend, and 3D readiness without commit or production action.
+
+## LOCAL DATABASE HARNESS PREFLIGHT
+
+- [x] Inspect only already installed Docker, Podman, MySQL, and TiDB capabilities plus existing non-production project database configuration.
+- [x] Identify an already available isolated local database target, if any, without connecting, creating databases, or running migration.
+- [x] Report the local database path, safe-target decision, and blocker without modifications or production access.
+
+## WINDOWS LOCAL RUNTIME GUIDE
+
+- [x] Verify the latest source baseline, Windows-relevant package scripts, health route, and canonical migration chain without executing setup commands.
+- [x] Write the minimal Windows prerequisite, local database, environment, startup, verification, and cleanup guide.
+- [x] Validate and publish only the Windows runtime guide documentation/tracker changes without application patch, production access, or runtime execution.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.
