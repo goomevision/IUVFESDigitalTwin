@@ -1426,6 +1426,34 @@ Sebelum database mutation atau P10, siapkan approved migration execution plan, b
 
 ---
 
+## 2026-08-25 — Infrastructure Deployment Blocker
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Source SHA assessed:** `ee7a13b6e927a17a3d8fd2b5b3e94ddcf5cc4460`
+**Status:** **EXTERNAL CONFIGURATION REQUIRED**
+
+### Verified conclusion
+
+| Area | Status |
+|---|---|
+| Source | READY |
+| Canonical migration chain | READY |
+| Production database | NOT READY |
+| Backup | UNKNOWN |
+| Restore | UNKNOWN |
+| PITR | UNKNOWN |
+| Full backend deployment from GitHub checkout | NOT AVAILABLE in the exposed Manus runtime |
+| Migration owner | UNKNOWN |
+
+### Decision and boundary
+
+Source governance is complete, but production migration cannot proceed without externally verified backup/recovery ownership and a full GitHub-backend deployment path. Application checkpoint rollback does not restore remote database schema or data, so it is not a database migration rollback strategy.
+
+No migration, database mutation, backend deployment, OAuth, experiment/session/telemetry creation, P10, or 3D runtime test was performed. The next action must come from infrastructure ownership: provide a production backup/restore/PITR procedure, named migration and release owners, and a deployment mechanism that runs the complete GitHub backend from a verifiable release identity.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:

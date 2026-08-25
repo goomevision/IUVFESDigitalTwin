@@ -416,6 +416,18 @@
 - [x] Validate canonical migration governance with non-mutating checks, commit/push only the scoped patch, and keep production deployment/database/P10 blocked.
 - [x] Record the CI-verified canonical migration governance result in Buku Besar without changing database deployment or P10 status.
 
+## INSTRUCTION REVIEW — PASTED CONTENT 22
+
+- [x] Read `pasted_content_22.txt` and complete the read-only migration-execution readiness audit. Production remains at base migration only; backup, restore, PITR, rollback, and migration ownership are unverified, so stop as BACKUP/RECOVERY REQUIRED and MIGRATION EXECUTION BLOCKED.
+
+## MANUS PLATFORM CAPABILITY AUDIT
+
+- [x] Perform one read-only audit of Manus backup, restore, PITR, rollback, migration ownership, and full GitHub backend deployment capabilities; no exposed capability proves backup/restore/PITR or GitHub-checkout backend deployment, while application checkpoint rollback exists but excludes database rollback. External configuration remains required.
+
+## INFRASTRUCTURE BLOCKER FINALIZATION
+
+- [x] Record the verified Infrastructure Blocker in Buku Besar and push the documentation-only commit to feature/control-room-ui without changing application source or technical state.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.
