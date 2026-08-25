@@ -33,6 +33,17 @@ export function isAllowedOAuthReturnTo(returnTo: string): boolean {
   }
 }
 
+function getPublicRequestOrigin(req: Request): string {
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const protocol = (Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto)
+    ?.split(",")[0]
+    ?.trim();
+  const effectiveProtocol = protocol === "https" || protocol === "http" ? protocol : req.protocol;
+  const forwardedHost = req.headers["x-forwarded-host"];
+  const host = (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost)?.split(",")[0]?.trim() || req.get("host");
+  return `${effectiveProtocol}://${host}`;
+}
+
 export function registerOAuthRoutes(app: Express) {
   app.get("/api/oauth/login", (req: Request, res: Response) => {
     const returnTo = getQueryParam(req, "returnTo") ?? DEFAULT_WEB_ORIGIN;
@@ -41,7 +52,7 @@ export function registerOAuthRoutes(app: Express) {
       return;
     }
 
-    const callbackUri = `${req.protocol}://${req.get("host")}/api/oauth/callback`;
+    const callbackUri = `${getPublicRequestOrigin(req)}/api/oauth/callback`;
     const nonce = crypto.randomUUID();
     const state = encodeOAuthState({
       redirectUri: callbackUri,
