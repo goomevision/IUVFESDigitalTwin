@@ -485,6 +485,13 @@
 - [x] Implement identity/integrity inspectors, link graph, readiness gates, P20/P21 integration, and Knowledge Center learning content without scientific state changes.
 - [x] Add P22 integrity-bound regression coverage, run static validation, document, commit, and push while retaining P10/WebGL blockers.
 
+## P23 — SCIENTIFIC AUDIT TRAIL & REPRODUCIBILITY FOUNDATION
+
+- [x] Audit reusable P17–P22 identity, event journal, provenance, replay, and Process Simulator mechanisms without creating parallel runtime data.
+- [x] Define source-safe Scientific Audit Event, Scientific Replay Reference, reproducibility matrix, and readiness contracts without events, frames, or persistence.
+- [x] Implement Scientific Reconstruction, Reproducibility Inspector, P20/P21/P22 contextual integration, and Knowledge Center learning content.
+- [x] Add P23 reproducibility-bound regression coverage, run static validation, document, commit, and push while retaining P10/WebGL blockers.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.

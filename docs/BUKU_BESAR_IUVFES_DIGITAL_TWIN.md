@@ -1788,6 +1788,55 @@ Sebelum P22 dapat memverifikasi evidence, sediakan canonical persisted records d
 
 ---
 
+## 2026-08-26 — P23 Scientific Audit Trail & Reproducibility Foundation source publication
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Commit:** Source-publication commit for this entry
+**PR:** open; no merge performed
+
+### Source audit
+
+P23 memeriksa P17 Instrument Registry, P18 Traceability, P19 Uncertainty, P20 Laboratory Evidence, P21 Experimental Comparison, P22 Experimental Identity & Evidence Integrity, `CausalFrame`, `scientificEventJournal`, dataset manifests, provenance records, identity experiment/session, hash mechanism, `ProcessRunReplay`, `ProcessSimulator`, `closedLoopRuntimeStore`, dan `controlRoomObservability`. Tidak ditemukan kebutuhan untuk sistem audit paralel.
+
+Canonical reuse yang ditemukan adalah `ScientificEvent` dengan `previousHash`/`eventHash` dan canonical SHA-256 journal, `ClosedLoopRuntimeSession` dengan canonical `sessionId`/`experimentId` serta accessor snapshot/frame history, `ProcessRunReplay` sebagai reader visual atas frame yang disediakan, `ControlRoomObservabilityEvent` sebagai browser-local lifecycle/operator/frame vocabulary, dan P22 identity/integrity/hash reference contract. Browser observability tidak diperlakukan sebagai scientific evidence chain, dan visual replay tidak diperlakukan sebagai scientific reproducibility.
+
+### Perubahan
+
+P23 menambahkan `ScientificAuditEvent`, `ScientificReplayReference`, Reproducibility Matrix, `getReproducibilityReadiness()`, `getReconstructionBlockedReasons()`, Scientific Reconstruction view, Reproducibility Inspector, dan Knowledge Center content dalam mode SIMPLE, SCIENTIFIC, dan EXPERT. Contract menyediakan field audit event yang dapat mereferensikan canonical event existing di masa depan tanpa membuat event runtime baru. Empty audit-event collection, replay reference, dan matrix state ditampilkan secara eksplisit.
+
+Scientific Reconstruction menampilkan urutan konseptual **Experiment → Configuration → Simulation → Frame → Operator Action → Instrument → Evidence → Dataset → Comparison → Integrity**. Setiap tahap memuat status, source, provenance, reference, dan interpretation limit. Karena tidak ada record legitimate dimuat, UI menyatakan **Insufficient evidence for reconstruction**; tidak ada timeline sintetis, CausalFrame sintetis, atau audit event palsu.
+
+### P17–P22 integration
+
+P17 Instrument, P18 Traceability, P19 Uncertainty, P20 Evidence, P21 Comparison, dan P22 Identity/Integrity menjadi contextual references dalam reconstruction surface. P20 tetap **NO EVIDENCE LOADED**. P21 tetap blocked tanpa evidence. P22 identity, provenance, event hash, dan SHA-256 reference hanya direuse sebagai contract; P23 tidak menghitung hash, append event, memverifikasi integrity, atau menghasilkan validation.
+
+### Data flow affected
+
+P23 adalah client-side UI/contract layer tanpa persistence, database migration, API route, experiment/session creation, telemetry, atau CausalFrame mutation. `timestampSeconds`, `sensorAfter`, `effectiveCommands`, dan `actuatorLevels` tetap authority existing yang tidak dimodifikasi. P23 tidak menggunakan browser-local observability atau visual replay sebagai pengganti persisted scientific record.
+
+### Scientific impact
+
+Tidak ada perubahan physics, PID, safety, engine, ProcessMachine3D, CausalFrame, database, migration, OAuth, event journal persistence, hash mechanism, experiment/session lifecycle, measurement, laboratory evidence, calibration, uncertainty, comparison, validation, confidence, atau accuracy score. Default reproducibility readiness berada di **PARTIAL** akibat existing simulation/instrument contract surfaces, tetapi reproducibility tetap tidak dapat diklaim; **REPRODUCIBLE** tidak muncul pada empty state.
+
+### Simulation/Lab boundary impact
+
+`SIMULATION ≠ MEASURED`, `DERIVED ≠ MEASURED`, `COMPARISON ≠ VALIDATION`, `COMPLETE ≠ VERIFIED`, `READY FOR VERIFICATION ≠ VERIFIED`, dan **Replay visual ≠ scientific reproducibility** ditegaskan dalam UI/contract. `UNKNOWN` tetap `UNKNOWN`, `NOT LOADED` tetap `NOT LOADED`, dan absence of reconstruction evidence tidak diganti oleh inferensi.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS — 41 files / 114 tests, termasuk `server/scientificAuditTrail.p23.test.ts`. `pnpm build`: PASS. `git diff --check`: PASS. Warning ukuran JavaScript bundle lebih dari 500 kB tetap non-blocking.
+
+### Status
+
+🟢 P23 **source publication** tervalidasi secara statis pada branch fitur tanpa merge. 🟡 Audit Trail dan Reproducibility adalah UI/contract foundation dengan zero loaded scientific audit events dan zero reconstruction records; bukan scientific reproduction, integrity verification, atau validation. 🟡 Authenticated WebGL smoke tetap **BLOCKED** oleh OAuth/session/full backend deployment; P10 tidak berubah.
+
+### Next action
+
+Sebelum reconstruction/reproducibility legitimate dapat dinyatakan, sediakan canonical persisted experiment/session/configuration/frame/event/dataset/evidence/provenance/integrity records, authorized hash verification, custody/retention governance, reviewer ownership, dan runtime evidence yang sah. Jangan membuat synthetic audit trail atau menjalankan P10/browser acceptance sebelum prerequisite yang legitimate tersedia.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:
