@@ -363,7 +363,7 @@
 - [x] Integrate safe interaction logs into Control Room and ProcessMachine3D without changing scientific or engine authority.
 - [x] Improve approved Control Room visual presentation while preserving topology, CausalFrame actuator mappings, effectiveCommands, and timestampSeconds.
 - [x] Add and run regression tests for event shape, sensitive-data redaction, auth state, frame references, technical errors, and 3D interaction logging.
-- [ ] Document P13 architecture, limitations, and P10 authentication boundary; commit and push validated changes to feature/control-room-ui.
+- [x] Document P13 architecture, limitations, and P10 authentication boundary; commit and push validated changes to feature/control-room-ui.
 
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 

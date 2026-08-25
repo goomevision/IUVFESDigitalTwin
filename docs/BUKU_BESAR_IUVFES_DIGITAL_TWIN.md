@@ -1295,6 +1295,51 @@ Push branch setelah final Quality Gate, kemudian lakukan authenticated browser v
 
 ---
 
+## 2026-08-25 — P13 Log-first Control Room observability and 3D presentation refinement
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Commits:** `0922232` — `feat(control-room): establish log-first operator observability`; `b80be43` — `feat(control-room): modernize scientific 3d twin visualization`
+**PR:** open; no merge performed
+
+### Temuan
+
+Control Room sudah memiliki lifecycle server-side yang terotorisasi dan `controlLogs` untuk start/pause/resume/stop/perubahan parameter. Namun tidak ada lapisan terpadu untuk membedakan status auth operator, aktivitas UI 3D, error teknis browser, dan referensi frame tanpa mencampurkannya dengan journal ilmiah atau membuat telemetry baru. Browser P10 tetap tidak dapat membentuk OAuth operator pada GitHub Pages deployment, sehingga status P10 tetap `AUTH BLOCKED`.
+
+### Perubahan
+
+P13 menambahkan event stream observabilitas browser-local yang ter-redaksi untuk auth, operator action, Control Room lifecycle, runtime/React/DOM/WebGL, interaksi 3D, dan referensi CausalFrame. Event hanya menyimpan referensi existing (`experimentId`, `sessionId`, component, frame step, dan `timestampSeconds`) apabila tersedia; event tidak dipersist sebagai scientific result dan tidak dikirim ke endpoint baru. UI gate sekarang menunjukkan `NOT AUTHENTICATED` sebelum intake, session recovery, Control Room, atau 3D dapat dioperasikan.
+
+ProcessMachine3D mempertahankan topologi authoritative reactor → vapor path → empat cold trap → vacuum serta cooling loop. Penyempurnaan P13 menambah pencahayaan industrial, deck/grid, reinforcing ribs dan support reactor, skid vacuum pump, serta rack condenser untuk memperjelas hierarchy tanpa mengubah geometry path, physics, or state engine.
+
+### Data flow affected
+
+`auth.me → ControlRoomAccessGate → experiment selection → canonical persisted session recovery → ProcessSimulator → ProcessMachine3D`. Observability mengamati lifecycle ini secara lokal. Jalur ilmiah tetap `ClosedLoopSimulationEngine → CausalFrame → replay/evidence/recorder`; `ScientificEventJournal`, closed-loop router, schema database, dan CausalFrame tidak diubah.
+
+### Scientific impact
+
+Tidak ada perubahan physics, PID, safety, intended command, effective command, material model, CausalFrame contract, frame timestamp, atau perhitungan sensor. `actuatorLevels` tetap sumber visual kontinu, `effectiveCommands` tetap command/interlock authority, dan `timestampSeconds` tetap satu-satunya simulation time. Tidak ada experiment, session, telemetry, frame, atau data scientific sintetis yang dibuat.
+
+### Simulation/Lab boundary impact
+
+Tidak berubah. P13 event operasional eksplisit **non-scientific** dan tidak boleh dianggap observasi laboratorium, evidence, atau telemetry proses. Visual 3D tetap simulation-derived ketika frame tersedia; absent data tetap `UNKNOWN`.
+
+### Tests / Quality Gate
+
+Validasi lokal: `pnpm check` PASS; `pnpm test` PASS — 29 file / 75 tests; `pnpm build` PASS; `git diff --check` PASS. Test baru memverifikasi redaksi nilai credential-shaped, bentuk event operasi, frame reference-only, dan subscription event local. Peringatan chunk JavaScript lebih dari 500 kB tetap non-blocking.
+
+GitHub Actions untuk `b80be43`: Deploy IUVFES Control Room to GitHub Pages #48 PASS (run `32869142278`); Control Room Phase 1 Validation #239 PASS (run `32869141808`); IUVFES Quality Gate #612 PASS (run `32869141825`).
+
+### Status
+
+🟢 Log-first auth/operator/runtime observability tersedia sebagai layer browser-local ter-redaksi. 🟢 Visual hierarchy reactor, cold trap, piping, lighting, material, camera, selection, dan actuator presentation diperhalus tanpa mengubah contract ilmiah. 🟡 P13 visual browser runtime yang terautentikasi dan P10 lifecycle/WebGL verification tetap pending karena OAuth deployment blocker. 🔴 Tidak ada klaim laboratory validation.
+
+### Next integration note
+
+P10 tetap tidak berubah dan `AUTH BLOCKED`. Jangan menjalankan lifecycle/session/3D acceptance P10 sampai legitimate operator OAuth tersedia pada deployment P10 yang benar.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:
