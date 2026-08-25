@@ -1,5 +1,7 @@
 -- Scientific research persistence foundation.
+-- NON-CANONICAL DEVELOPMENT SCAFFOLD.
 -- Intended to be incorporated into the Drizzle schema/migration pipeline after review.
+-- Do not execute this file: the canonical MySQL/Drizzle migration chain is numbered.
 
 CREATE TABLE IF NOT EXISTS research_experiments (
   id varchar(64) PRIMARY KEY,

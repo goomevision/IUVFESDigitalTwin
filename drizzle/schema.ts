@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, decimal, boolean, index } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, decimal, boolean, index, unique } from "drizzle-orm/mysql-core";
 import { relations } from "drizzle-orm";
 
 export const users = mysqlTable("users", {
@@ -46,12 +46,12 @@ export type Report = typeof reports.$inferSelect;
 export type InsertReport = typeof reports.$inferInsert;
 
 export const researchExperiments = mysqlTable("researchExperiments", {
-  id: varchar("id", { length: 64 }).primaryKey(), experimentId: varchar("experimentId", { length: 36 }).notNull().unique(), title: varchar("title", { length: 255 }).notNull(), status: mysqlEnum("status", ["draft", "ready", "running", "paused", "completed", "failed", "reviewed"]).default("draft").notNull(), researcherId: varchar("researcherId", { length: 128 }).notNull(), objective: text("objective").notNull(), hypothesis: text("hypothesis"), materialId: int("materialId").notNull(), sampleId: varchar("sampleId", { length: 128 }).notNull(), batchId: varchar("batchId", { length: 128 }), massKg: decimal("massKg", { precision: 12, scale: 4 }).notNull(), environment: json("environment"), procedure: json("procedure").notNull(), inputParameters: json("inputParameters").notNull(), provenanceId: varchar("provenanceId", { length: 128 }), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  id: varchar("id", { length: 64 }).primaryKey(), experimentId: varchar("experimentId", { length: 36 }).notNull().unique(), title: varchar("title", { length: 255 }).notNull(), status: mysqlEnum("status", ["draft", "ready", "running", "paused", "completed", "failed", "reviewed"]).default("draft").notNull(), researcherId: varchar("researcherId", { length: 128 }).notNull(), objective: text("objective").notNull(), hypothesis: text("hypothesis"), materialId: int("materialId").notNull().references(() => materials.id), sampleId: varchar("sampleId", { length: 128 }).notNull(), batchId: varchar("batchId", { length: 128 }), massKg: decimal("massKg", { precision: 12, scale: 4 }).notNull(), environment: json("environment"), procedure: json("procedure").notNull(), inputParameters: json("inputParameters").notNull(), provenanceId: varchar("provenanceId", { length: 128 }), createdAt: timestamp("createdAt").defaultNow().notNull(), updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => ({ researcherIdx: index("researchExperiments_researcher_idx").on(table.researcherId) }));
 export type ResearchExperiment = typeof researchExperiments.$inferSelect;
 export type InsertResearchExperiment = typeof researchExperiments.$inferInsert;
 
-export const experimentInstruments = mysqlTable("experimentInstruments", { id: int("id").autoincrement().primaryKey(), experimentId: varchar("experimentId", { length: 64 }).notNull(), instrumentId: varchar("instrumentId", { length: 128 }).notNull(), role: varchar("role", { length: 128 }).notNull(), calibrationId: varchar("calibrationId", { length: 128 }) });
+export const experimentInstruments = mysqlTable("experimentInstruments", { id: int("id").autoincrement().primaryKey(), experimentId: varchar("experimentId", { length: 64 }).notNull().references(() => researchExperiments.id), instrumentId: varchar("instrumentId", { length: 128 }).notNull(), role: varchar("role", { length: 128 }).notNull(), calibrationId: varchar("calibrationId", { length: 128 }).references(() => instrumentCalibrations.id) });
 export type ExperimentInstrument = typeof experimentInstruments.$inferSelect;
 export type InsertExperimentInstrument = typeof experimentInstruments.$inferInsert;
 
@@ -59,21 +59,31 @@ export const instrumentCalibrations = mysqlTable("instrumentCalibrations", { id:
 export type InstrumentCalibration = typeof instrumentCalibrations.$inferSelect;
 export type InsertInstrumentCalibration = typeof instrumentCalibrations.$inferInsert;
 
-export const sensorObservations = mysqlTable("sensorObservations", { id: int("id").autoincrement().primaryKey(), experimentId: varchar("experimentId", { length: 64 }).notNull(), observedAt: timestamp("observedAt").notNull(), instrumentId: varchar("instrumentId", { length: 128 }).notNull(), parameter: varchar("parameter", { length: 128 }).notNull(), value: decimal("value", { precision: 18, scale: 8 }).notNull(), unit: varchar("unit", { length: 32 }), qualityFlag: mysqlEnum("qualityFlag", ["RAW", "VALIDATED", "REJECTED", "CORRECTED"]).default("RAW").notNull(), rawPayloadRef: varchar("rawPayloadRef", { length: 512 }), rawPayloadSha256: varchar("rawPayloadSha256", { length: 64 }) }, (table) => ({ experimentTimeIdx: index("sensorObservations_experiment_time_idx").on(table.experimentId, table.observedAt) }));
+export const sensorObservations = mysqlTable("sensorObservations", { id: int("id").autoincrement().primaryKey(), experimentId: varchar("experimentId", { length: 64 }).notNull().references(() => researchExperiments.id), observedAt: timestamp("observedAt").notNull(), instrumentId: varchar("instrumentId", { length: 128 }).notNull(), parameter: varchar("parameter", { length: 128 }).notNull(), value: decimal("value", { precision: 18, scale: 8 }).notNull(), unit: varchar("unit", { length: 32 }), qualityFlag: mysqlEnum("qualityFlag", ["RAW", "VALIDATED", "REJECTED", "CORRECTED"]).default("RAW").notNull(), rawPayloadRef: varchar("rawPayloadRef", { length: 512 }), rawPayloadSha256: varchar("rawPayloadSha256", { length: 64 }) }, (table) => ({ experimentTimeIdx: index("sensorObservations_experiment_time_idx").on(table.experimentId, table.observedAt) }));
 export type SensorObservation = typeof sensorObservations.$inferSelect;
 export type InsertSensorObservation = typeof sensorObservations.$inferInsert;
 
-export const operatorObservations = mysqlTable("operatorObservations", { id: int("id").autoincrement().primaryKey(), experimentId: varchar("experimentId", { length: 64 }).notNull(), observedAt: timestamp("observedAt").notNull(), authorId: varchar("authorId", { length: 128 }).notNull(), note: text("note").notNull(), eventId: varchar("eventId", { length: 128 }) }, (table) => ({ experimentTimeIdx: index("operatorObservations_experiment_time_idx").on(table.experimentId, table.observedAt) }));
+export const operatorObservations = mysqlTable("operatorObservations", { id: int("id").autoincrement().primaryKey(), experimentId: varchar("experimentId", { length: 64 }).notNull().references(() => researchExperiments.id), observedAt: timestamp("observedAt").notNull(), authorId: varchar("authorId", { length: 128 }).notNull(), note: text("note").notNull(), eventId: varchar("eventId", { length: 128 }) }, (table) => ({ experimentTimeIdx: index("operatorObservations_experiment_time_idx").on(table.experimentId, table.observedAt) }));
 export type OperatorObservation = typeof operatorObservations.$inferSelect;
 export type InsertOperatorObservation = typeof operatorObservations.$inferInsert;
 
-export const datasetManifests = mysqlTable("datasetManifests", { id: varchar("id", { length: 128 }).primaryKey(), experimentId: varchar("experimentId", { length: 64 }), version: varchar("version", { length: 32 }).notNull(), origin: mysqlEnum("origin", ["EXPERIMENTAL", "SIMULATION", "DERIVED", "AI_ANALYSIS"]).notNull(), qualityStatus: mysqlEnum("qualityStatus", ["RAW", "VALIDATED", "REVIEWED", "CALIBRATED", "REPLICATED", "PUBLISHED", "RETRACTED", "SUPERSEDED"]).notNull(), sha256: varchar("sha256", { length: 64 }).notNull(), storageRef: varchar("storageRef", { length: 512 }).notNull(), metadata: json("metadata").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull() }, (table) => ({ experimentIdx: index("datasetManifests_experiment_idx").on(table.experimentId) }));
+export const datasetManifests = mysqlTable("datasetManifests", { id: varchar("id", { length: 128 }).primaryKey(), experimentId: varchar("experimentId", { length: 64 }).references(() => researchExperiments.id), version: varchar("version", { length: 32 }).notNull(), origin: mysqlEnum("origin", ["EXPERIMENTAL", "SIMULATION", "DERIVED", "AI_ANALYSIS"]).notNull(), qualityStatus: mysqlEnum("qualityStatus", ["RAW", "VALIDATED", "REVIEWED", "CALIBRATED", "REPLICATED", "PUBLISHED", "RETRACTED", "SUPERSEDED"]).notNull(), sha256: varchar("sha256", { length: 64 }).notNull(), storageRef: varchar("storageRef", { length: 512 }).notNull(), metadata: json("metadata").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull() }, (table) => ({ experimentIdx: index("datasetManifests_experiment_idx").on(table.experimentId) }));
 export type DatasetManifest = typeof datasetManifests.$inferSelect;
 export type InsertDatasetManifest = typeof datasetManifests.$inferInsert;
 
 export const provenanceRecords = mysqlTable("provenanceRecords", { id: varchar("id", { length: 128 }).primaryKey(), entityId: varchar("entityId", { length: 128 }).notNull(), activityId: varchar("activityId", { length: 128 }).notNull(), agentId: varchar("agentId", { length: 128 }).notNull(), inputRefs: json("inputRefs").notNull(), outputRefs: json("outputRefs").notNull(), createdAt: timestamp("createdAt").defaultNow().notNull() });
 export type ProvenanceRecord = typeof provenanceRecords.$inferSelect;
 export type InsertProvenanceRecord = typeof provenanceRecords.$inferInsert;
+
+// Canonical runtime persistence table. This is intentionally separate from the
+// CausalFrame engine contract and stores the immutable event-hash journal only.
+export const scientificEventJournal = mysqlTable("scientificEventJournal", {
+  id: varchar("id", { length: 128 }).primaryKey(), experimentId: varchar("experimentId", { length: 64 }).notNull(), sequence: int("sequence").notNull(), eventType: varchar("eventType", { length: 128 }).notNull(), stage: varchar("stage", { length: 64 }), occurredAt: timestamp("occurredAt").defaultNow().notNull(), source: varchar("source", { length: 64 }).notNull(), payload: json("payload").notNull(), previousHash: varchar("previousHash", { length: 64 }), eventHash: varchar("eventHash", { length: 64 }).notNull(),
+}, (table) => ({
+  experimentSequenceUnique: unique("scientificEventJournal_experiment_sequence_unique").on(table.experimentId, table.sequence),
+  experimentTimeIdx: index("scientificEventJournal_experiment_time_idx").on(table.experimentId, table.occurredAt),
+  experimentHashIdx: index("scientificEventJournal_experiment_hash_idx").on(table.experimentId, table.eventHash),
+}));
 
 // Persistent closed-loop simulator session state. The JSON snapshot contains the causal engine state, PID state, dynamics state, sensors and frames needed for deterministic resume.
 export const closedLoopSessions = mysqlTable("closedLoopSessions", {

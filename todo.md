@@ -372,6 +372,50 @@
 - [x] Run P14 static, regression, production-build, diff, and browser documentation-ui checks; preserve P10 as AUTH BLOCKED.
 - [x] Record the CI-verified P14 result in Buku Besar and push the validated P14 commit to feature/control-room-ui.
 
+## INSTRUCTION REVIEW — PASTED CONTENT 12
+
+- [x] Read `pasted_content_12.txt`, assess the requested scope against current scientific/authentication boundaries, and execute only approved evidence-safe work. The requested OAuth source commit is current in Git, but production login initiation serves the SPA fallback rather than the backend route; stop as BACKEND DEPLOYMENT REQUIRED with no source patch.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 13
+
+- [x] Read `pasted_content_13.txt`, assess its deployment/OAuth instruction, and perform only the permitted read-only verification work.
+- [x] Deploy or restart only the Manus backend OAuth source from `5393e8d` and verify callback, login redirect, nonce cookie, and CORS before any P10 action.
+- [ ] Expose an existing deployment/configuration-backed production build identity and prove the active API matches `5393e8d` before authentication or P10.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 14
+
+- [x] Read `pasted_content_14.txt` and complete the read-only Control Room route identity audit. GitHub Pages is the P10 Control Room route family; the Manus preview is a distinct legacy Setup Wizard runtime at checkpoint `4afce6af`.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 15
+
+- [x] Read `pasted_content_15.txt` and complete the read-only source-of-truth audit. `/home/ubuntu/iuvfes-github` on `feature/control-room-ui` is aligned with origin and renders the correct NOT AUTHENTICATED Control Room gate; legacy Manus Preview remains separate.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 16
+
+- [x] Read `pasted_content_16.txt` and complete the pre-auth deployment audit. The active Manus backend lacks the branch's closed-loop server stack and any deployment identity mechanism, so it cannot truthfully expose `5393e8d`; retain VERSION COMPATIBILITY UNVERIFIED.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 17
+
+- [x] Read `pasted_content_17.txt` and complete the full-backend synchronization audit. Active Manus backend is a separate S3-backed project with 8 server files versus 62 in Git, lacks the closed-loop stack and required database tables, so full deployment requires external configuration.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 18
+
+- [x] Assess whether the complete GitHub backend at `5393e8d` can be deployed as one source unit with a compatible database and verifiable release identity. The Git source is complete with migrations, but the current Manus target is a separate legacy project and its database lacks required closed-loop tables; stop as DATABASE MIGRATION REQUIRED and BACKEND DEPLOYMENT REQUIRES EXTERNAL CONFIGURATION.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 19
+
+- [x] Read `pasted_content_19.txt` and complete the read-only database migration preflight. Source migration inventory is incomplete in the Drizzle journal, production has only the base migration applied and lacks closed-loop/research tables, while backup and rollback capabilities are unverified; stop as MIGRATION REQUIRES EXTERNAL CONFIGURATION.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 20
+
+- [x] Read `pasted_content_20.txt` and complete the canonical migration-chain audit. The source journal registers only `0000`, two distinct files share `0002`, `scientificEventJournal` is used by persistence code but absent from Drizzle schema, and `scientific-data.sql` is an alternate development scaffold; stop as CANONICAL CHAIN REQUIRES SOURCE PATCH.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 21
+
+- [x] Establish the canonical Drizzle migration chain: register unique ordered migrations, align snapshots and schema with runtime persistence, and preserve `scientific-data.sql` as non-canonical.
+- [x] Validate canonical migration governance with non-mutating checks, commit/push only the scoped patch, and keep production deployment/database/P10 blocked.
+- [ ] Record the CI-verified canonical migration governance result in Buku Besar without changing database deployment or P10 status.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.
