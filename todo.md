@@ -506,6 +506,12 @@
 - [x] Assess source-level Control Room, 3D, WebGL, replay, journal, evidence, provenance, and P15–P24 integration readiness without runtime actions.
 - [x] Create, validate, and publish a documentation-only P25 preflight report without application patch, migration, deployment, login, data creation, or merge.
 
+## P26 — DEPLOYMENT READINESS SPECIFICATION
+
+- [x] Verify the specified P25 release SHA and P24/P25 documentation baseline without runtime or infrastructure action.
+- [x] Write the documentation-only deployment readiness specification covering release, architecture, database, identity, environment, rollback, health gate, P10 order, and stop conditions.
+- [x] Validate and publish only the P26 documentation/tracker changes without application patch, deployment, migration, login, data creation, or merge.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.
