@@ -350,6 +350,20 @@
 - [ ] Verify simulation timestamp source, DOM/canvas uniqueness, WebGL health, and browser console.
 - [ ] Record real browser evidence for every PASS; otherwise classify P10 as BLOCKED or FAIL.
 - [x] Record the 25 August 2026 authenticated P10 attempt: admin OAuth is valid and an existing experiment is open, but the active preview has no `closedLoop.getForExperiment` procedure, so no canonical ClosedLoop session can be verified there.
+- [x] Perform a read-only Git/build/deployment/browser/API identity audit; no application code, data, commit, push, or merge was changed.
+- [x] Perform P10-RUNTIME-002 only if the browser runtime is demonstrably built from `04d98ca`, the specified existing experiment is authorized, and its canonical persisted ClosedLoop session is discoverable; otherwise stop and report the exact blocker. The verified Pages bundle is correct, but `auth.me` on its configured API returned `null`, so the run stopped as AUTH BLOCKED before session lookup.
+- [x] Attempt legitimate operator authentication on the verified `04d98ca` Pages/API deployment before any existing-experiment or ClosedLoop query. `auth.me` remains `null`, and the Pages login callback target `https://goomevision.github.io/api/oauth/callback` returns 404, so no valid Pages/API OAuth session can be established in this runtime.
+- [x] Analyze `pasted_content_7.txt` against the OAuth blocker and prepare an evidence-backed minimal remediation recommendation only; no application patch, data creation, commit, push, or merge was performed.
+
+## P13 — LOG-FIRST CONTROL ROOM OBSERVABILITY
+
+- [x] Audit the P13 instruction and targeted Control Room, OAuth, provenance, error-handling, and test surfaces; publish a focused read map.
+- [x] Define a redacted non-scientific observability event contract and explicit NOT AUTHENTICATED Control Room gate.
+- [x] Implement authentication, operator action, runtime, lifecycle, and CausalFrame-reference logging without creating telemetry, physics, CausalFrames, experiments, or sessions.
+- [x] Integrate safe interaction logs into Control Room and ProcessMachine3D without changing scientific or engine authority.
+- [x] Improve approved Control Room visual presentation while preserving topology, CausalFrame actuator mappings, effectiveCommands, and timestampSeconds.
+- [x] Add and run regression tests for event shape, sensitive-data redaction, auth state, frame references, technical errors, and 3D interaction logging.
+- [ ] Document P13 architecture, limitations, and P10 authentication boundary; commit and push validated changes to feature/control-room-ui.
 
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 

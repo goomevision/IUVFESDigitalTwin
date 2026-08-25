@@ -9,6 +9,9 @@ import { ScientificRunRecorder } from "@/components/ScientificRunRecorder";
 import { LiveProcessTrend } from "@/components/LiveProcessTrend";
 import { CausalFrameInspector } from "@/components/CausalFrameInspector";
 import { ProcessRunReplay } from "@/components/ProcessRunReplay";
+import { ControlRoomObservabilityPanel } from "@/components/ControlRoomObservabilityPanel";
+import { recordControlRoomEvent, toFrameReference, toOperatorReference } from "@/lib/controlRoomObservability";
+import { useAuth } from "@/_core/hooks/useAuth";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../server/routers";
 
@@ -71,6 +74,7 @@ function ProgressRing({ progress }: { progress: number }) {
 }
 
 export function ProcessSimulator({ experimentId, onExit, onComplete }: { experimentId: string; onExit?: () => void; onComplete?: () => void }) {
+  const auth = useAuth();
   const experiment = trpc.experiments.get.useQuery(experimentId);
   const create = trpc.closedLoop.create.useMutation();
   const start = trpc.closedLoop.start.useMutation();
@@ -101,10 +105,22 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
   const sessionFrames = trpc.closedLoop.frames.useQuery(sessionId ?? "", { enabled: Boolean(sessionId), refetchInterval: sessionId ? 1000 : false });
   const busy = useRef(false);
   const timer = useRef<number | null>(null);
+  const lastObservedFrameStep = useRef<number | null>(null);
+  const experimentEventRecorded = useRef(false);
   const scientificOutputRef = useRef<HTMLDivElement | null>(null);
   const clearTimer = () => { if (timer.current !== null) window.clearInterval(timer.current); timer.current = null; };
 
   useEffect(() => () => clearTimer(), []);
+  useEffect(() => {
+    recordControlRoomEvent({ event: "CONTROL_ROOM_OPEN", result: "INFO", operator: toOperatorReference(auth.user), experimentId });
+  }, [experimentId]);
+  useEffect(() => {
+    if (experiment.data && !experimentEventRecorded.current) {
+      experimentEventRecorded.current = true;
+      recordControlRoomEvent({ event: "EXPERIMENT_OPEN", result: "SUCCESS", operator: toOperatorReference(auth.user), experimentId });
+    }
+    if (experiment.error) recordControlRoomEvent({ event: "SESSION_ERROR", result: "ERROR", operator: toOperatorReference(auth.user), experimentId, detail: { source: "experiments.get", message: experiment.error.message } });
+  }, [auth.user, experiment.data, experiment.error, experimentId]);
   useEffect(() => {
     const parameters = experiment.data?.inputParameters as Record<string, unknown> | undefined;
     if (!parameters) return;
@@ -115,6 +131,7 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
   useEffect(() => {
     const recovered = recoveredSession.data;
     if (!recovered || sessionId) return;
+    recordControlRoomEvent({ event: "SESSION_RECOVER", result: "INFO", operator: toOperatorReference(auth.user), experimentId, sessionId: recovered.sessionId });
     setSessionId(recovered.sessionId);
     setRunning(recovered.status === "running");
     setPaused(recovered.status === "paused");
@@ -124,7 +141,16 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
     const persisted = sessionFrames.data?.frames as Frame[] | undefined;
     if (!persisted) return;
     setFrames(previous => persisted.length >= previous.length ? persisted : previous);
+    const frame = persisted.at(-1);
+    if (frame && frame.step !== lastObservedFrameStep.current) {
+      lastObservedFrameStep.current = frame.step;
+      recordControlRoomEvent({ event: "FRAME_RECEIVED", result: "INFO", operator: toOperatorReference(auth.user), experimentId, sessionId: sessionId ?? undefined, frameRef: toFrameReference(frame) });
+    }
   }, [sessionFrames.data]);
+  useEffect(() => {
+    if (!recoveredSession.error) return;
+    recordControlRoomEvent({ event: "SESSION_ERROR", result: "ERROR", operator: toOperatorReference(auth.user), experimentId, detail: { source: "closedLoop.getForExperiment", message: recoveredSession.error.message } });
+  }, [auth.user, experimentId, recoveredSession.error]);
   useEffect(() => {
     const status = session.data?.status;
     if (!status) return;
@@ -148,7 +174,10 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
   const statusTone = runtimeStatus === "RUNNING" ? "text-emerald-300 border-emerald-500/30 bg-emerald-500/10" : runtimeStatus === "PAUSED" || runtimeStatus === "REPLAY" ? "text-amber-300 border-amber-500/30 bg-amber-500/10" : runtimeStatus === "FAULT" ? "text-red-300 border-red-500/30 bg-red-500/10" : "text-cyan-300 border-cyan-500/30 bg-cyan-500/10";
   const disabled = !running || replayMode;
 
-  const onReplayFrame = useCallback((frame: Frame | undefined, index: number) => { if (!frame) return; setReplayMode(true); setReplayIndex(index); }, []);
+  const onReplayFrame = useCallback((frame: Frame | undefined, index: number) => { if (!frame) return; setReplayMode(true); setReplayIndex(index); recordControlRoomEvent({ event: "REPLAY_OPEN", result: "SUCCESS", operator: toOperatorReference(auth.user), experimentId, sessionId: sessionId ?? undefined, frameRef: toFrameReference(frame) }); }, [auth.user, experimentId, sessionId]);
+  const onMachineObservabilityEvent = useCallback((event: Parameters<NonNullable<Parameters<typeof ProcessMachine3D>[0]["onObservabilityEvent"]>>[0]) => {
+    recordControlRoomEvent({ ...event, operator: toOperatorReference(auth.user), experimentId, sessionId: sessionId ?? undefined });
+  }, [auth.user, experimentId, sessionId]);
   const oneStep = async (id: string) => {
     if (busy.current) return;
     busy.current = true;
@@ -179,6 +208,7 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
     if (!experiment.data) return;
     const parameters = experiment.data.inputParameters as Record<string, unknown>;
     try {
+      recordControlRoomEvent({ event: "PLAY", result: "INFO", operator: toOperatorReference(auth.user), experimentId });
       clearTimer();
       setFrames([]);
       setReplayMode(false);
@@ -206,13 +236,15 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
       setSessionId(created.sessionId);
       setRunning(true);
       await oneStep(created.sessionId);
+      recordControlRoomEvent({ event: "PLAY", result: "SUCCESS", operator: toOperatorReference(auth.user), experimentId, sessionId: created.sessionId });
       toast.success("Closed-loop engine connected");
-    } catch (error) { console.error(error); toast.error("Could not start closed-loop controller"); }
+    } catch (error) { recordControlRoomEvent({ event: "PLAY", result: "FAILURE", operator: toOperatorReference(auth.user), experimentId, detail: { message: error instanceof Error ? error.message : String(error) } }); console.error(error); toast.error("Could not start closed-loop controller"); }
   };
 
   const apply = async () => {
     if (!sessionId) return;
     try {
+      recordControlRoomEvent({ event: "CONTROL_APPLY", result: "INFO", operator: toOperatorReference(auth.user), experimentId, sessionId });
       const view = await control.mutateAsync({ sessionId, targetPressureMbar: pressure, targetTemperatureC: temperature, coolingTemperatureC: cooling, heaterMax: heaterLimit, vacuumPumpMax: pumpLimit, condenserMax: condenserLimit, coolingMax: coolingLimit, operatorNotes: "Operator live controller adjustment." });
       setTemperature(view.targets.targetTemperatureC);
       setPressure(view.targets.targetPressureMbar);
@@ -221,14 +253,15 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
       setPumpLimit(view.operatorLimits.vacuumPumpMax);
       setCondenserLimit(view.operatorLimits.condenserMax);
       setCoolingLimit(view.operatorLimits.coolingMax);
+      recordControlRoomEvent({ event: "CONTROL_APPLY", result: "SUCCESS", operator: toOperatorReference(auth.user), experimentId, sessionId });
       toast.success("Controller settings applied");
-    } catch { toast.error("Controller setting rejected"); }
+    } catch (error) { recordControlRoomEvent({ event: "CONTROL_APPLY", result: "FAILURE", operator: toOperatorReference(auth.user), experimentId, sessionId, detail: { message: error instanceof Error ? error.message : String(error) } }); toast.error("Controller setting rejected"); }
   };
 
-  const doPause = async () => { if (!sessionId) return; try { await pause.mutateAsync(sessionId); clearTimer(); setPaused(true); setRunning(false); } catch { toast.error("Pause rejected"); } };
-  const doResume = async () => { if (!sessionId) return; try { await resume.mutateAsync(sessionId); setPaused(false); setRunning(true); setReplayMode(false); } catch { toast.error("Resume rejected"); } };
-  const doStop = async () => { if (!sessionId) return; try { await stop.mutateAsync(sessionId); clearTimer(); setRunning(false); setPaused(false); } catch { toast.error("Stop rejected"); } };
-  const doReset = async () => { clearTimer(); if (sessionId) try { await reset.mutateAsync(sessionId); } catch { toast.error("Reset rejected"); } setSessionId(null); setFrames([]); setReplayMode(false); setReplayIndex(0); setRunning(false); setPaused(false); setCompleted(false); };
+  const doPause = async () => { if (!sessionId) return; try { await pause.mutateAsync(sessionId); clearTimer(); setPaused(true); setRunning(false); recordControlRoomEvent({ event: "PAUSE", result: "SUCCESS", operator: toOperatorReference(auth.user), experimentId, sessionId }); } catch (error) { recordControlRoomEvent({ event: "PAUSE", result: "FAILURE", operator: toOperatorReference(auth.user), experimentId, sessionId, detail: { message: error instanceof Error ? error.message : String(error) } }); toast.error("Pause rejected"); } };
+  const doResume = async () => { if (!sessionId) return; try { await resume.mutateAsync(sessionId); setPaused(false); setRunning(true); setReplayMode(false); recordControlRoomEvent({ event: "RESUME", result: "SUCCESS", operator: toOperatorReference(auth.user), experimentId, sessionId }); } catch (error) { recordControlRoomEvent({ event: "RESUME", result: "FAILURE", operator: toOperatorReference(auth.user), experimentId, sessionId, detail: { message: error instanceof Error ? error.message : String(error) } }); toast.error("Resume rejected"); } };
+  const doStop = async () => { if (!sessionId) return; try { await stop.mutateAsync(sessionId); clearTimer(); setRunning(false); setPaused(false); recordControlRoomEvent({ event: "STOP", result: "SUCCESS", operator: toOperatorReference(auth.user), experimentId, sessionId }); } catch (error) { recordControlRoomEvent({ event: "STOP", result: "FAILURE", operator: toOperatorReference(auth.user), experimentId, sessionId, detail: { message: error instanceof Error ? error.message : String(error) } }); toast.error("Stop rejected"); } };
+  const doReset = async () => { clearTimer(); if (sessionId) try { await reset.mutateAsync(sessionId); recordControlRoomEvent({ event: "RESET", result: "SUCCESS", operator: toOperatorReference(auth.user), experimentId, sessionId }); } catch (error) { recordControlRoomEvent({ event: "RESET", result: "FAILURE", operator: toOperatorReference(auth.user), experimentId, sessionId, detail: { message: error instanceof Error ? error.message : String(error) } }); toast.error("Reset rejected"); } setSessionId(null); setFrames([]); setReplayMode(false); setReplayIndex(0); setRunning(false); setPaused(false); setCompleted(false); };
 
   return <div className="min-h-screen bg-[#020712] text-slate-100">
     <div className="min-h-screen bg-[radial-gradient(circle_at_50%_-12%,#123a54_0%,#06111d_35%,#020712_72%)] px-3 py-3 md:px-5 md:py-5">
@@ -251,7 +284,7 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
           </aside>
 
           <main className="min-w-0 space-y-3">
-            <section className="border border-cyan-500/25 bg-slate-950/70 p-3 shadow-[0_0_55px_rgba(14,116,144,0.12)]"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><div className="text-[9px] tracking-[0.24em] text-cyan-300">PROCESS TWIN</div><h2 className="mt-1 text-lg font-semibold tracking-wide">REACTOR → VAPOR → MULTI-STAGE CONDENSATION → RECOVERY</h2></div><div className="flex items-center gap-3"><ProgressRing progress={engineProgress} /><div className="font-mono text-[10px]"><div className="text-slate-500">ENGINE STAGE</div><div className="mt-1 text-cyan-200">{state?.stage ?? "WAITING"}</div><div className="mt-1 max-w-[220px] text-[9px] text-slate-500">{safety?.transitionReason ?? "Waiting for the first CausalFrame."}</div></div></div></div><ProcessMachine3D frame={displayFrame} /></section>
+            <section className="border border-cyan-500/25 bg-slate-950/70 p-3 shadow-[0_0_55px_rgba(14,116,144,0.12)]"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><div className="text-[9px] tracking-[0.24em] text-cyan-300">PROCESS TWIN</div><h2 className="mt-1 text-lg font-semibold tracking-wide">REACTOR → VAPOR → MULTI-STAGE CONDENSATION → RECOVERY</h2></div><div className="flex items-center gap-3"><ProgressRing progress={engineProgress} /><div className="font-mono text-[10px]"><div className="text-slate-500">ENGINE STAGE</div><div className="mt-1 text-cyan-200">{state?.stage ?? "WAITING"}</div><div className="mt-1 max-w-[220px] text-[9px] text-slate-500">{safety?.transitionReason ?? "Waiting for the first CausalFrame."}</div></div></div></div><ProcessMachine3D frame={displayFrame} onObservabilityEvent={onMachineObservabilityEvent} /></section>
             <section className="grid divide-x divide-slate-800 border border-slate-800 bg-slate-950/65 sm:grid-cols-3 xl:grid-cols-6"><Instrument label="TEMPERATURE" value={format(sensor?.temperatureC, 1)} unit="°C" /><Instrument label="PRESSURE" value={format(sensor?.pressureMbar, 1)} unit="mbar" tone="sky" /><Instrument label="YIELD" value={format(sensor?.yieldPercent, 2)} unit="%" tone="emerald" /><Instrument label="OIL RECOVERED" value={format(sensor?.oilRecoveredKg, 3)} unit="kg" tone="amber" /><Instrument label="WATER REMOVED" value={format(sensor?.waterRemovedKg, 3)} unit="kg" tone="sky" /><Instrument label="ENERGY" value={format(sensor?.energyKwh, 3)} unit="kWh" tone="amber" /></section>
           </main>
 
@@ -264,6 +297,7 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
         </section>
 
         <section className="grid gap-3 xl:grid-cols-[1.15fr_.85fr]"><LiveProcessTrend frames={recent} /><CausalFrameInspector frames={replayFrames} /></section>
+        <ControlRoomObservabilityPanel />
         <section className="grid gap-3 xl:grid-cols-[1fr_.8fr]"><ProcessRunReplay frames={frames} onFrameChange={onReplayFrame} /><section className="border border-slate-800 bg-slate-950/70 p-4"><div className="flex items-center justify-between"><div><div className="text-[9px] tracking-[0.2em] text-cyan-300">PROCESS STATE</div><div className="mt-1 text-lg font-semibold">{state?.stage ?? "WAITING"}</div></div><Activity className={`h-7 w-7 ${safety?.allSystemsSafe ? "text-emerald-300" : "text-red-300"}`} /></div><div className="mt-4 grid grid-cols-3 gap-2 text-center"><div className="border border-slate-800 p-2"><div className="text-[8px] text-slate-600">MATERIAL REMAINING</div><div className="mt-1 font-mono text-xs text-slate-200">{format(material?.remainingMassKg, 3)} kg</div></div><div className="border border-slate-800 p-2"><div className="text-[8px] text-slate-600">WATER REMAINING</div><div className="mt-1 font-mono text-xs text-sky-200">{format(material?.waterRemainingKg, 3)} kg</div></div><div className="border border-slate-800 p-2"><div className="text-[8px] text-slate-600">OIL POTENTIAL</div><div className="mt-1 font-mono text-xs text-amber-200">{format(material?.oilRemainingPotentialKg, 3)} kg</div></div></div><div className="mt-4 flex items-center gap-2 text-[9px] text-slate-500"><Droplets className="h-3.5 w-3.5 text-sky-300" />Mass-inventory values are derived from the active engine frame.</div></section></section>
         <section className="grid gap-3 xl:grid-cols-[.85fr_1.15fr]"><ProcessEventTimeline timeline={replayFrames.map(frame => ({ stage: frame.safety.stage, elapsedSeconds: frame.controller.elapsedSeconds, alarm: frame.safety.alarm, transitionReason: frame.safety.transitionReason, interlocks: { overTemperature: frame.safety.overTemperature, vacuumAchieved: frame.safety.vacuumAchieved, allSystemsSafe: frame.safety.allSystemsSafe } }))} /><section className="border border-slate-800 bg-slate-950/70 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><div className="text-[9px] tracking-[0.2em] text-emerald-300">SCIENTIFIC OUTPUT</div><p className="mt-1 text-xs text-slate-500">Use the recorder below to preserve run metadata and the causal-frame dataset.</p></div><Button onClick={() => scientificOutputRef.current?.scrollIntoView({ behavior: "smooth" })} disabled={!frames.length} variant="outline" className="border-emerald-500/40 text-emerald-300"><FileText className="mr-2 h-4 w-4" />RESULTS / PRINT</Button></div></section></section>
         <div ref={scientificOutputRef}><ScientificRunRecorder experimentId={experimentId} frames={frames} completed={completed} /></div>

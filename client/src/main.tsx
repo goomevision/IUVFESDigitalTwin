@@ -6,7 +6,10 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { startLogin } from "./const";
+import { installRuntimeObservability } from "./lib/controlRoomObservability";
 import "./index.css";
+
+installRuntimeObservability();
 
 const queryClient = new QueryClient();
 

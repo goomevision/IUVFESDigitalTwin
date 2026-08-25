@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { Component, ReactNode } from "react";
+import { recordControlRoomEvent } from "@/lib/controlRoomObservability";
 
 interface Props {
   children: ReactNode;
@@ -19,6 +20,14 @@ class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error) {
+    recordControlRoomEvent({
+      event: /removeChild|insertBefore|NotFoundError/i.test(error.message) ? "DOM_ERROR" : "REACT_ERROR",
+      result: "ERROR",
+      detail: { name: error.name, message: error.message, stack: error.stack },
+    });
   }
 
   render() {
