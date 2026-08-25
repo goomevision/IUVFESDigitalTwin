@@ -492,6 +492,13 @@
 - [x] Implement Scientific Reconstruction, Reproducibility Inspector, P20/P21/P22 contextual integration, and Knowledge Center learning content.
 - [x] Add P23 reproducibility-bound regression coverage, run static validation, document, commit, and push while retaining P10/WebGL blockers.
 
+## P24 — INTEGRATED SYSTEM AUDIT & SCIENTIFIC READINESS
+
+- [x] Verify Git source integrity, P15–P23 publication history, and Buku Besar alignment without implementation changes.
+- [x] Audit P15–P23 source contracts, cross-phase identifiers, scientific boundaries, backend/database/auth source readiness, and static quality evidence.
+- [x] Produce read-only scientific readiness and evidence-grounded maturity matrices with runtime/deployment blockers separated from source presence.
+- [x] Deliver the P24 audit report with no application patch, migration, deployment, or authentication action; documentation-only publication is permitted without merge.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.
