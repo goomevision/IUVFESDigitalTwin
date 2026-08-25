@@ -499,6 +499,13 @@
 - [x] Produce read-only scientific readiness and evidence-grounded maturity matrices with runtime/deployment blockers separated from source presence.
 - [x] Deliver the P24 audit report with no application patch, migration, deployment, or authentication action; documentation-only publication is permitted without merge.
 
+## P25 — VERIFIED RUNTIME INTEGRATION PREFLIGHT
+
+- [x] Verify Git/remote alignment and authoritative backend source identity without modifying runtime state.
+- [x] Assess deployment, database, migration, OAuth, CORS, auth, existing experiment, and canonical session prerequisites read-only; stop at the first fundamental external blocker.
+- [x] Assess source-level Control Room, 3D, WebGL, replay, journal, evidence, provenance, and P15–P24 integration readiness without runtime actions.
+- [x] Create, validate, and publish a documentation-only P25 preflight report without application patch, migration, deployment, login, data creation, or merge.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.
