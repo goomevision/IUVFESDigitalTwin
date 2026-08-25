@@ -1745,6 +1745,49 @@ Jangan menjalankan comparison sampai available records memiliki lawful sample/ex
 
 ---
 
+## 2026-08-26 — P22 Experimental Identity & Evidence Integrity source publication
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Commit:** Source-publication commit for this entry
+**PR:** open; no merge performed
+
+### Source audit
+
+P22 memeriksa `client/src/lib/instrumentRegistry.ts`, `client/src/lib/laboratoryEvidence.ts`, `client/src/lib/experimentalComparison.ts`, `server/scientificRecordIdentity.ts`, `shared/experimentNotebook.ts`, `shared/scientificData.ts`, `server/scientificDataset.ts`, `server/scientificDatasetPersistence.ts`, `server/scientificProvenance.ts`, `server/scientificEventJournal.ts`, `drizzle/schema.ts`, dan `drizzle/meta/_journal.json`. Tidak ditemukan konflik pada canonical persisted identity path; P22 tidak menggunakan adapter notebook in-memory yang membuat ID timestamp sebagai canonical identity.
+
+Identifier dan mekanisme reusable yang ditemukan adalah canonical `researchExperiments.experimentId` dan `sampleId`; `experimentInstruments.instrumentId` serta `calibrationId`; `datasetManifests.id`/`sha256`; `provenanceRecords.id`; dan `scientificEventJournal.eventHash`/`previousHash`. `ScientificRecordIdentity` mempertahankan source experiment ID jika tersedia, sementara `PersistedScientificDataset` menghubungkan dataset, provenance, SHA-256, dan terminal event hash. Mekanisme hashing existing adalah SHA-256 di dataset manifest, event journal canonicalizer, dan simulation dataset persistence. P22 hanya mereferensikan mechanism tersebut sebagai future server-side reuse; tidak membuat hash mechanism kedua atau menghitung hash terhadap evidence yang tidak ada.
+
+### Perubahan
+
+P22 menambahkan `ExperimentalIdentity`, `EvidenceIntegrityRecord`, `EvidenceHashProvider` interface, readiness gates, Identity & Integrity Center, Identity Link Graph, Experimental Identity Inspector, Evidence Integrity Inspector, serta content Knowledge Center dalam mode SIMPLE, SCIENTIFIC, dan EXPERT. Empty contract menyimpan semua ID dan link sebagai `NOT LOADED`; tidak ada experiment, sample, simulation run, measurement, instrument physical record, calibration, dataset, evidence, provenance, timestamp, hash, maupun verified state yang dibuat.
+
+### P17–P21 integration
+
+P17 Instrument Registry, P18 Traceability Chain, dan P19 Uncertainty Budget ditautkan hanya sebagai evidence-bound contextual surfaces. P20 tetap memiliki zero evidence records dan diberi status identity `NOT LOADED`. P21 tetap **COMPARISON BLOCKED** dengan reason `IDENTITY INCOMPLETE`; P22 tidak menghitung difference, accuracy, confidence, validation, atau comparison result. Existing CausalFrame source, `timestampSeconds`, `sensorAfter`, `effectiveCommands`, dan `actuatorLevels` tidak diubah.
+
+### Scientific impact
+
+Tidak ada perubahan physics, PID, safety, closed-loop engine, ProcessMachine3D authority, CausalFrame authority, database, migration, OAuth, experiment/session, telemetry, measurement, laboratory evidence, certificate, calibration result, uncertainty value, comparison result, atau production record. `NOT LOADED` bukan nol; `UNKNOWN` tetap `UNKNOWN`; `VERIFIED` tidak muncul pada identity/evidence empty state. Tidak ada secret, credential, atau OAuth token yang disimpan.
+
+### Simulation/Lab boundary impact
+
+`SIMULATION ≠ MEASURED`, `DERIVED ≠ MEASURED`, `COMPARISON ≠ VALIDATION`, `COMPLETE ≠ VERIFIED`, dan `READY FOR VERIFICATION ≠ VERIFIED` ditegaskan dalam UI/contract. Integrity hanya menjawab keberadaan dan verifiability evidence payload; integrity bukan laboratory validation dan provenance bukan evidence proof secara otomatis.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS — 40 files / 110 tests, termasuk `server/experimentalIdentityIntegrity.p22.test.ts`. `pnpm build`: PASS. `git diff --check`: PASS. Warning ukuran JavaScript bundle lebih dari 500 kB tetap non-blocking.
+
+### Status
+
+🟢 P22 **source publication** tervalidasi secara statis pada branch fitur tanpa merge. 🟡 Identity & Integrity Center adalah UI/contract foundation dengan zero loaded identity/evidence records; ini bukan hash result, verification, integrity approval, atau validation. 🟡 Authenticated WebGL smoke tetap **BLOCKED** oleh OAuth/session/full backend deployment; P10 tidak berubah.
+
+### Next action
+
+Sebelum P22 dapat memverifikasi evidence, sediakan canonical persisted records dan governance yang disetujui untuk experiment/sample/instrument/calibration/dataset/evidence/provenance identity, authorized server-side hash verification, custody, retention, validation method, and reviewer ownership. Jangan mengisi empty contract dengan synthetic identifiers atau menjalankan P10/browser acceptance sebelum runtime prerequisite yang legitimate tersedia.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:

@@ -478,6 +478,13 @@
 - [x] Implement a Comparison Center and Comparison Inspector with blocked explanation, visual foundation, and contextual links.
 - [x] Add P21 comparison-boundary regression coverage, run static validation once, document, commit, and push while retaining P10/WebGL blockers.
 
+## P22 — EXPERIMENTAL IDENTITY & EVIDENCE INTEGRITY
+
+- [x] Audit reusable P17–P21 identifiers, provenance, manifest, event-journal, hash, schema, and migration mechanisms; stop on identity conflict.
+- [x] Define canonical Experimental Identity, Evidence Integrity, hash-provider abstraction, and readiness contracts without records, hashes, or synthetic identifiers.
+- [x] Implement identity/integrity inspectors, link graph, readiness gates, P20/P21 integration, and Knowledge Center learning content without scientific state changes.
+- [x] Add P22 integrity-bound regression coverage, run static validation, document, commit, and push while retaining P10/WebGL blockers.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.
