@@ -471,6 +471,13 @@
 - [x] Implement a Laboratory Evidence Center and Evidence Inspector with contextual links and an explicit sample-to-verification flow.
 - [x] Add P20 evidence-bound regression coverage, run static validation once, document, commit, and push while retaining P10/WebGL blockers.
 
+## P21 — EXPERIMENTAL DATASET & SIMULATION COMPARISON FOUNDATION
+
+- [x] Map P14–P20 comparison, evidence, instrument, traceability, uncertainty, and Control Room surfaces while preserving all scientific/runtime boundaries.
+- [x] Define a source-safe Comparison Record, readiness gate, and blocked-state contract without datasets, calculated results, persistence, or synthetic identifiers.
+- [x] Implement a Comparison Center and Comparison Inspector with blocked explanation, visual foundation, and contextual links.
+- [x] Add P21 comparison-boundary regression coverage, run static validation once, document, commit, and push while retaining P10/WebGL blockers.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.

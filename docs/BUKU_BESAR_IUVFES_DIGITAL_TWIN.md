@@ -1702,6 +1702,49 @@ Sebelum evidence record nyata dapat diingest, sediakan governance dan approved p
 
 ---
 
+## 2026-08-26 — P21 Experimental Dataset & Simulation Comparison Foundation source publication
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Commit:** Source-publication commit for this entry
+**PR:** open; no merge performed
+
+### Temuan
+
+P20 menyiapkan empty Evidence Center tetapi belum menyediakan surface yang memisahkan simulation-only display dari comparison terhadap laboratory measurement. Tanpa readiness gate, UI berisiko menghasilkan comparison, agreement, accuracy, confidence, atau validation claim sebelum sample, timestamp, unit, instrument, calibration, traceability, uncertainty, provenance, serta evidence measurement tersedia.
+
+### Perubahan
+
+P21 menambahkan Comparison Center, Comparison Record contract, Comparison Inspector, readiness gate, dan visual comparison foundation. Contract mendeklarasikan comparison reference, simulation/measurement references and fields, experiment/sample/instrument context, alignment state, calibration/traceability/uncertainty/provenance status, unit, interpretation limit, serta future value context untuk simulation value, measured value, difference, uncertainty, timestamp, dan provenance. Tidak ada Comparison Record, laboratory dataset, measured value, difference, graph, atau comparison result yang diisi.
+
+Readiness gate mengevaluasi sample alignment, timestamp alignment, unit compatibility, instrument identity, calibration status, traceability status, uncertainty status, provenance status, dan measurement status. Karena zero evidence/data records dimuat, UI menampilkan **NO LABORATORY DATA LOADED**, **COMPARISON NOT READY**, dan **REQUIRED EVIDENCE MISSING**; tidak ada comparison calculation atau automatic verification.
+
+### Data flow affected
+
+P21 adalah client-side UI/contract tanpa persistence, database migration, API call, experiment/session, telemetry, atau CausalFrame mutation. Simulation side tetap dapat diberi label `SIMULATION`, sementara measurement side tetap `NOT LOADED`. Tidak ada perubahan pada `timestampSeconds`, `sensorAfter`, `effectiveCommands`, atau `actuatorLevels`; nilai tersebut tidak digunakan sebagai laboratory data atau validation evidence.
+
+### Scientific impact
+
+Tidak ada perubahan physics, PID, safety, CausalFrame, actuator authority, OAuth, backend, database, migration, certificate, calibration, uncertainty, evidence, sample, laboratory measurement, atau comparison outcome. UI tidak membuat accuracy score, confidence score, model validation score, agreement score, laboratory validation claim, atau ISO/IEC 17025 claim.
+
+### Simulation/Lab boundary impact
+
+`SIMULATION ≠ MEASURED`, `DERIVED ≠ MEASURED`, `UNKNOWN ≠ ZERO`, `COMPLETE ≠ VERIFIED`, dan `COMPARISON ≠ VALIDATION` dinyatakan pada UI/contract. Simulation-only data bukan experimental validation. Measurement side tidak dimunculkan tanpa evidence laboratory dan metadata prerequisite yang lengkap; comparison tetap evidence-bound dan blocked.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS — 39 files / 106 tests, termasuk `server/experimentalComparison.p21.test.ts`. `pnpm build`: PASS. `git diff --check`: PASS. Warning ukuran JavaScript bundle lebih dari 500 kB tetap non-blocking.
+
+### Status
+
+🟢 P21 **source publication** tervalidasi secara statis pada branch fitur tanpa merge. 🟡 Comparison Center adalah UI/contract foundation dengan zero loaded comparison and laboratory records; ini bukan comparison result ataupun validation. 🟡 Authenticated WebGL smoke tetap **BLOCKED** oleh OAuth/session/full backend deployment; P10 tidak berubah.
+
+### Next action
+
+Jangan menjalankan comparison sampai available records memiliki lawful sample/experiment/instrument identities, measurement and simulation references, unit compatibility, timestamp alignment, calibration, traceability, uncertainty, provenance, and interpretation methodology. Jangan mengisi contract dengan synthetic data dan jangan menjalankan P10/browser acceptance sampai runtime prerequisite yang legitimate tersedia.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:
