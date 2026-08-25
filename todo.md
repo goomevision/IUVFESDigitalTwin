@@ -518,6 +518,28 @@
 - [x] Classify the six downstream deployment, database, OAuth, CORS, and runtime-acceptance checks without P10, experiment, session, WebGL, or 3D action.
 - [x] Create, validate, and publish only the P27 gate documentation/tracker changes without application patch, deployment, migration, login, data creation, or merge.
 
+## BACKEND DEPLOYMENT PATH DISCOVERY
+
+- [x] Inspect only official project/repository connection and deployment capability metadata for the specified GitHub backend release.
+- [x] Report branch, SHA, full-backend, release-identity, API-host, and managed-database capability availability without changes or workarounds.
+
+## MANUS FULL-STACK RUNTIME CAPABILITY TEST
+
+- [x] Verify GitHub source checkout, exact SHA, lockfile, and full backend module presence without modifying the checkout.
+- [x] Assess official Cloud Computer, local backend runtime, isolated database configuration, and public HTTPS capabilities without production actions.
+- [x] Run only the minimum source build/type/test checks needed for runtime-capability classification, with no commit or source modification.
+
+## P28 — RUNTIME ARCHITECTURE DECISION
+
+- [x] Inspect only currently available Manus Web App/project runtime, database, secrets, public API, release identity, and Git access capabilities for the specified source release.
+- [x] Compare those capabilities with the complete GitHub backend requirements and report the minimum external path without deployment or source changes.
+
+## P29 — EXTERNAL RUNTIME DEPLOYMENT SPECIFICATION
+
+- [x] Verify the specified Git source baseline and P26/P28 architecture-decision context without runtime action.
+- [x] Write the minimal external full-backend deployment specification for source, build, runtime, secrets, database, HTTPS API, release identity, health, and rollback.
+- [x] Validate and publish only the P29 documentation/tracker changes without application patch, deployment, migration, login, data creation, or merge.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.
