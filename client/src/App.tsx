@@ -1,18 +1,33 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import ScientificExperimentFlow from "@/pages/ScientificExperimentFlow";
+import ExperimentReplay from "./pages/ExperimentReplay";
+import ScientificKnowledgeCenter from "./pages/ScientificKnowledgeCenter";
+import { Route, Router as WouterRouter, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+
+const GITHUB_PAGES_BASE = "/IUVFESDigitalTwin";
 
 function Router() {
+  const routerBase =
+    typeof window !== "undefined" &&
+    window.location.pathname.startsWith(`${GITHUB_PAGES_BASE}/`)
+      ? GITHUB_PAGES_BASE
+      : "";
+
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/404" component={NotFound} />
-      <Route component={NotFound} />
-    </Switch>
+    <WouterRouter base={routerBase}>
+      <Switch>
+        <Route path="/" component={ScientificExperimentFlow} />
+        <Route path="/experiment" component={ScientificExperimentFlow} />
+        <Route path="/knowledge" component={ScientificKnowledgeCenter} />
+        <Route path="/replay/:experimentId" component={ExperimentReplay} />
+        <Route path="/404" component={NotFound} />
+        <Route component={NotFound} />
+      </Switch>
+    </WouterRouter>
   );
 }
 

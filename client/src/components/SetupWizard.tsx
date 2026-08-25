@@ -1,11 +1,11 @@
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { AlertCircle, CheckCircle2, ChevronRight, X, Droplet, Weight, Gauge } from "lucide-react";
+import { CheckCircle2, ChevronRight, Droplet, Gauge, ShieldCheck, Weight, X, Zap } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -15,6 +15,7 @@ interface SetupWizardProps {
 }
 
 interface ValidationErrors {
+  material?: string;
   materialWeight?: string;
   waterContent?: string;
   oilContent?: string;
@@ -25,125 +26,108 @@ interface ValidationErrors {
   experimentName?: string;
 }
 
+const STEP_COUNT = 3;
+const STEPS = [
+  { number: 1, title: "Material", subtitle: "Input material" },
+  { number: 2, title: "Process", subtitle: "Operating conditions" },
+  { number: 3, title: "Review", subtitle: "Confirm experiment" },
+];
+
+function FieldError({ children }: { children?: string }) {
+  return children ? <p className="mt-1.5 text-xs text-red-300">{children}</p> : null;
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-white/5 py-2.5 last:border-0">
+      <span className="text-sm text-slate-400">{label}</span>
+      <span className="text-right font-mono text-sm text-slate-100">{value}</span>
+    </div>
+  );
+}
+
 export function SetupWizard({ onComplete, onCancel }: SetupWizardProps) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<ValidationErrors>({});
 
-  // Material Selection State
   const [selectedMaterial, setSelectedMaterial] = useState<number | null>(null);
   const [materialWeight, setMaterialWeight] = useState(10);
   const [waterContent, setWaterContent] = useState(50);
   const [oilContent, setOilContent] = useState(3);
 
-  // Process Parameters State
   const [targetPressure, setTargetPressure] = useState(100);
   const [targetTemperature, setTargetTemperature] = useState(60);
   const [ultrasonicFrequency, setUltrasonicFrequency] = useState(40);
   const [duration, setDuration] = useState(2);
   const [materialWaterRatio, setMaterialWaterRatio] = useState("1:1");
   const [processModel, setProcessModel] = useState("hybrid");
-
-  // Experiment Name
   const [experimentName, setExperimentName] = useState("");
 
-  // Fetch materials
   const { data: materials = [] } = trpc.materials.list.useQuery();
   const createExperiment = trpc.experiments.create.useMutation();
 
-  // Get selected material details
-  const selectedMaterialData = useMemo(() => {
-    return materials.find(m => m.id === selectedMaterial);
-  }, [selectedMaterial, materials]);
+  const selectedMaterialData = useMemo(
+    () => materials.find(material => material.id === selectedMaterial),
+    [materials, selectedMaterial],
+  );
+
+  const validateStep1 = () => {
+    const nextErrors: ValidationErrors = {};
+    if (!selectedMaterial) nextErrors.material = "Select a material before continuing.";
+    if (materialWeight <= 0 || materialWeight > 1000) nextErrors.materialWeight = "Weight must be between 0.1 and 1000 kg.";
+    if (waterContent < 0 || waterContent > 100) nextErrors.waterContent = "Water content must be between 0 and 100%.";
+    if (oilContent < 0 || oilContent > 100) nextErrors.oilContent = "Oil content must be between 0 and 100%.";
+    if (waterContent + oilContent > 100) nextErrors.waterContent = "Water + oil content cannot exceed 100%.";
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const validateStep2 = () => {
+    const nextErrors: ValidationErrors = {};
+    if (!experimentName.trim()) nextErrors.experimentName = "Experiment name is required.";
+    if (targetPressure < 1 || targetPressure > 1000) nextErrors.targetPressure = "Pressure must be between 1 and 1000 mbar.";
+    if (targetTemperature < 20 || targetTemperature > 150) nextErrors.targetTemperature = "Temperature must be between 20 and 150°C.";
+    if (ultrasonicFrequency < 20 || ultrasonicFrequency > 100) nextErrors.ultrasonicFrequency = "Frequency must be between 20 and 100 kHz.";
+    if (duration < 0.5 || duration > 24) nextErrors.duration = "Duration must be between 0.5 and 24 hours.";
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
 
   const handleMaterialSelect = (materialId: number) => {
     setSelectedMaterial(materialId);
-    const material = materials.find(m => m.id === materialId);
+    const material = materials.find(item => item.id === materialId);
     if (material) {
       setWaterContent(Number(material.defaultWaterContent) || 50);
       setOilContent(Number(material.defaultOilContent) || 3);
     }
   };
 
-  // Validation functions
-  const validateStep1 = (): boolean => {
-    const newErrors: ValidationErrors = {};
-    
-    if (!selectedMaterial) {
-      newErrors.materialWeight = "Please select a material";
-    }
-    if (materialWeight <= 0 || materialWeight > 1000) {
-      newErrors.materialWeight = "Weight must be between 0.1 and 1000 kg";
-    }
-    if (waterContent < 0 || waterContent > 100) {
-      newErrors.waterContent = "Water content must be between 0 and 100%";
-    }
-    if (oilContent < 0 || oilContent > 100) {
-      newErrors.oilContent = "Oil content must be between 0 and 100%";
-    }
-    if (waterContent + oilContent > 100) {
-      newErrors.waterContent = "Water + Oil content cannot exceed 100%";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const validateStep2 = (): boolean => {
-    const newErrors: ValidationErrors = {};
-    
-    if (!experimentName.trim()) {
-      newErrors.experimentName = "Experiment name is required";
-    }
-    if (targetPressure < 1 || targetPressure > 1000) {
-      newErrors.targetPressure = "Pressure must be between 1 and 1000 mbar";
-    }
-    if (targetTemperature < 20 || targetTemperature > 150) {
-      newErrors.targetTemperature = "Temperature must be between 20 and 150°C";
-    }
-    if (ultrasonicFrequency < 20 || ultrasonicFrequency > 100) {
-      newErrors.ultrasonicFrequency = "Frequency must be between 20 and 100 kHz";
-    }
-    if (duration < 0.5 || duration > 24) {
-      newErrors.duration = "Duration must be between 0.5 and 24 hours";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleNext = () => {
-    if (step === 1) {
-      if (!validateStep1()) {
-        toast.error("Please fix the errors before proceeding");
-        return;
-      }
-    } else if (step === 2) {
-      if (!validateStep2()) {
-        toast.error("Please fix the errors before proceeding");
-        return;
-      }
+    const valid = step === 1 ? validateStep1() : validateStep2();
+    if (!valid) {
+      toast.error("Please correct the highlighted fields.");
+      return;
     }
     setErrors({});
-    setStep(step + 1);
+    setStep(current => Math.min(STEP_COUNT, current + 1));
   };
 
   const handlePrevious = () => {
     setErrors({});
-    setStep(step - 1);
+    setStep(current => Math.max(1, current - 1));
   };
 
   const handleSubmit = async () => {
     if (!validateStep1() || !validateStep2()) {
-      toast.error("Please fill in all required fields correctly");
+      toast.error("Please complete all required fields.");
       return;
     }
-
     setLoading(true);
     try {
       const result = await createExperiment.mutateAsync({
         materialId: selectedMaterial!,
-        experimentName,
+        experimentName: experimentName.trim(),
         inputParameters: {
           materialWeight,
           waterContent,
@@ -156,489 +140,135 @@ export function SetupWizard({ onComplete, onCancel }: SetupWizardProps) {
           processModel,
         },
       });
-
-      toast.success("Experiment created successfully!");
+      toast.success("Experiment created successfully");
       onComplete?.(result.experimentId);
     } catch (error) {
-      toast.error("Failed to create experiment");
       console.error(error);
+      toast.error("Failed to create experiment");
     } finally {
       setLoading(false);
     }
   };
 
-  // Progress Indicator Component
-  const ProgressIndicator = () => (
-    <div className="flex justify-center items-center gap-2 mb-8">
-      {[1, 2, 3, 4, 5].map((s) => (
-        <div key={s} className="flex items-center">
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold transition-all ${
-            s < step ? "bg-cyan-500 text-white" :
-            s === step ? "bg-cyan-500 text-white ring-2 ring-cyan-300" :
-            "bg-slate-700 text-slate-400 border border-slate-600"
-          }`}>
-            {s < step ? <CheckCircle2 size={20} /> : s}
-          </div>
-          {s < 5 && <div className={`w-8 h-1 mx-1 ${s < step ? "bg-cyan-500" : "bg-slate-700"}`} />}
-        </div>
-      ))}
-    </div>
-  );
-
-  // System Overview Panel Component
-  const SystemOverviewPanel = () => (
-    <div className="bg-slate-900/40 border border-cyan-500/30 rounded-lg p-4 space-y-4">
-      <h3 className="text-cyan-400 font-bold text-sm tracking-wider">SYSTEM OVERVIEW</h3>
-      
-      <div className="space-y-3">
-        {/* Temperature */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Gauge size={16} className="text-cyan-400" />
-            <span className="text-slate-400 text-xs">TEMPERATURE</span>
-          </div>
-          <span className="text-cyan-400 font-mono text-sm">22.4°C</span>
-        </div>
-
-        {/* Pressure */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Gauge size={16} className="text-cyan-400" />
-            <span className="text-slate-400 text-xs">PRESSURE</span>
-          </div>
-          <span className="text-cyan-400 font-mono text-sm">101.3 kPa</span>
-        </div>
-
-        {/* Vacuum */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Gauge size={16} className="text-cyan-400" />
-            <span className="text-slate-400 text-xs">VACUUM</span>
-          </div>
-          <span className="text-cyan-400 font-mono text-sm">-0.8 kPa</span>
-        </div>
-      </div>
-
-      <div className="border-t border-slate-700 pt-3">
-        <div className="flex items-center gap-2">
-          <CheckCircle2 size={16} className="text-green-500" />
-          <span className="text-slate-300 text-xs">ALL SYSTEMS NOMINAL</span>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-6 flex items-center justify-center">
-      <div className="w-full max-w-7xl">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
+    <div className="min-h-screen bg-[#030711] px-4 py-6 text-slate-100 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1320px]">
+        <header className="mb-6 rounded-2xl border border-white/10 bg-slate-950/80 p-5 shadow-2xl shadow-cyan-950/10 backdrop-blur-xl">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-cyan-400 text-2xl font-bold tracking-wider">SETUP WIZARD</h1>
-              <p className="text-slate-400 text-sm">STEP {step} OF 5</p>
-            </div>
-            <button
-              onClick={onCancel}
-              className="text-slate-400 hover:text-cyan-400 transition-colors"
-            >
-              <X size={24} />
-            </button>
-          </div>
-          <ProgressIndicator />
-        </div>
-
-        {/* Main Content Area */}
-        <div className="border-2 border-cyan-500/50 rounded-lg p-8 bg-slate-900/20 backdrop-blur-sm">
-          
-          {/* Step 1: Material Selection */}
-          {step === 1 && (
-            <div className="space-y-6">
-              <h2 className="text-cyan-400 text-2xl font-bold tracking-wider text-center mb-8">MATERIAL SELECTION</h2>
-              
-              <div className="grid grid-cols-3 gap-8">
-                {/* Left Panel: Material Preview */}
-                <div className="flex flex-col gap-4">
-                  <div className="bg-slate-800/50 border border-cyan-500/30 rounded-lg p-6 flex flex-col items-center justify-center min-h-96">
-                    <p className="text-cyan-400 text-xs font-bold mb-4 tracking-wider">SELECTED MATERIAL PREVIEW</p>
-                    {selectedMaterialData ? (
-                      <>
-                        <div className="w-48 h-48 bg-gradient-to-b from-purple-500/20 to-transparent rounded-full flex items-center justify-center mb-4 border border-cyan-500/30">
-                          <div className="text-6xl">🌿</div>
-                        </div>
-                        <h3 className="text-cyan-400 font-bold text-lg text-center">{selectedMaterialData.name.toUpperCase()}</h3>
-                        <p className="text-slate-400 text-xs text-center mt-2">{selectedMaterialData.description || "Botanical material"}</p>
-                      </>
-                    ) : (
-                      <p className="text-slate-500 text-center">Select a material to preview</p>
-                    )}
-                  </div>
-
-                  {/* Material Properties */}
-                  {selectedMaterialData && (
-                    <div className="bg-slate-800/50 border border-cyan-500/30 rounded-lg p-4">
-                      <h4 className="text-cyan-400 text-xs font-bold mb-3 tracking-wider">MATERIAL PROPERTIES</h4>
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <Droplet size={14} className="text-blue-400" />
-                            <span className="text-slate-400">MOISTURE</span>
-                          </div>
-                          <span className="text-cyan-400 font-mono">{selectedMaterialData.defaultWaterContent}%</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <Droplet size={14} className="text-yellow-400" />
-                            <span className="text-slate-400">OIL CONTENT</span>
-                          </div>
-                          <span className="text-cyan-400 font-mono">{selectedMaterialData.defaultOilContent}%</span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center gap-2">
-                            <Weight size={14} className="text-slate-400" />
-                            <span className="text-slate-400">DENSITY</span>
-                          </div>
-                          <span className="text-cyan-400 font-mono">{selectedMaterialData.density || "0.92"} g/cm³</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Center Panel: Material Selection Inputs */}
-                <div className="flex flex-col gap-6">
-                  <div>
-                    <label className="text-cyan-400 text-sm font-bold mb-2 block tracking-wider">PILIH JENIS BAHAN</label>
-                    <Select value={selectedMaterial?.toString() || ""} onValueChange={(v) => handleMaterialSelect(Number(v))}>
-                      <SelectTrigger className="bg-slate-800 border-cyan-500/50 text-white hover:border-cyan-400 transition-colors">
-                        <SelectValue placeholder="Select a material..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-800 border-cyan-500/50">
-                        {materials.map((m) => (
-                          <SelectItem key={m.id} value={m.id.toString()} className="text-white">
-                            {m.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.materialWeight && <p className="text-red-400 text-xs mt-1">{errors.materialWeight}</p>}
-                  </div>
-
-                  <div>
-                    <label className="text-cyan-400 text-sm font-bold mb-2 block tracking-wider">BERAT BAHAN (KG)</label>
-                    <div className="flex items-center gap-2 border border-cyan-500/50 rounded-lg px-4 py-2 bg-slate-800">
-                      <Weight size={20} className="text-cyan-400" />
-                      <input
-                        type="number"
-                        value={materialWeight.toFixed(2)}
-                        onChange={(e) => setMaterialWeight(Number(e.target.value))}
-                        className="bg-transparent text-white font-mono flex-1 outline-none"
-                      />
-                      <span className="text-slate-400">kg</span>
-                    </div>
-                    {errors.materialWeight && <p className="text-red-400 text-xs mt-1">{errors.materialWeight}</p>}
-                  </div>
-
-                  <div>
-                    <label className="text-cyan-400 text-sm font-bold mb-2 block tracking-wider">KADAR AIR AWAL (%)</label>
-                    <div className="flex items-center gap-2 border border-cyan-500/50 rounded-lg px-4 py-2 bg-slate-800">
-                      <Droplet size={20} className="text-blue-400" />
-                      <input
-                        type="number"
-                        value={waterContent.toFixed(2)}
-                        onChange={(e) => setWaterContent(Number(e.target.value))}
-                        className="bg-transparent text-white font-mono flex-1 outline-none"
-                      />
-                      <span className="text-slate-400">%</span>
-                    </div>
-                    {errors.waterContent && <p className="text-red-400 text-xs mt-1">{errors.waterContent}</p>}
-                  </div>
-
-                  <div>
-                    <label className="text-cyan-400 text-sm font-bold mb-2 block tracking-wider">KADAR MINYAK AWAL (%)</label>
-                    <div className="flex items-center gap-2 border border-cyan-500/50 rounded-lg px-4 py-2 bg-slate-800">
-                      <Droplet size={20} className="text-yellow-400" />
-                      <input
-                        type="number"
-                        value={oilContent.toFixed(2)}
-                        onChange={(e) => setOilContent(Number(e.target.value))}
-                        className="bg-transparent text-white font-mono flex-1 outline-none"
-                      />
-                      <span className="text-slate-400">%</span>
-                    </div>
-                    {errors.oilContent && <p className="text-red-400 text-xs mt-1">{errors.oilContent}</p>}
-                  </div>
-                </div>
-
-                {/* Right Panel: System Overview */}
-                <div>
-                  <SystemOverviewPanel />
-                </div>
+              <div className="mb-2 flex items-center gap-2 font-mono text-[10px] font-semibold tracking-[0.3em] text-cyan-400">
+                <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_12px_rgba(34,211,238,.8)]" /> IUVFES DIGITAL TWIN
               </div>
+              <h1 className="text-2xl font-semibold tracking-tight text-white md:text-3xl">Experiment Setup</h1>
+              <p className="mt-1 text-sm text-slate-400">Configure the process inputs before opening the closed-loop simulation.</p>
             </div>
-          )}
-
-          {/* Step 2: Process Parameters */}
-          {step === 2 && (
-            <div className="space-y-6">
-              <h2 className="text-cyan-400 text-2xl font-bold tracking-wider text-center mb-8">PROCESS PARAMETERS</h2>
-              
-              <div className="grid grid-cols-3 gap-8">
-                {/* Left Panel: Parameter Info */}
-                <div className="bg-slate-800/50 border border-cyan-500/30 rounded-lg p-6">
-                  <h3 className="text-cyan-400 font-bold mb-4 tracking-wider">CONFIGURATION</h3>
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <p className="text-slate-400">Target Pressure</p>
-                      <p className="text-cyan-400 font-mono text-lg">{targetPressure.toFixed(0)} mbar</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Target Temperature</p>
-                      <p className="text-cyan-400 font-mono text-lg">{targetTemperature.toFixed(0)}°C</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Ultrasonic Frequency</p>
-                      <p className="text-cyan-400 font-mono text-lg">{ultrasonicFrequency.toFixed(0)} kHz</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Duration</p>
-                      <p className="text-cyan-400 font-mono text-lg">{duration.toFixed(1)} hours</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Material:Water Ratio</p>
-                      <p className="text-cyan-400 font-mono text-lg">{materialWaterRatio}</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-400">Process Model</p>
-                      <p className="text-cyan-400 font-mono text-lg capitalize">{processModel}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Center Panel: Parameter Inputs */}
-                <div className="flex flex-col gap-6">
-                  <div>
-                    <label className="text-cyan-400 text-sm font-bold mb-2 block tracking-wider">EXPERIMENT NAME</label>
-                    <Input
-                      value={experimentName}
-                      onChange={(e) => setExperimentName(e.target.value)}
-                      placeholder="e.g., Nilam Extraction - Trial 1"
-                      className="bg-slate-800 border-cyan-500/50 text-white placeholder-slate-500"
-                    />
-                    {errors.experimentName && <p className="text-red-400 text-xs mt-1">{errors.experimentName}</p>}
-                  </div>
-
-                  <div>
-                    <label className="text-cyan-400 text-sm font-bold mb-2 block tracking-wider">
-                      TARGET PRESSURE: {targetPressure.toFixed(0)} mbar
-                    </label>
-                    <Slider
-                      value={[targetPressure]}
-                      onValueChange={(v) => setTargetPressure(v[0])}
-                      min={1}
-                      max={1000}
-                      step={1}
-                    />
-                    {errors.targetPressure && <p className="text-red-400 text-xs mt-1">{errors.targetPressure}</p>}
-                  </div>
-
-                  <div>
-                    <label className="text-cyan-400 text-sm font-bold mb-2 block tracking-wider">
-                      TARGET TEMPERATURE: {targetTemperature.toFixed(0)}°C
-                    </label>
-                    <Slider
-                      value={[targetTemperature]}
-                      onValueChange={(v) => setTargetTemperature(v[0])}
-                      min={20}
-                      max={150}
-                      step={1}
-                    />
-                    {errors.targetTemperature && <p className="text-red-400 text-xs mt-1">{errors.targetTemperature}</p>}
-                  </div>
-
-                  <div>
-                    <label className="text-cyan-400 text-sm font-bold mb-2 block tracking-wider">
-                      ULTRASONIC FREQUENCY: {ultrasonicFrequency.toFixed(0)} kHz
-                    </label>
-                    <Slider
-                      value={[ultrasonicFrequency]}
-                      onValueChange={(v) => setUltrasonicFrequency(v[0])}
-                      min={20}
-                      max={100}
-                      step={1}
-                    />
-                    {errors.ultrasonicFrequency && <p className="text-red-400 text-xs mt-1">{errors.ultrasonicFrequency}</p>}
-                  </div>
-
-                  <div>
-                    <label className="text-cyan-400 text-sm font-bold mb-2 block tracking-wider">
-                      DURATION: {duration.toFixed(1)} hours
-                    </label>
-                    <Slider
-                      value={[duration]}
-                      onValueChange={(v) => setDuration(v[0])}
-                      min={0.5}
-                      max={24}
-                      step={0.5}
-                    />
-                    {errors.duration && <p className="text-red-400 text-xs mt-1">{errors.duration}</p>}
-                  </div>
-
-                  <div>
-                    <label className="text-cyan-400 text-sm font-bold mb-2 block tracking-wider">MATERIAL:WATER RATIO</label>
-                    <Select value={materialWaterRatio} onValueChange={setMaterialWaterRatio}>
-                      <SelectTrigger className="bg-slate-800 border-cyan-500/50 text-white">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-800 border-cyan-500/50">
-                        <SelectItem value="1:1" className="text-white">1:1</SelectItem>
-                        <SelectItem value="1:2" className="text-white">1:2</SelectItem>
-                        <SelectItem value="1:3" className="text-white">1:3</SelectItem>
-                        <SelectItem value="2:1" className="text-white">2:1</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <label className="text-cyan-400 text-sm font-bold mb-2 block tracking-wider">PROCESS MODEL</label>
-                    <RadioGroup value={processModel} onValueChange={setProcessModel}>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="vacuum" id="vacuum" className="border-cyan-500" />
-                        <Label htmlFor="vacuum" className="text-slate-300 cursor-pointer">Vacuum Drying</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="distillation" id="distillation" className="border-cyan-500" />
-                        <Label htmlFor="distillation" className="text-slate-300 cursor-pointer">Vacuum Distillation</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="ultrasonic" id="ultrasonic" className="border-cyan-500" />
-                        <Label htmlFor="ultrasonic" className="text-slate-300 cursor-pointer">Ultrasonic Extraction</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="hybrid" id="hybrid" className="border-cyan-500" />
-                        <Label htmlFor="hybrid" className="text-slate-300 cursor-pointer">Hybrid Model</Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                </div>
-
-                {/* Right Panel: System Overview */}
-                <div>
-                  <SystemOverviewPanel />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Review & Confirm */}
-          {step === 3 && (
-            <div className="space-y-6">
-              <h2 className="text-cyan-400 text-2xl font-bold tracking-wider text-center mb-8">REVIEW & CONFIRM</h2>
-              
-              <div className="grid grid-cols-3 gap-8">
-                {/* Left Panel: Material Summary */}
-                <div className="space-y-4">
-                  <div className="bg-slate-800/50 border border-cyan-500/30 rounded-lg p-4">
-                    <h4 className="text-cyan-400 text-xs font-bold mb-3 tracking-wider">MATERIAL</h4>
-                    <p className="text-white font-semibold">{selectedMaterialData?.name}</p>
-                    <p className="text-slate-400 text-xs mt-1">{selectedMaterialData?.description || "Botanical material"}</p>
-                  </div>
-
-                  <div className="bg-slate-800/50 border border-cyan-500/30 rounded-lg p-4">
-                    <h4 className="text-cyan-400 text-xs font-bold mb-3 tracking-wider">INITIAL CONDITIONS</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Weight</span>
-                        <span className="text-cyan-400 font-mono">{materialWeight.toFixed(1)} kg</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Water</span>
-                        <span className="text-cyan-400 font-mono">{waterContent.toFixed(1)}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Oil</span>
-                        <span className="text-cyan-400 font-mono">{oilContent.toFixed(2)}%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Center Panel: Process Summary */}
-                <div className="space-y-4">
-                  <div className="bg-slate-800/50 border border-cyan-500/30 rounded-lg p-4">
-                    <h4 className="text-cyan-400 text-xs font-bold mb-3 tracking-wider">EXPERIMENT</h4>
-                    <p className="text-white font-semibold">{experimentName}</p>
-                  </div>
-
-                  <div className="bg-slate-800/50 border border-cyan-500/30 rounded-lg p-4">
-                    <h4 className="text-cyan-400 text-xs font-bold mb-3 tracking-wider">PROCESS PARAMETERS</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Pressure</span>
-                        <span className="text-cyan-400 font-mono">{targetPressure.toFixed(0)} mbar</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Temperature</span>
-                        <span className="text-cyan-400 font-mono">{targetTemperature.toFixed(0)}°C</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Frequency</span>
-                        <span className="text-cyan-400 font-mono">{ultrasonicFrequency.toFixed(0)} kHz</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Duration</span>
-                        <span className="text-cyan-400 font-mono">{duration.toFixed(1)} h</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Ratio</span>
-                        <span className="text-cyan-400 font-mono">{materialWaterRatio}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Model</span>
-                        <span className="text-cyan-400 font-mono capitalize">{processModel}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Panel: System Overview */}
-                <div>
-                  <SystemOverviewPanel />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex justify-between items-center mt-8 pt-6 border-t border-slate-700">
-            <Button
-              onClick={step === 1 ? onCancel : handlePrevious}
-              className="border-2 border-cyan-500/50 bg-transparent text-cyan-400 hover:bg-cyan-500/10 hover:border-cyan-400"
-            >
-              <X size={18} className="mr-2" />
-              {step === 1 ? "CANCEL" : "PREVIOUS"}
+            <Button onClick={onCancel} variant="ghost" className="self-start text-slate-400 hover:bg-white/5 hover:text-white md:self-center" aria-label="Cancel setup">
+              <X className="mr-2 h-4 w-4" /> Exit setup
             </Button>
-
-            {step < 3 ? (
-              <Button
-                onClick={handleNext}
-                className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold"
-              >
-                NEXT
-                <ChevronRight size={18} className="ml-2" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleSubmit}
-                disabled={loading}
-                className="bg-green-600 hover:bg-green-700 text-white font-bold disabled:opacity-50"
-              >
-                {loading ? "STARTING..." : "START SIMULATION"}
-                <ChevronRight size={18} className="ml-2" />
-              </Button>
-            )}
           </div>
-        </div>
+
+          <div className="mt-6 grid grid-cols-3 gap-2">
+            {STEPS.map(item => {
+              const active = item.number === step;
+              const complete = item.number < step;
+              return (
+                <div key={item.number} className={`relative rounded-xl border px-3 py-3 transition-all ${active ? "border-cyan-400/50 bg-cyan-400/10" : complete ? "border-emerald-400/20 bg-emerald-400/5" : "border-white/5 bg-white/[0.02]"}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${active ? "bg-cyan-400 text-slate-950" : complete ? "bg-emerald-400/20 text-emerald-300" : "bg-slate-800 text-slate-500"}`}>
+                      {complete ? <CheckCircle2 className="h-4 w-4" /> : item.number}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold tracking-wide text-white">{item.title}</div>
+                      <div className="truncate text-[10px] text-slate-500">{item.subtitle}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </header>
+
+        <main className="rounded-2xl border border-white/10 bg-slate-950/70 p-4 shadow-2xl backdrop-blur-xl sm:p-6 lg:p-8">
+          {step === 1 && (
+            <section>
+              <div className="mb-6 flex items-end justify-between gap-4">
+                <div><p className="font-mono text-[10px] tracking-[0.25em] text-cyan-400">01 / MATERIAL INPUT</p><h2 className="mt-1 text-xl font-semibold text-white">Material selection</h2></div>
+                <span className="hidden text-xs text-slate-500 md:block">All values remain editable until confirmation.</span>
+              </div>
+              <div className="grid gap-5 xl:grid-cols-[1.05fr_1fr_.85fr]">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
+                  <div className="mb-4 flex items-center justify-between"><span className="text-[10px] font-semibold tracking-[0.2em] text-slate-500">MATERIAL PREVIEW</span><Droplet className="h-4 w-4 text-cyan-400" /></div>
+                  <div className="flex min-h-[250px] flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-slate-900/60 p-6 text-center">
+                    <div className="mb-4 flex h-28 w-28 items-center justify-center rounded-full border border-cyan-400/20 bg-cyan-400/5 text-5xl shadow-[0_0_50px_rgba(34,211,238,.08)]">🌿</div>
+                    {selectedMaterialData ? <><h3 className="text-lg font-semibold text-white">{selectedMaterialData.name}</h3><p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">{selectedMaterialData.description || "Botanical material"}</p></> : <p className="text-sm text-slate-500">Select a material to load its properties.</p>}
+                  </div>
+                  {selectedMaterialData && <div className="mt-4 grid grid-cols-3 gap-2"><div className="rounded-xl bg-slate-900/80 p-3"><div className="text-[9px] text-slate-500">MOISTURE</div><div className="mt-1 font-mono text-sm text-cyan-300">{selectedMaterialData.defaultWaterContent}%</div></div><div className="rounded-xl bg-slate-900/80 p-3"><div className="text-[9px] text-slate-500">OIL</div><div className="mt-1 font-mono text-sm text-amber-300">{selectedMaterialData.defaultOilContent}%</div></div><div className="rounded-xl bg-slate-900/80 p-3"><div className="text-[9px] text-slate-500">DENSITY</div><div className="mt-1 font-mono text-sm text-slate-200">{selectedMaterialData.density || "0.92"}</div></div></div>}
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
+                  <div className="mb-5 flex items-center gap-2"><Weight className="h-4 w-4 text-cyan-400" /><span className="text-xs font-semibold tracking-wider text-white">INPUT CONDITIONS</span></div>
+                  <div className="space-y-5">
+                    <div><Label className="text-xs text-slate-400">Material</Label><Select value={selectedMaterial?.toString() || ""} onValueChange={value => handleMaterialSelect(Number(value))}><SelectTrigger className="mt-2 h-11 border-white/10 bg-slate-900 text-white"><SelectValue placeholder="Select material" /></SelectTrigger><SelectContent className="border-white/10 bg-slate-900">{materials.map(material => <SelectItem key={material.id} value={material.id.toString()} className="text-white">{material.name}</SelectItem>)}</SelectContent></Select><FieldError>{errors.material}</FieldError></div>
+                    <div><Label className="text-xs text-slate-400">Material weight</Label><div className="mt-2 flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-slate-900 px-3"><Weight className="h-4 w-4 text-cyan-400" /><Input type="number" min="0.1" max="1000" value={materialWeight} onChange={event => setMaterialWeight(Number(event.target.value))} className="h-9 border-0 bg-transparent p-0 font-mono text-white focus-visible:ring-0" /><span className="text-xs text-slate-500">kg</span></div><FieldError>{errors.materialWeight}</FieldError></div>
+                    <div><Label className="text-xs text-slate-400">Initial water content</Label><div className="mt-2 flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-slate-900 px-3"><Droplet className="h-4 w-4 text-blue-400" /><Input type="number" min="0" max="100" value={waterContent} onChange={event => setWaterContent(Number(event.target.value))} className="h-9 border-0 bg-transparent p-0 font-mono text-white focus-visible:ring-0" /><span className="text-xs text-slate-500">%</span></div><FieldError>{errors.waterContent}</FieldError></div>
+                    <div><Label className="text-xs text-slate-400">Initial oil content</Label><div className="mt-2 flex h-11 items-center gap-3 rounded-lg border border-white/10 bg-slate-900 px-3"><Droplet className="h-4 w-4 text-amber-400" /><Input type="number" min="0" max="100" value={oilContent} onChange={event => setOilContent(Number(event.target.value))} className="h-9 border-0 bg-transparent p-0 font-mono text-white focus-visible:ring-0" /><span className="text-xs text-slate-500">%</span></div><FieldError>{errors.oilContent}</FieldError></div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.025] p-5">
+                  <div className="mb-5 flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-300" /><span className="text-xs font-semibold tracking-wider text-white">ENGINE HANDSHAKE</span></div>
+                  <div className="space-y-2">{[["Controller", "READY"], ["Vacuum pump", "STANDBY"], ["Heater", "STANDBY"], ["Extractor", "STANDBY"], ["Condenser", "STANDBY"], ["Cooling", "STANDBY"]].map(([label, value]) => <div key={label} className="flex items-center justify-between rounded-lg bg-slate-900/70 px-3 py-2.5"><span className="text-xs text-slate-500">{label}</span><span className="font-mono text-[10px] text-slate-300">{value}</span></div>)}</div>
+                  <div className="mt-4 rounded-xl border border-emerald-400/10 bg-emerald-400/5 p-3"><div className="flex items-center gap-2 text-xs text-emerald-300"><CheckCircle2 className="h-4 w-4" /> Setup ready</div><p className="mt-1 text-[10px] leading-4 text-slate-500">Live telemetry appears only after a closed-loop session is started.</p></div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {step === 2 && (
+            <section>
+              <div className="mb-6"><p className="font-mono text-[10px] tracking-[0.25em] text-cyan-400">02 / PROCESS CONTROL</p><h2 className="mt-1 text-xl font-semibold text-white">Operating conditions</h2></div>
+              <div className="grid gap-5 xl:grid-cols-[.85fr_1.15fr]">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
+                  <div className="mb-5 flex items-center gap-2"><Gauge className="h-4 w-4 text-cyan-400" /><span className="text-xs font-semibold tracking-wider text-white">LIVE CONFIGURATION PREVIEW</span></div>
+                  <div className="space-y-1"><SummaryRow label="Experiment" value={experimentName || "Not named"} /><SummaryRow label="Target pressure" value={`${targetPressure} mbar`} /><SummaryRow label="Target temperature" value={`${targetTemperature} °C`} /><SummaryRow label="Ultrasonic" value={`${ultrasonicFrequency} kHz`} /><SummaryRow label="Duration" value={`${duration} h`} /><SummaryRow label="Material : water" value={materialWaterRatio} /><SummaryRow label="Process model" value={processModel} /></div>
+                  <div className="mt-5 rounded-xl border border-cyan-400/10 bg-cyan-400/5 p-4"><div className="flex items-center gap-2 text-xs text-cyan-300"><Zap className="h-4 w-4" /> Engine contract preserved</div><p className="mt-1 text-[10px] leading-4 text-slate-500">These values are passed unchanged into the experiment inputParameters object.</p></div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
+                  <div className="space-y-6">
+                    <div><Label className="text-xs text-slate-400">Experiment name</Label><Input value={experimentName} onChange={event => setExperimentName(event.target.value)} placeholder="e.g. Nilam Extraction — Trial 01" className="mt-2 h-11 border-white/10 bg-slate-900 text-white placeholder:text-slate-600" /><FieldError>{errors.experimentName}</FieldError></div>
+                    <div><div className="flex justify-between"><Label className="text-xs text-slate-400">Target pressure</Label><span className="font-mono text-xs text-cyan-300">{targetPressure} mbar</span></div><Slider className="mt-4" value={[targetPressure]} onValueChange={value => setTargetPressure(value[0])} min={1} max={1000} step={1} /><FieldError>{errors.targetPressure}</FieldError></div>
+                    <div><div className="flex justify-between"><Label className="text-xs text-slate-400">Target temperature</Label><span className="font-mono text-xs text-cyan-300">{targetTemperature} °C</span></div><Slider className="mt-4" value={[targetTemperature]} onValueChange={value => setTargetTemperature(value[0])} min={20} max={150} step={1} /><FieldError>{errors.targetTemperature}</FieldError></div>
+                    <div><div className="flex justify-between"><Label className="text-xs text-slate-400">Ultrasonic frequency</Label><span className="font-mono text-xs text-cyan-300">{ultrasonicFrequency} kHz</span></div><Slider className="mt-4" value={[ultrasonicFrequency]} onValueChange={value => setUltrasonicFrequency(value[0])} min={20} max={100} step={1} /><FieldError>{errors.ultrasonicFrequency}</FieldError></div>
+                    <div><div className="flex justify-between"><Label className="text-xs text-slate-400">Duration</Label><span className="font-mono text-xs text-cyan-300">{duration} h</span></div><Slider className="mt-4" value={[duration]} onValueChange={value => setDuration(value[0])} min={0.5} max={24} step={0.5} /><FieldError>{errors.duration}</FieldError></div>
+                    <div className="grid gap-5 md:grid-cols-2">
+                      <div><Label className="text-xs text-slate-400">Material : water ratio</Label><Select value={materialWaterRatio} onValueChange={setMaterialWaterRatio}><SelectTrigger className="mt-2 h-11 border-white/10 bg-slate-900 text-white"><SelectValue /></SelectTrigger><SelectContent className="border-white/10 bg-slate-900"><SelectItem value="1:1" className="text-white">1 : 1</SelectItem><SelectItem value="1:2" className="text-white">1 : 2</SelectItem><SelectItem value="1:3" className="text-white">1 : 3</SelectItem><SelectItem value="2:1" className="text-white">2 : 1</SelectItem></SelectContent></Select></div>
+                      <div><Label className="text-xs text-slate-400">Process model</Label><RadioGroup value={processModel} onValueChange={setProcessModel} className="mt-3 grid grid-cols-2 gap-2">{[["vacuum", "Vacuum drying"], ["distillation", "Vacuum distillation"], ["ultrasonic", "Ultrasonic extraction"], ["hybrid", "Hybrid model"]].map(([value, label]) => <Label key={value} htmlFor={value} className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-slate-900 p-3 text-[11px] text-slate-300 hover:border-cyan-400/30"><RadioGroupItem value={value} id={value} className="border-cyan-500" />{label}</Label>)}</RadioGroup></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {step === 3 && (
+            <section>
+              <div className="mb-6"><p className="font-mono text-[10px] tracking-[0.25em] text-cyan-400">03 / FINAL REVIEW</p><h2 className="mt-1 text-xl font-semibold text-white">Confirm experiment</h2><p className="mt-1 text-sm text-slate-500">Review the exact values that will be sent to the experiment engine.</p></div>
+              <div className="grid gap-5 lg:grid-cols-3">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5"><div className="mb-4 text-xs font-semibold tracking-wider text-cyan-300">EXPERIMENT</div><div className="rounded-xl bg-slate-900 p-4"><div className="text-[10px] text-slate-500">NAME</div><div className="mt-1 text-base font-medium text-white">{experimentName}</div></div><div className="mt-3"><SummaryRow label="Material" value={selectedMaterialData?.name || "—"} /><SummaryRow label="Weight" value={`${materialWeight} kg`} /><SummaryRow label="Water" value={`${waterContent}%`} /><SummaryRow label="Oil" value={`${oilContent}%`} /></div></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5"><div className="mb-4 text-xs font-semibold tracking-wider text-cyan-300">PROCESS PARAMETERS</div><SummaryRow label="Pressure" value={`${targetPressure} mbar`} /><SummaryRow label="Temperature" value={`${targetTemperature} °C`} /><SummaryRow label="Ultrasonic" value={`${ultrasonicFrequency} kHz`} /><SummaryRow label="Duration" value={`${duration} h`} /><SummaryRow label="Ratio" value={materialWaterRatio} /><SummaryRow label="Model" value={processModel} /></div>
+                <div className="rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.025] p-5"><div className="mb-4 flex items-center gap-2 text-xs font-semibold tracking-wider text-emerald-300"><ShieldCheck className="h-4 w-4" /> ENGINE HANDSHAKE</div><div className="space-y-2"><div className="flex items-center gap-3 rounded-xl border border-emerald-400/10 bg-slate-900/70 p-4"><CheckCircle2 className="h-5 w-5 text-emerald-400" /><div><div className="text-sm font-medium text-white">Ready to create</div><div className="text-[10px] text-slate-500">Experiment input contract validated</div></div></div><p className="mt-3 text-[10px] leading-5 text-slate-500">Starting the experiment creates the backend record. The closed-loop simulation session is started by the control-room flow after creation.</p></div></div>
+              </div>
+            </section>
+          )}
+
+          <footer className="mt-8 flex flex-col-reverse gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
+            <Button onClick={step === 1 ? onCancel : handlePrevious} variant="outline" className="border-white/10 bg-transparent text-slate-300 hover:bg-white/5 hover:text-white"><X className="mr-2 h-4 w-4" />{step === 1 ? "Cancel" : "Previous"}</Button>
+            {step < STEP_COUNT ? <Button onClick={handleNext} className="bg-cyan-400 text-slate-950 hover:bg-cyan-300">Continue <ChevronRight className="ml-2 h-4 w-4" /></Button> : <Button onClick={handleSubmit} disabled={loading} className="bg-emerald-400 text-slate-950 hover:bg-emerald-300 disabled:opacity-50">{loading ? "Creating experiment…" : "Create experiment"}<ChevronRight className="ml-2 h-4 w-4" /></Button>}
+          </footer>
+        </main>
+
+        <div className="mt-4 flex items-center justify-center gap-2 text-[10px] text-slate-600"><ShieldCheck className="h-3.5 w-3.5" /> UI presentation layer — engine contract unchanged</div>
       </div>
     </div>
   );

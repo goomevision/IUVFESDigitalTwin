@@ -1,0 +1,56 @@
+name: Deploy IUVFES Control Room to GitHub Pages
+
+on:
+  push:
+    branches:
+      - feature/control-room-ui
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-branch
+  cancel-in-progress: true
+
+env:
+  # A repository secret can override this endpoint for a future dedicated API host.
+  # The fallback is intentionally public: it is the verified IUVFES API consumed by
+  # the public GitHub Pages frontend, not a credential.
+  VITE_IUVFES_API_URL: ${{ secrets.IUVFES_API_URL || 'https://iuvfeslab-4eacvnnf.manus.space' }}
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.4.1 --activate
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm check
+
+      - name: Build
+        run: pnpm build
+
+      - name: Publish static frontend to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist/public
+          force_orphan: true

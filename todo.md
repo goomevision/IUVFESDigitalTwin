@@ -274,12 +274,314 @@
 
 ---
 
-**Status:** Phase 1 Complete - Screen 1 Opening Animation ✓
-**Current Phase:** Phase 2 - Redesign SetupWizard (Screen 2-4)
-**Last Updated:** 31 July 2026
-**Implementation Strategy:** Hybrid physics model, 5 FPS updates, MySQL database, checkpoint after each phase
+**Status:** Master Quality corrections complete locally; authenticated browser verification remains pending.
+**Current Phase:** Quality Gate green; ready for review on `feature/control-room-ui`.
+**Last Updated:** 25 August 2026
+**Implementation Strategy:** Closed-loop causal frames, engine-bound visual telemetry, explicit simulation provenance, deterministic evidence, and experiment-identity preservation.
 
 ### UI Fixes (Reported 31 Jul 2026)
 - [x] Fix Tailwind CSS px-4 error breaking all styling
 - [x] Polish Material Selection screen to match mockup (proper spacing, borders, colors)
 - [x] Verify all wizard screens render correctly after CSS fix
+
+---
+
+## BUKU BESAR BASELINE & QUALITY GATE (ACTIVE)
+
+- [x] Publish the IUVFES Baseline Acknowledgement from the official Buku Besar.
+- [x] Synchronize the local branch with the official remote `feature/control-room-ui` baseline.
+- [x] Verify the current Quality Gate baseline: 19 test files / 52 tests passing locally.
+- [x] Audit the ProcessSimulator data bindings against CausalFrame and session sources.
+- [x] Record confirmed repository and architecture discrepancies in the Buku Besar.
+- [x] Fix closed-loop reset authorization to validate the parent experiment rather than the session identifier.
+- [x] Replace the ProcessSimulator's duplicated frame contract with tRPC-inferred closed-loop API types.
+- [x] Poll and reconcile the known active Process Simulator session from the session API without fabricating telemetry.
+- [x] Add a lifecycle API to discover a persisted session by experiment after a full browser reload.
+- [x] Guard ProcessMachine3D renderer cleanup so React never removes a detached canvas node.
+
+## PROCESS SIMULATOR — LIVING MACHINE REDESIGN (ACTIVE)
+
+- [x] Recompose the Process Simulator into a control-room canvas with a live status top bar, operator rail, machine hero, and hardware rail.
+- [x] Bind operating-input displays, simulation progress, and sensor instrumentation only to experiment inputs, session state, or CausalFrame data.
+- [x] Surface engine-derived vacuum, cold-trap, ultrasonic, safety, and provenance diagnostics without creating synthetic telemetry.
+- [x] Pass stored ultrasonic operator inputs into the closed-loop session configuration when they are available.
+- [x] Preserve causal trace, replay, trend, and recorder interactions in the redesigned Control Room.
+
+## REPLAY / EVIDENCE / PROVENANCE (ACTIVE)
+
+- [x] Remove fabricated numeric fallbacks from persisted replay normalization and expose missing data as UNKNOWN.
+- [x] Restrict scientific replay to structurally valid causal frames while clearly identifying unsupported legacy results.
+- [x] Add a reproducible JSON evidence export for the selected persisted replay window with source and boundary metadata.
+
+## QUALITY GATE VALIDATION — 2026-08-12
+
+- [x] TypeScript validation passed (`pnpm check`).
+- [x] Regression suite passed (20 test files, 53 tests).
+- [x] Production build passed (`pnpm build`); non-blocking bundle-size warning documented.
+- [x] GitHub Actions IUVFES Quality Gate passed for commit `ea3f7a0`.
+
+## GITHUB DEVELOPMENT REVIEW — 2026-08-12
+
+- [x] Review latest remote development, PR, and Quality Gate status with the project owner.
+- [x] Agree the next implementation priority after reviewing current engineering gaps.
+
+## P10 — INTERACTIVE SCIENTIFIC 3D DIGITAL TWIN (MASTER COMMAND)
+
+- [x] Preserve the established 3D topology while exposing a single CausalFrame-derived visual state contract.
+- [x] Bind heater, vacuum pump, extractor, condenser, and cooling visuals continuously to `frame.actuatorLevels`.
+- [x] Add camera navigation, scientific presets, reset view, and non-engine-affecting view modes.
+- [x] Add selection, focus, and a compact component inspector that distinguishes command, actuator, sensor, provenance, time, and UNKNOWN data.
+- [x] Add equipment, piping, flow, particle, material, label, electrical, and diagnostics layer controls without altering engine state.
+- [x] Preserve simulation time semantics and mark derived process animation as non-measured flow.
+- [x] Add focused client-side regression tests and include them in the Quality Gate.
+- [ ] Complete authenticated browser interaction and WebGL lifecycle verification using a real persisted experiment; OAuth preview session is currently blocked.
+- [x] Complete TypeScript, full test, diff, and production build verification before commit.
+- [x] Record the implemented interactive 3D Twin capability and browser-verification boundary in the Buku Besar.
+
+## P10-RUNTIME-001 — AUTHENTICATED OPERATOR VERIFICATION
+
+- [ ] Authenticate as an authorized IUVFES operator without bypassing OAuth.
+- [ ] Open an existing persisted experiment and record its experimentId and canonical sessionId.
+- [ ] Verify lifecycle continuity: Play, Pause, Resume, Refresh, Play Again without duplicate session creation.
+- [ ] Verify camera rotation, zoom, pan, reset, and all declared presets.
+- [ ] Verify selection, focus, and inspector coverage for all requested equipment targets.
+- [ ] Verify Realistic, X-Ray, Wireframe, and all declared visual-layer controls.
+- [ ] Verify distinct CausalFrame actuator visual states at LOW/MEDIUM/HIGH where existing real frames provide those levels.
+- [ ] Verify simulation timestamp source, DOM/canvas uniqueness, WebGL health, and browser console.
+- [ ] Record real browser evidence for every PASS; otherwise classify P10 as BLOCKED or FAIL.
+- [x] Record the 25 August 2026 authenticated P10 attempt: admin OAuth is valid and an existing experiment is open, but the active preview has no `closedLoop.getForExperiment` procedure, so no canonical ClosedLoop session can be verified there.
+- [x] Perform a read-only Git/build/deployment/browser/API identity audit; no application code, data, commit, push, or merge was changed.
+- [x] Perform P10-RUNTIME-002 only if the browser runtime is demonstrably built from `04d98ca`, the specified existing experiment is authorized, and its canonical persisted ClosedLoop session is discoverable; otherwise stop and report the exact blocker. The verified Pages bundle is correct, but `auth.me` on its configured API returned `null`, so the run stopped as AUTH BLOCKED before session lookup.
+- [x] Attempt legitimate operator authentication on the verified `04d98ca` Pages/API deployment before any existing-experiment or ClosedLoop query. `auth.me` remains `null`, and the Pages login callback target `https://goomevision.github.io/api/oauth/callback` returns 404, so no valid Pages/API OAuth session can be established in this runtime.
+- [x] Analyze `pasted_content_7.txt` against the OAuth blocker and prepare an evidence-backed minimal remediation recommendation only; no application patch, data creation, commit, push, or merge was performed.
+
+## P13 — LOG-FIRST CONTROL ROOM OBSERVABILITY
+
+- [x] Audit the P13 instruction and targeted Control Room, OAuth, provenance, error-handling, and test surfaces; publish a focused read map.
+- [x] Define a redacted non-scientific observability event contract and explicit NOT AUTHENTICATED Control Room gate.
+- [x] Implement authentication, operator action, runtime, lifecycle, and CausalFrame-reference logging without creating telemetry, physics, CausalFrames, experiments, or sessions.
+- [x] Integrate safe interaction logs into Control Room and ProcessMachine3D without changing scientific or engine authority.
+- [x] Improve approved Control Room visual presentation while preserving topology, CausalFrame actuator mappings, effectiveCommands, and timestampSeconds.
+- [x] Add and run regression tests for event shape, sensitive-data redaction, auth state, frame references, technical errors, and 3D interaction logging.
+- [x] Document P13 architecture, limitations, and P10 authentication boundary; commit and push validated changes to feature/control-room-ui.
+
+## P14 — SCIENTIFIC KNOWLEDGE & METHOD CENTER
+
+- [x] Read the P14 master command, audit compatibility with existing scientific contracts, and define an evidence-safe implementation plan before making changes.
+- [x] Implement a public Knowledge Center route, searchable source-grounded methods/glossary/FAQ, scientific-literacy presentation modes, and a runtime-safe Why-this-value affordance without changing scientific state.
+- [x] Run P14 static, regression, production-build, diff, and browser documentation-ui checks; preserve P10 as AUTH BLOCKED.
+- [x] Record the CI-verified P14 result in Buku Besar and push the validated P14 commit to feature/control-room-ui.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 12
+
+- [x] Read `pasted_content_12.txt`, assess the requested scope against current scientific/authentication boundaries, and execute only approved evidence-safe work. The requested OAuth source commit is current in Git, but production login initiation serves the SPA fallback rather than the backend route; stop as BACKEND DEPLOYMENT REQUIRED with no source patch.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 13
+
+- [x] Read `pasted_content_13.txt`, assess its deployment/OAuth instruction, and perform only the permitted read-only verification work.
+- [x] Deploy or restart only the Manus backend OAuth source from `5393e8d` and verify callback, login redirect, nonce cookie, and CORS before any P10 action.
+- [ ] Expose an existing deployment/configuration-backed production build identity and prove the active API matches `5393e8d` before authentication or P10.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 14
+
+- [x] Read `pasted_content_14.txt` and complete the read-only Control Room route identity audit. GitHub Pages is the P10 Control Room route family; the Manus preview is a distinct legacy Setup Wizard runtime at checkpoint `4afce6af`.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 15
+
+- [x] Read `pasted_content_15.txt` and complete the read-only source-of-truth audit. `/home/ubuntu/iuvfes-github` on `feature/control-room-ui` is aligned with origin and renders the correct NOT AUTHENTICATED Control Room gate; legacy Manus Preview remains separate.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 16
+
+- [x] Read `pasted_content_16.txt` and complete the pre-auth deployment audit. The active Manus backend lacks the branch's closed-loop server stack and any deployment identity mechanism, so it cannot truthfully expose `5393e8d`; retain VERSION COMPATIBILITY UNVERIFIED.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 17
+
+- [x] Read `pasted_content_17.txt` and complete the full-backend synchronization audit. Active Manus backend is a separate S3-backed project with 8 server files versus 62 in Git, lacks the closed-loop stack and required database tables, so full deployment requires external configuration.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 18
+
+- [x] Assess whether the complete GitHub backend at `5393e8d` can be deployed as one source unit with a compatible database and verifiable release identity. The Git source is complete with migrations, but the current Manus target is a separate legacy project and its database lacks required closed-loop tables; stop as DATABASE MIGRATION REQUIRED and BACKEND DEPLOYMENT REQUIRES EXTERNAL CONFIGURATION.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 19
+
+- [x] Read `pasted_content_19.txt` and complete the read-only database migration preflight. Source migration inventory is incomplete in the Drizzle journal, production has only the base migration applied and lacks closed-loop/research tables, while backup and rollback capabilities are unverified; stop as MIGRATION REQUIRES EXTERNAL CONFIGURATION.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 20
+
+- [x] Read `pasted_content_20.txt` and complete the canonical migration-chain audit. The source journal registers only `0000`, two distinct files share `0002`, `scientificEventJournal` is used by persistence code but absent from Drizzle schema, and `scientific-data.sql` is an alternate development scaffold; stop as CANONICAL CHAIN REQUIRES SOURCE PATCH.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 21
+
+- [x] Establish the canonical Drizzle migration chain: register unique ordered migrations, align snapshots and schema with runtime persistence, and preserve `scientific-data.sql` as non-canonical.
+- [x] Validate canonical migration governance with non-mutating checks, commit/push only the scoped patch, and keep production deployment/database/P10 blocked.
+- [x] Record the CI-verified canonical migration governance result in Buku Besar without changing database deployment or P10 status.
+
+## INSTRUCTION REVIEW — PASTED CONTENT 22
+
+- [x] Read `pasted_content_22.txt` and complete the read-only migration-execution readiness audit. Production remains at base migration only; backup, restore, PITR, rollback, and migration ownership are unverified, so stop as BACKUP/RECOVERY REQUIRED and MIGRATION EXECUTION BLOCKED.
+
+## MANUS PLATFORM CAPABILITY AUDIT
+
+- [x] Perform one read-only audit of Manus backup, restore, PITR, rollback, migration ownership, and full GitHub backend deployment capabilities; no exposed capability proves backup/restore/PITR or GitHub-checkout backend deployment, while application checkpoint rollback exists but excludes database rollback. External configuration remains required.
+
+## INFRASTRUCTURE BLOCKER FINALIZATION
+
+- [x] Record the verified Infrastructure Blocker in Buku Besar and push the documentation-only commit to feature/control-room-ui without changing application source or technical state.
+
+## P15 — MODERN 3D CONTROL ROOM
+
+- [x] Audit ProcessMachine3D and Control Room visual authority boundaries before visual-only refinement.
+- [x] Modernize authoritative 3D equipment, piping, lighting, materials, spatial hierarchy, inspector, layers, and scientific legend without changing engine or scientific state.
+- [ ] Run P15 code, test, build, diff, and authenticated browser visual smoke checks without creating runtime data; document, commit, and push only if all checks pass. Static checks pass, but ProcessMachine3D cannot mount during unauthenticated browser smoke.
+- [x] Re-run P15 static validation and publish the existing visual-only source changes while documenting authenticated WebGL smoke as BLOCKED by OAuth/session.
+
+## P16 — SCIENTIFIC INTERACTIVE PRESENTATION
+
+- [x] Map existing P15 Control Room presentation surfaces and preserve the CausalFrame-only authority boundary.
+- [x] Make the 3D Twin the central learning surface with an accessible process-flow presentation.
+- [x] Expand the component inspector with function, method, input, output, provenance, and interpretation-limit explanations without creating values.
+- [x] Add explicit SIMULATION / DERIVED / MEASURED / UNKNOWN presentation, contextual Knowledge Center / Why This Value links, and SIMPLE / SCIENTIFIC / EXPERT modes.
+- [x] Run P16 code, test, build, diff, documentation, commit, and push checks; keep authenticated WebGL smoke explicitly BLOCKED by OAuth/session when unavailable.
+
+## P17 — INSTRUMENT & CALIBRATION FOUNDATION
+
+- [x] Map P16 instrument, sensor, provenance, and Knowledge Center surfaces while preserving CausalFrame authority.
+- [x] Implement a source-safe Instrument Registry and Instrument Inspector with calibration, certificate, range, resolution, traceability, uncertainty, provenance, and unloaded-status contract fields.
+- [x] Connect the 3D sensor inspector to the instrument information layer without creating measurement data or changing frame contracts.
+- [x] Add P17 regression coverage, run static quality gates, document, commit, and push while retaining the authenticated WebGL blocker.
+
+## P18 — METROLOGICAL TRACEABILITY FOUNDATION
+
+- [x] Map the P17 Instrument Registry contract and preserve its unloaded measurement boundary.
+- [x] Define traceability chain nodes and source-safe statuses for instrument, certificate, reference standard, laboratory, measurement result, and evidence/provenance.
+- [x] Add a readable traceability-chain visual to the Instrument Inspector without claiming metrological traceability.
+- [x] Add P18 regression coverage, run static quality gates, document, commit, and push while retaining the authenticated WebGL blocker.
+
+## P19 — MEASUREMENT UNCERTAINTY FOUNDATION
+
+- [x] Map P17/P18 instrument and traceability contracts while preserving CausalFrame and measurement boundaries.
+- [x] Define a source-safe uncertainty-budget contract with unloaded component fields and no numerical uncertainty values.
+- [x] Add a readable uncertainty budget, scientific status, and Instrument → Calibration → Traceability → Uncertainty Budget → Measurement Result relationship to the Instrument Inspector.
+- [x] Add P19 regression coverage, run validation once, document, commit, and push while retaining the authenticated WebGL blocker.
+
+## P20 — LABORATORY EVIDENCE & DATA INGESTION FOUNDATION
+
+- [x] Map P14–P19 knowledge, instrument, traceability, uncertainty, and Control Room surfaces while preserving all scientific/runtime boundaries.
+- [x] Define a source-safe Evidence Record contract, lifecycle, completeness model, and verification gate without records, persistence, or synthetic identifiers.
+- [x] Implement a Laboratory Evidence Center and Evidence Inspector with contextual links and an explicit sample-to-verification flow.
+- [x] Add P20 evidence-bound regression coverage, run static validation once, document, commit, and push while retaining P10/WebGL blockers.
+
+## P21 — EXPERIMENTAL DATASET & SIMULATION COMPARISON FOUNDATION
+
+- [x] Map P14–P20 comparison, evidence, instrument, traceability, uncertainty, and Control Room surfaces while preserving all scientific/runtime boundaries.
+- [x] Define a source-safe Comparison Record, readiness gate, and blocked-state contract without datasets, calculated results, persistence, or synthetic identifiers.
+- [x] Implement a Comparison Center and Comparison Inspector with blocked explanation, visual foundation, and contextual links.
+- [x] Add P21 comparison-boundary regression coverage, run static validation once, document, commit, and push while retaining P10/WebGL blockers.
+
+## P22 — EXPERIMENTAL IDENTITY & EVIDENCE INTEGRITY
+
+- [x] Audit reusable P17–P21 identifiers, provenance, manifest, event-journal, hash, schema, and migration mechanisms; stop on identity conflict.
+- [x] Define canonical Experimental Identity, Evidence Integrity, hash-provider abstraction, and readiness contracts without records, hashes, or synthetic identifiers.
+- [x] Implement identity/integrity inspectors, link graph, readiness gates, P20/P21 integration, and Knowledge Center learning content without scientific state changes.
+- [x] Add P22 integrity-bound regression coverage, run static validation, document, commit, and push while retaining P10/WebGL blockers.
+
+## P23 — SCIENTIFIC AUDIT TRAIL & REPRODUCIBILITY FOUNDATION
+
+- [x] Audit reusable P17–P22 identity, event journal, provenance, replay, and Process Simulator mechanisms without creating parallel runtime data.
+- [x] Define source-safe Scientific Audit Event, Scientific Replay Reference, reproducibility matrix, and readiness contracts without events, frames, or persistence.
+- [x] Implement Scientific Reconstruction, Reproducibility Inspector, P20/P21/P22 contextual integration, and Knowledge Center learning content.
+- [x] Add P23 reproducibility-bound regression coverage, run static validation, document, commit, and push while retaining P10/WebGL blockers.
+
+## P24 — INTEGRATED SYSTEM AUDIT & SCIENTIFIC READINESS
+
+- [x] Verify Git source integrity, P15–P23 publication history, and Buku Besar alignment without implementation changes.
+- [x] Audit P15–P23 source contracts, cross-phase identifiers, scientific boundaries, backend/database/auth source readiness, and static quality evidence.
+- [x] Produce read-only scientific readiness and evidence-grounded maturity matrices with runtime/deployment blockers separated from source presence.
+- [x] Deliver the P24 audit report with no application patch, migration, deployment, or authentication action; documentation-only publication is permitted without merge.
+
+## P25 — VERIFIED RUNTIME INTEGRATION PREFLIGHT
+
+- [x] Verify Git/remote alignment and authoritative backend source identity without modifying runtime state.
+- [x] Assess deployment, database, migration, OAuth, CORS, auth, existing experiment, and canonical session prerequisites read-only; stop at the first fundamental external blocker.
+- [x] Assess source-level Control Room, 3D, WebGL, replay, journal, evidence, provenance, and P15–P24 integration readiness without runtime actions.
+- [x] Create, validate, and publish a documentation-only P25 preflight report without application patch, migration, deployment, login, data creation, or merge.
+
+## P26 — DEPLOYMENT READINESS SPECIFICATION
+
+- [x] Verify the specified P25 release SHA and P24/P25 documentation baseline without runtime or infrastructure action.
+- [x] Write the documentation-only deployment readiness specification covering release, architecture, database, identity, environment, rollback, health gate, P10 order, and stop conditions.
+- [x] Validate and publish only the P26 documentation/tracker changes without application patch, deployment, migration, login, data creation, or merge.
+
+## P27 — RUNTIME ACCEPTANCE GATE PREFLIGHT
+
+- [x] Verify only Git/remote alignment and immutable backend deployment identity; stop immediately if deployment identity is not verified.
+- [x] Classify the six downstream deployment, database, OAuth, CORS, and runtime-acceptance checks without P10, experiment, session, WebGL, or 3D action.
+- [x] Create, validate, and publish only the P27 gate documentation/tracker changes without application patch, deployment, migration, login, data creation, or merge.
+
+## BACKEND DEPLOYMENT PATH DISCOVERY
+
+- [x] Inspect only official project/repository connection and deployment capability metadata for the specified GitHub backend release.
+- [x] Report branch, SHA, full-backend, release-identity, API-host, and managed-database capability availability without changes or workarounds.
+
+## MANUS FULL-STACK RUNTIME CAPABILITY TEST
+
+- [x] Verify GitHub source checkout, exact SHA, lockfile, and full backend module presence without modifying the checkout.
+- [x] Assess official Cloud Computer, local backend runtime, isolated database configuration, and public HTTPS capabilities without production actions.
+- [x] Run only the minimum source build/type/test checks needed for runtime-capability classification, with no commit or source modification.
+
+## P28 — RUNTIME ARCHITECTURE DECISION
+
+- [x] Inspect only currently available Manus Web App/project runtime, database, secrets, public API, release identity, and Git access capabilities for the specified source release.
+- [x] Compare those capabilities with the complete GitHub backend requirements and report the minimum external path without deployment or source changes.
+
+## P29 — EXTERNAL RUNTIME DEPLOYMENT SPECIFICATION
+
+- [x] Verify the specified Git source baseline and P26/P28 architecture-decision context without runtime action.
+- [x] Write the minimal external full-backend deployment specification for source, build, runtime, secrets, database, HTTPS API, release identity, health, and rollback.
+- [x] Validate and publish only the P29 documentation/tracker changes without application patch, deployment, migration, login, data creation, or merge.
+
+## LOCAL FULL-STACK RUNTIME PREFLIGHT
+
+- [x] Verify the latest published source checkout, lockfile, scripts, and frontend/backend entry points without modifying source.
+- [x] Assess existing local database and migration-rehearsal configuration without creating a database or running migration.
+- [x] Run only safe local smoke checks permitted by existing configuration and report local backend, health, closed-loop, frontend, and 3D readiness without commit or production action.
+
+## LOCAL DATABASE HARNESS PREFLIGHT
+
+- [x] Inspect only already installed Docker, Podman, MySQL, and TiDB capabilities plus existing non-production project database configuration.
+- [x] Identify an already available isolated local database target, if any, without connecting, creating databases, or running migration.
+- [x] Report the local database path, safe-target decision, and blocker without modifications or production access.
+
+## WINDOWS LOCAL RUNTIME GUIDE
+
+- [x] Verify the latest source baseline, Windows-relevant package scripts, health route, and canonical migration chain without executing setup commands.
+- [x] Write the minimal Windows prerequisite, local database, environment, startup, verification, and cleanup guide.
+- [x] Validate and publish only the Windows runtime guide documentation/tracker changes without application patch, production access, or runtime execution.
+
+## DEPLOYED INTAKE MATERIAL LIST DEFECT
+
+- [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.
+- [x] Restore the existing material-list query path without seeding or fabricating material data.
+- [x] Verify the deployed selector reports available data, a loading state, or an explicit empty-data state.
+- [x] Deploy the existing GitHub CORS policy to the active Manus API service for the GitHub Pages origin.
+- [x] Configure the GitHub Pages build with the verified public IUVFES API URL.
+- [x] Ensure an environment CORS override cannot remove the required GitHub Pages origin from the production API allowlist.
+
+## MASTER AUTONOMOUS QUALITY & COMPLETION
+
+- [x] Perform non-destructive Git/GitHub forensics and record source-of-truth evidence.
+- [x] Create the targeted master read map and evidence-backed IUVFES Gap Registry.
+- [x] Create the Requirement Registry with implementation, test, runtime, and evidence status.
+- [x] Verify session lifecycle, persistence, replay evidence, reports, material boundary, and 3D causal mapping.
+- [x] Resolve only actionable gaps supported by the existing architecture and contracts.
+- [x] Run all available static, test, build, CI, and authenticated browser gates; record blockers honestly.
+- [x] Publish a final completion matrix with VERIFIED, PENDING, BLOCKED, and OUT_OF_SCOPE states.
+
+## AUDIT-DISCOVERED DATA CONTRACT GAPS
+
+- [x] Define one authorized handoff from a completed live closed-loop session to persisted causal replay/evidence data.
+- [x] Quarantine or explicitly separate the legacy batch `simulation.run` output from the authoritative closed-loop replay contract.
+- [x] Preserve the original IUVFES experiment identity when the scientific recorder creates research records and dataset manifests.
+- [x] Remove the synthetic default sample identifier from scientific recording; require user input or preserve UNKNOWN.
+- [x] Make canonical replay evidence checksums stable by excluding volatile export timestamps from the hashed body.
+- [x] Make runtime recovery tests explicitly isolate id and experiment lookup mocks between cases.
