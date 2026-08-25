@@ -1385,6 +1385,47 @@ Pertahankan P14 sebagai documentation/presentation layer. Sebelum meneruskan P10
 
 ---
 
+## 2026-08-25 — Canonical Drizzle Migration Governance
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Commit:** `ee7a13b6e927a17a3d8fd2b5b3e94ddcf5cc4460` — `fix(db): establish canonical migration chain`
+**PR:** open; no merge performed
+
+### Temuan
+
+Source sebelumnya memiliki SQL migration ClosedLoop, scientific event journal, dan research/evidence yang belum terdaftar dalam Drizzle journal. Dua file memakai prefix `0002`, `scientificEventJournal` dipakai runtime tetapi belum dideklarasikan dalam `drizzle/schema.ts`, dan `scientific-data.sql` adalah scaffold alternatif dengan konvensi tipe/nama yang tidak sama dengan schema MySQL kanonik.
+
+### Perubahan
+
+Drizzle toolchain digunakan untuk menghasilkan chain kanonik `0000 → 0001_purple_ozymandias → 0002_known_wolfpack → 0003_open_peter_quill`, termasuk journal dan snapshot metadata. `0001` menambah persistent ClosedLoop session, `0002` menambah scientific event journal, dan `0003` menambah research/evidence/provenance dengan foreign-key dependency yang dideklarasikan dalam schema. File SQL manual yang tidak terdaftar digantikan oleh output generator. `scientific-data.sql` dipertahankan tetapi ditandai **NON-CANONICAL DEVELOPMENT SCAFFOLD** dan tidak boleh dijalankan bersama chain kanonik.
+
+### Data flow affected
+
+Perubahan membakukan persistence schema untuk `closedLoopSessionStore`, `scientificEventJournal`, dan `scientificDatasetPersistence`. Tidak ada router, lifecycle, engine, CausalFrame, replay, atau evidence payload yang diubah; tidak ada migration yang diterapkan ke database.
+
+### Scientific impact
+
+Tidak ada perubahan physics, PID, safety, intended/effective command, actuator mapping, `timestampSeconds`, atau hasil simulasi. Patch ini hanya membangun governance metadata agar deployment masa depan dapat membandingkan runtime persistence requirements dengan migration chain yang eksplisit.
+
+### Simulation/Lab boundary impact
+
+Tidak berubah. Tidak ada experiment, session, CausalFrame, telemetry, material, laboratory record, atau scientific data sintetis yang dibuat. `scientific-data.sql` tidak dinaikkan menjadi sumber data ilmiah atau migration produksi.
+
+### Tests / Quality Gate
+
+`pnpm drizzle-kit generate` terhadap schema final melaporkan **No schema changes, nothing to migrate**. `pnpm check` PASS; `pnpm test` PASS — 32 test files / 85 tests; `pnpm build` PASS; `git diff --check` PASS. Test governance baru mengunci urutan journal, presence runtime tables, generated migration outputs, dan status non-canonical scaffold. GitHub Actions: Deploy IUVFES Control Room to GitHub Pages #54 PASS (run `32886019425`); Control Room Phase 1 Validation #245 PASS (run `32886019391`); IUVFES Quality Gate #624 PASS (run `32886019388`).
+
+### Status
+
+🟢 Canonical source migration chain sekarang jelas dan generator-backed. 🟡 Production database masih hanya memiliki base migration; backup, rollback, migration execution, full GitHub backend deployment, dan release identity belum tersedia. 🔴 P10 tetap blocked dan tidak boleh memakai chain ini sebagai klaim bahwa database production telah dimigrasikan.
+
+### Next action
+
+Sebelum database mutation atau P10, siapkan approved migration execution plan, backup/restore/PITR evidence, dan full backend deployment yang terikat ke release identity. Kemudian lakukan migration dan post-deploy checks sebagai pekerjaan terpisah, tidak dalam patch governance ini.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:

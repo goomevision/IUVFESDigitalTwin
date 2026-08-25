@@ -414,7 +414,7 @@
 
 - [x] Establish the canonical Drizzle migration chain: register unique ordered migrations, align snapshots and schema with runtime persistence, and preserve `scientific-data.sql` as non-canonical.
 - [x] Validate canonical migration governance with non-mutating checks, commit/push only the scoped patch, and keep production deployment/database/P10 blocked.
-- [ ] Record the CI-verified canonical migration governance result in Buku Besar without changing database deployment or P10 status.
+- [x] Record the CI-verified canonical migration governance result in Buku Besar without changing database deployment or P10 status.
 
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
