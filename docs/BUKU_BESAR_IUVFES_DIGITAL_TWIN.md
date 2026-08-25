@@ -1536,6 +1536,47 @@ Pertahankan P16 sebagai layer presentasi dan pendidikan. Jangan melakukan P10 at
 
 ---
 
+## 2026-08-26 — P17 Instrument & Calibration Foundation source publication
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Commit:** Source-publication commit for this entry
+**PR:** open; no merge performed
+
+### Temuan
+
+Control Room sudah menunjukkan sensor simulation dan provenance `CausalFrame`, tetapi belum memiliki surface yang membedakan channel modelled tersebut dari instrument nyata beserta metadata calibration, certificate, measurement range, resolution, traceability, uncertainty, dan evidence. P17 menambahkan foundation UI/contract agar metadata nyata dapat dimasukkan pada tahap yang disetujui tanpa memperlakukan simulation sebagai hasil laboratorium.
+
+### Perubahan
+
+P17 menambahkan Instrument Registry dan Instrument Inspector yang mendeklarasikan channel reactor temperature, chamber pressure, ultrasonic effective power, serta empat cold-trap temperature channels. Setiap registry entry menyediakan contract fields untuk calibration status, certificate reference, measurement range, resolution, traceability chain, measurement uncertainty, evidence reference, provenance, dan frame field. Semua field laboratorium saat ini berstatus `UNKNOWN` atau `NOT LOADED` tanpa nilai numerik. Inspector 3D sekarang memberi contextual link ke registry ketika component memiliki channel instrument yang dideklarasikan.
+
+### Data flow affected
+
+Jalur runtime tetap `CausalFrame → ProcessMachine3D / ProcessSimulator`. Registry hanya memetakan component 3D ke metadata UI dan menegaskan field authoritative yang sudah ada, misalnya `sensorAfter.temperatureC`, `sensorAfter.pressureMbar`, `ultrasonic.effectivePowerW`, dan `hardwareDiagnostics.coldTrapTemperaturesC[n]`. Tidak ada frame baru, sensor baru, persistence baru, atau request API baru.
+
+### Scientific impact
+
+Tidak ada perubahan physics, PID, safety, CausalFrame contract, database, migration, OAuth, backend, experiment/session, lifecycle P10, scientific journal, atau telemetry. P17 tidak membuat data laboratorium, certificate, calibration date, measurement range, resolution, traceability chain, evidence, atau nilai uncertainty. P17 juga tidak mengklaim ISO/IEC 17025 compliance.
+
+### Simulation/Lab boundary impact
+
+`SIMULATION` tetap berarti value dari active CausalFrame. `MEASURED` tidak digunakan sebagai claim karena measurement dataset belum dimuat. `NOT LOADED` dan `UNKNOWN` dipertahankan untuk calibration, traceability, evidence, range, resolution, dan uncertainty yang belum tersedia. Foundation ini tidak mengubah simulation menjadi laboratory observation atau validation.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS — 35 files / 94 tests, termasuk `server/instrumentRegistry.p17.test.ts`. `pnpm build`: PASS. `git diff --check`: PASS. Warning ukuran JavaScript bundle lebih dari 500 kB tetap non-blocking.
+
+### Status
+
+🟢 P17 **source publication** tervalidasi secara statis pada branch fitur tanpa merge. 🟡 Instrument Registry adalah contract/UI foundation; metadata measurement nyata tetap `NOT LOADED` atau `UNKNOWN` sampai sumber yang legitimate tersedia. 🟡 Authenticated WebGL smoke tetap **BLOCKED** oleh OAuth/session/full backend deployment; status P10 tidak berubah.
+
+### Next action
+
+Sebelum mengisi metadata instrument nyata, sediakan governance terpisah untuk instrument master data, calibration certificate/evidence, traceability, uncertainty, validation, ownership, dan persistence. Jangan mengisi field P17 dengan nilai sintetis. Jangan melakukan P10/3D browser acceptance sebelum prasyarat runtime legitimate tersedia.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:

@@ -5,12 +5,14 @@ import type { CausalFrame } from "../../../server/closedLoopSimulation";
 import type { ControlRoomEventName, ControlRoomEventResult, FrameReference } from "@/lib/controlRoomObservability";
 import { WhyThisValue } from "@/components/WhyThisValue";
 import { Link } from "wouter";
+import { getInstrumentForMachineComponent } from "@/lib/instrumentRegistry";
 
 type MachineObservabilityEvent = Extract<ControlRoomEventName, "THREE_SCENE_INIT" | "THREE_RENDERER_INIT" | "THREE_DISPOSE" | "WEBGL_ERROR" | "FRAME_RENDERED" | "SELECT_COMPONENT" | "FOCUS_COMPONENT" | "CAMERA_PRESET" | "ZOOM" | "RESET_VIEW" | "LAYER_CHANGE" | "VIEW_MODE_CHANGE">;
 
 interface Props {
   frame?: CausalFrame;
   onObservabilityEvent?: (input: { event: MachineObservabilityEvent; result: ControlRoomEventResult; componentId?: string; detail?: Record<string, unknown>; frameRef?: FrameReference }) => void;
+  onInstrumentFocus?: (instrumentId: string | undefined) => void;
 }
 
 type ViewMode = "REALISTIC" | "X_RAY" | "WIREFRAME";
@@ -215,7 +217,7 @@ function createParticles(parent: THREE.Object3D, count: number, color: number) {
   return group;
 }
 
-export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
+export function ProcessMachine3D({ frame, onObservabilityEvent, onInstrumentFocus }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<CausalFrame | undefined>(frame);
   const sceneRuntimeRef = useRef<{
@@ -277,12 +279,15 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
         if (Array.isArray(material)) material.forEach(apply); else apply(material);
       }));
     });
-    if (selectedComponent) observabilityRef.current?.({ event: "SELECT_COMPONENT", result: "SUCCESS", componentId: selectedComponent });
+    if (selectedComponent) {
+      observabilityRef.current?.({ event: "SELECT_COMPONENT", result: "SUCCESS", componentId: selectedComponent });
+      onInstrumentFocus?.(getInstrumentForMachineComponent(selectedComponent)?.id);
+    } else onInstrumentFocus?.(undefined);
     if (selectedObjects.length) {
       applyPreset(COMPONENT_PRESETS[selectedComponent as ComponentId]);
       observabilityRef.current?.({ event: "FOCUS_COMPONENT", result: "SUCCESS", componentId: selectedComponent ?? undefined });
     }
-  }, [selectedComponent, applyPreset]);
+  }, [selectedComponent, applyPreset, onInstrumentFocus]);
 
   useEffect(() => {
     const runtime = sceneRuntimeRef.current;
@@ -913,6 +918,7 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
       ? displayNumber(visual.pressureMbar, 1, "mbar")
       : displayNumber(visual.temperatureC, 1, "°C");
   const selectedExplanation = selectedComponent ? getProcessMachineComponentExplanation(selectedComponent) : undefined;
+  const selectedInstrument = getInstrumentForMachineComponent(selectedComponent);
   const presentationCopy: Record<PresentationMode, { title: string; detail: string }> = {
     SIMPLE: { title: "OPERATOR OVERVIEW", detail: "Select equipment to learn what it does. Values remain tied to the active frame." },
     SCIENTIFIC: { title: "SCIENTIFIC CONTEXT", detail: "Trace the process topology, authoritative source, provenance, and interpretation boundary." },
@@ -973,7 +979,7 @@ export function ProcessMachine3D({ frame, onObservabilityEvent }: Props) {
 
       <div className="pointer-events-auto absolute bottom-28 left-4 w-[22rem] rounded-xl border border-violet-500/20 bg-slate-950/90 p-3 font-mono text-[9px] shadow-xl backdrop-blur">
         <div className="flex items-center justify-between gap-2"><span className="text-[8px] tracking-[0.2em] text-violet-300">COMPONENT INSPECTOR</span><select aria-label="Select 3D component" value={selectedComponent ?? ""} onChange={event => setSelectedComponent((event.target.value || null) as ComponentId | null)} className="max-w-32 rounded border border-slate-700 bg-slate-900 px-1 py-0.5 text-[8px] text-slate-200"><option value="">SELECT</option>{(Object.keys(COMPONENT_LABELS) as ComponentId[]).map(id => <option value={id} key={id}>{COMPONENT_LABELS[id]}</option>)}</select></div>
-        {selectedComponent && selectedExplanation ? <div className="mt-2 space-y-2 text-slate-400"><div><div className="text-xs text-violet-200">{COMPONENT_LABELS[selectedComponent]}</div><div className="mt-0.5 text-[8px] text-slate-500">{selectedExplanation.function}</div></div><div className="grid grid-cols-2 gap-x-3 gap-y-1"><span>STATE</span><span className="text-right text-slate-200">{visual.stage ?? "UNKNOWN"}</span><span>COMMAND</span><span className="text-right text-slate-200">{commandFor(selectedComponent) === undefined ? "UNKNOWN" : commandFor(selectedComponent) ? "ON" : "OFF"}</span><span>ACTUATOR</span><span className="text-right text-cyan-200">{actuatorFor(selectedComponent) === undefined ? "UNKNOWN" : normalizedLevel(actuatorFor(selectedComponent)).toFixed(2)}</span><span>SENSOR</span><span className="text-right text-slate-200">{selectedSensor}</span><span>FLOW RATE</span><span className="text-right text-amber-200">UNKNOWN</span><span>SIM TIME</span><span className="text-right text-slate-200">{displayNumber(visual.timestampSeconds, 1, "s")}</span><span>PROVENANCE</span><span className="text-right text-violet-200">{selectedExplanation.classification}</span><span>MEASURED</span><span className="text-right text-slate-500">NOT LOADED</span></div><div className="border-t border-slate-800 pt-2 text-[8px] leading-relaxed"><div><span className="text-slate-600">METHOD:</span> {selectedExplanation.method}</div><div className="mt-1"><span className="text-slate-600">VISUAL OUTPUT:</span> {selectedExplanation.visualOutput}</div>{presentationMode !== "SIMPLE" ? <div className="mt-1"><span className="text-slate-600">AUTHORITATIVE INPUT:</span> {selectedExplanation.authoritativeInput}</div> : null}{presentationMode === "EXPERT" ? <div className="mt-1 text-amber-200"><span className="text-amber-300/70">LIMIT:</span> {selectedExplanation.interpretationLimit}</div> : null}</div><WhyThisValue source="Active CausalFrame" field={selectedExplanation.authoritativeInput} classification={selectedExplanation.classification} meaning={selectedExplanation.visualOutput} notMeaning={selectedExplanation.interpretationLimit} frameLabel={hasFrame ? `Frame simulation time ${displayNumber(visual.timestampSeconds, 1, "s")}` : "UNKNOWN — no active frame"} /><Link href="/knowledge"><span className="mt-2 inline-flex cursor-pointer border border-cyan-500/30 px-2 py-1 text-[7px] tracking-[0.12em] text-cyan-200 hover:bg-cyan-500/10">OPEN KNOWLEDGE CENTER →</span></Link></div> : <div className="mt-2 text-slate-500">Click a major 3D component or choose it here to focus the camera and inspect its authoritative frame values.</div>}
+        {selectedComponent && selectedExplanation ? <div className="mt-2 space-y-2 text-slate-400"><div><div className="text-xs text-violet-200">{COMPONENT_LABELS[selectedComponent]}</div><div className="mt-0.5 text-[8px] text-slate-500">{selectedExplanation.function}</div></div><div className="grid grid-cols-2 gap-x-3 gap-y-1"><span>STATE</span><span className="text-right text-slate-200">{visual.stage ?? "UNKNOWN"}</span><span>COMMAND</span><span className="text-right text-slate-200">{commandFor(selectedComponent) === undefined ? "UNKNOWN" : commandFor(selectedComponent) ? "ON" : "OFF"}</span><span>ACTUATOR</span><span className="text-right text-cyan-200">{actuatorFor(selectedComponent) === undefined ? "UNKNOWN" : normalizedLevel(actuatorFor(selectedComponent)).toFixed(2)}</span><span>SENSOR</span><span className="text-right text-slate-200">{selectedSensor}</span><span>FLOW RATE</span><span className="text-right text-amber-200">UNKNOWN</span><span>SIM TIME</span><span className="text-right text-slate-200">{displayNumber(visual.timestampSeconds, 1, "s")}</span><span>PROVENANCE</span><span className="text-right text-violet-200">{selectedExplanation.classification}</span><span>MEASURED</span><span className="text-right text-slate-500">NOT LOADED</span></div><div className="border-t border-slate-800 pt-2 text-[8px] leading-relaxed"><div><span className="text-slate-600">METHOD:</span> {selectedExplanation.method}</div><div className="mt-1"><span className="text-slate-600">VISUAL OUTPUT:</span> {selectedExplanation.visualOutput}</div>{presentationMode !== "SIMPLE" ? <div className="mt-1"><span className="text-slate-600">AUTHORITATIVE INPUT:</span> {selectedExplanation.authoritativeInput}</div> : null}{presentationMode === "EXPERT" ? <div className="mt-1 text-amber-200"><span className="text-amber-300/70">LIMIT:</span> {selectedExplanation.interpretationLimit}</div> : null}</div><WhyThisValue source="Active CausalFrame" field={selectedExplanation.authoritativeInput} classification={selectedExplanation.classification} meaning={selectedExplanation.visualOutput} notMeaning={selectedExplanation.interpretationLimit} frameLabel={hasFrame ? `Frame simulation time ${displayNumber(visual.timestampSeconds, 1, "s")}` : "UNKNOWN — no active frame"} /><div className="mt-2 flex flex-wrap gap-1.5"><Link href="/knowledge"><span className="inline-flex cursor-pointer border border-cyan-500/30 px-2 py-1 text-[7px] tracking-[0.12em] text-cyan-200 hover:bg-cyan-500/10">OPEN KNOWLEDGE CENTER →</span></Link>{selectedInstrument ? <button onClick={() => document.getElementById("instrument-registry")?.scrollIntoView({ behavior: "smooth", block: "start" })} className="border border-sky-500/30 px-2 py-1 text-[7px] tracking-[0.12em] text-sky-200 hover:bg-sky-500/10">INSTRUMENT {selectedInstrument.id} →</button> : <span className="border border-slate-800 px-2 py-1 text-[7px] tracking-[0.12em] text-slate-600">INSTRUMENT: NOT LOADED</span>}</div></div> : <div className="mt-2 text-slate-500">Click a major 3D component or choose it here to focus the camera and inspect its authoritative frame values.</div>}
       </div>
 
       {layers.instrument && <div className="absolute bottom-3 left-3 right-3 grid grid-cols-2 gap-2 md:grid-cols-6">

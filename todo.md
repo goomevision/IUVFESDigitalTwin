@@ -443,6 +443,13 @@
 - [x] Add explicit SIMULATION / DERIVED / MEASURED / UNKNOWN presentation, contextual Knowledge Center / Why This Value links, and SIMPLE / SCIENTIFIC / EXPERT modes.
 - [x] Run P16 code, test, build, diff, documentation, commit, and push checks; keep authenticated WebGL smoke explicitly BLOCKED by OAuth/session when unavailable.
 
+## P17 — INSTRUMENT & CALIBRATION FOUNDATION
+
+- [x] Map P16 instrument, sensor, provenance, and Knowledge Center surfaces while preserving CausalFrame authority.
+- [x] Implement a source-safe Instrument Registry and Instrument Inspector with calibration, certificate, range, resolution, traceability, uncertainty, provenance, and unloaded-status contract fields.
+- [x] Connect the 3D sensor inspector to the instrument information layer without creating measurement data or changing frame contracts.
+- [x] Add P17 regression coverage, run static quality gates, document, commit, and push while retaining the authenticated WebGL blocker.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.

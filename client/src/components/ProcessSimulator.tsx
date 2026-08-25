@@ -11,6 +11,7 @@ import { CausalFrameInspector } from "@/components/CausalFrameInspector";
 import { ProcessRunReplay } from "@/components/ProcessRunReplay";
 import { ControlRoomObservabilityPanel } from "@/components/ControlRoomObservabilityPanel";
 import { WhyThisValue, type WhyThisValueProps } from "@/components/WhyThisValue";
+import { InstrumentRegistry } from "@/components/InstrumentRegistry";
 import { recordControlRoomEvent, toFrameReference, toOperatorReference } from "@/lib/controlRoomObservability";
 import { useAuth } from "@/_core/hooks/useAuth";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -93,6 +94,7 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [focusedInstrumentId, setFocusedInstrumentId] = useState<string | undefined>(undefined);
   const [replayMode, setReplayMode] = useState(false);
   const [replayIndex, setReplayIndex] = useState(0);
   const [temperature, setTemperature] = useState(62);
@@ -181,6 +183,9 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
   const onMachineObservabilityEvent = useCallback((event: Parameters<NonNullable<Parameters<typeof ProcessMachine3D>[0]["onObservabilityEvent"]>>[0]) => {
     recordControlRoomEvent({ ...event, operator: toOperatorReference(auth.user), experimentId, sessionId: sessionId ?? undefined });
   }, [auth.user, experimentId, sessionId]);
+  const onMachineInstrumentFocus = useCallback((instrumentId: string | undefined) => {
+    setFocusedInstrumentId(previous => previous === instrumentId ? previous : instrumentId);
+  }, []);
   const oneStep = async (id: string) => {
     if (busy.current) return;
     busy.current = true;
@@ -287,7 +292,7 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
           </aside>
 
           <main className="min-w-0 space-y-3">
-            <section className="border border-cyan-500/25 bg-slate-950/70 p-3 shadow-[0_0_55px_rgba(14,116,144,0.12)]"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><div className="text-[9px] tracking-[0.24em] text-cyan-300">PROCESS TWIN</div><h2 className="mt-1 text-lg font-semibold tracking-wide">REACTOR → VAPOR → MULTI-STAGE CONDENSATION → RECOVERY</h2></div><div className="flex items-center gap-3"><ProgressRing progress={engineProgress} /><div className="font-mono text-[10px]"><div className="text-slate-500">ENGINE STAGE</div><div className="mt-1 text-cyan-200">{state?.stage ?? "WAITING"}</div><div className="mt-1 max-w-[220px] text-[9px] text-slate-500">{safety?.transitionReason ?? "Waiting for the first CausalFrame."}</div></div></div></div><ProcessMachine3D frame={displayFrame} onObservabilityEvent={onMachineObservabilityEvent} /></section>
+            <section className="border border-cyan-500/25 bg-slate-950/70 p-3 shadow-[0_0_55px_rgba(14,116,144,0.12)]"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><div><div className="text-[9px] tracking-[0.24em] text-cyan-300">PROCESS TWIN</div><h2 className="mt-1 text-lg font-semibold tracking-wide">REACTOR → VAPOR → MULTI-STAGE CONDENSATION → RECOVERY</h2></div><div className="flex items-center gap-3"><ProgressRing progress={engineProgress} /><div className="font-mono text-[10px]"><div className="text-slate-500">ENGINE STAGE</div><div className="mt-1 text-cyan-200">{state?.stage ?? "WAITING"}</div><div className="mt-1 max-w-[220px] text-[9px] text-slate-500">{safety?.transitionReason ?? "Waiting for the first CausalFrame."}</div></div></div></div><ProcessMachine3D frame={displayFrame} onObservabilityEvent={onMachineObservabilityEvent} onInstrumentFocus={onMachineInstrumentFocus} /></section>
             <section className="grid divide-x divide-slate-800 border border-slate-800 bg-slate-950/65 sm:grid-cols-3 xl:grid-cols-6"><Instrument label="TEMPERATURE" value={format(sensor?.temperatureC, 1)} unit="°C" why={{ source: "CausalFrame", field: "sensorAfter.temperatureC", classification: "SIMULATION", meaning: "Active-frame temperature presented by the Control Room.", notMeaning: "A laboratory measurement unless a separate MEASURED dataset says so.", frameLabel: displayFrame ? `Frame #${displayFrame.step} at ${format(displayFrame.timestampSeconds, 1)} s` : "UNKNOWN — no active frame" }} /><Instrument label="PRESSURE" value={format(sensor?.pressureMbar, 1)} unit="mbar" tone="sky" why={{ source: "CausalFrame", field: "sensorAfter.pressureMbar", classification: "SIMULATION", meaning: "Active-frame pressure presented by the Control Room.", notMeaning: "A laboratory measurement unless a separate MEASURED dataset says so.", frameLabel: displayFrame ? `Frame #${displayFrame.step} at ${format(displayFrame.timestampSeconds, 1)} s` : "UNKNOWN — no active frame" }} /><Instrument label="YIELD" value={format(sensor?.yieldPercent, 2)} unit="%" tone="emerald" /><Instrument label="OIL RECOVERED" value={format(sensor?.oilRecoveredKg, 3)} unit="kg" tone="amber" /><Instrument label="WATER REMOVED" value={format(sensor?.waterRemovedKg, 3)} unit="kg" tone="sky" /><Instrument label="ENERGY" value={format(sensor?.energyKwh, 3)} unit="kWh" tone="amber" /></section>
           </main>
 
@@ -298,6 +303,8 @@ export function ProcessSimulator({ experimentId, onExit, onComplete }: { experim
             <section className="border border-slate-800 bg-slate-950/80 p-3"><div className="flex items-center gap-2 text-[9px] tracking-[0.2em] text-violet-300"><Radio className="h-3.5 w-3.5" />DATA PROVENANCE</div><div className="mt-2"><DetailLine label="PRIMARY SOURCE" value="SIMULATION" tone="text-violet-200" /><DetailLine label="FRAME ORIGIN" value="CLOSED-LOOP ENGINE" tone="text-violet-200" /><DetailLine label="LAB VALIDATION" value="NOT AVAILABLE" tone="text-amber-300" /><DetailLine label="FRAME" value={displayFrame ? `#${displayFrame.step}` : "UNKNOWN"} /></div><p className="mt-2 text-[8px] leading-relaxed text-slate-600">Simulation-derived values are not laboratory observations. Missing properties remain UNKNOWN / DATA GAP.</p></section>
           </aside>
         </section>
+
+        <InstrumentRegistry selectedInstrumentId={focusedInstrumentId} />
 
         <section className="grid gap-3 xl:grid-cols-[1.15fr_.85fr]"><LiveProcessTrend frames={recent} /><CausalFrameInspector frames={replayFrames} /></section>
         <ControlRoomObservabilityPanel />
