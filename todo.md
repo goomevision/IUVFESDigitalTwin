@@ -512,6 +512,12 @@
 - [x] Write the documentation-only deployment readiness specification covering release, architecture, database, identity, environment, rollback, health gate, P10 order, and stop conditions.
 - [x] Validate and publish only the P26 documentation/tracker changes without application patch, deployment, migration, login, data creation, or merge.
 
+## P27 — RUNTIME ACCEPTANCE GATE PREFLIGHT
+
+- [x] Verify only Git/remote alignment and immutable backend deployment identity; stop immediately if deployment identity is not verified.
+- [x] Classify the six downstream deployment, database, OAuth, CORS, and runtime-acceptance checks without P10, experiment, session, WebGL, or 3D action.
+- [x] Create, validate, and publish only the P27 gate documentation/tracker changes without application patch, deployment, migration, login, data creation, or merge.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.
