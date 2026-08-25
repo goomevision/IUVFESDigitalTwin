@@ -1618,6 +1618,47 @@ Jangan mengisi node P18 sebelum tersedia evidence-backed records dan governance 
 
 ---
 
+## 2026-08-26 — P19 Measurement Uncertainty Foundation source publication
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Commit:** Source-publication commit for this entry
+**PR:** open; no merge performed
+
+### Temuan
+
+P17 dan P18 menyediakan contract instrument dan traceability, tetapi belum menyediakan uncertainty-budget surface yang secara eksplisit membedakan field uncertainty yang belum dimuat dari nilai uncertainty terkuantifikasi. Tanpa contract tersebut, Control Room berisiko menampilkan simulation field seolah-olah sudah memiliki measurement uncertainty atau measurement result.
+
+### Perubahan
+
+P19 menambahkan Measurement Uncertainty Foundation pada Instrument Inspector. Budget mencakup tujuh component: **Instrument**, **Calibration**, **Resolution**, **Repeatability**, **Reference Standard**, **Environmental**, dan **Other**. Setiap component memuat component ID, source/reference, distribution, evaluation method, standard uncertainty, sensitivity coefficient, contribution, provenance, status, dan interpretation limit. Semua field nilai saat ini `NOT LOADED`, `UNKNOWN`, atau `NOT APPLICABLE`; tidak ada angka uncertainty yang dibuat. Budget status awal ditampilkan sebagai **NOT AVAILABLE / NOT LOADED**.
+
+### Data flow affected
+
+Budget dibentuk deterministik dari P17 `InstrumentRegistryEntry`; tidak membaca atau mengubah CausalFrame di luar field provenance yang sudah dideklarasikan. Visual relationship **Instrument → Calibration → Traceability → Uncertainty Budget → Measurement Result** menautkan Registry, Traceability Chain, dan Knowledge Center. `timestampSeconds`, `sensorAfter`, `effectiveCommands`, dan `actuatorLevels` tidak berubah authority maupun penggunaannya.
+
+### Scientific impact
+
+Tidak ada perubahan database, migration, backend, OAuth, experiment/session, telemetry, CausalFrame, physics, PID, safety, certificate, calibration value, uncertainty number, measurement result, atau evidence. `MEASUREMENT RESULT` ditandai `NOT APPLICABLE` karena active channel adalah simulation. P19 tidak menghitung combined/expanded uncertainty atau mengklaim measurement result.
+
+### Simulation/Lab boundary impact
+
+UI menyatakan secara eksplisit `SIMULATION ≠ MEASURED`, `DERIVED ≠ MEASURED`, dan `UNKNOWN` tetap `UNKNOWN`. Uncertainty Budget dan Traceability Chain tetap evidence-bound: `NOT LOADED` bukan nilai nol, dan `NOT AVAILABLE` bukan hasil uncertainty. Tidak ada claim metrological traceability atau laboratory validity.
+
+### Tests / Quality Gate
+
+`pnpm check`: PASS. `pnpm test`: PASS — 37 files / 100 tests, termasuk `server/measurementUncertainty.p19.test.ts`. `pnpm build`: PASS. `git diff --check`: PASS. Warning ukuran JavaScript bundle lebih dari 500 kB tetap non-blocking.
+
+### Status
+
+🟢 P19 **source publication** tervalidasi secara statis pada branch fitur tanpa merge. 🟡 Measurement Uncertainty Foundation adalah UI/contract foundation dengan status **NOT AVAILABLE / NOT LOADED**, bukan uncertainty budget terkuantifikasi. 🟡 Authenticated WebGL smoke tetap **BLOCKED** oleh OAuth/session/full backend deployment; P10 tidak berubah.
+
+### Next action
+
+Jangan mengisi budget P19 sebelum tersedia records nyata yang evidence-backed untuk physical instrument, calibration, resolution, repeatability, reference standard, environmental condition, uncertainty method, measurement result, traceability, dan provenance. Jangan menjalankan P10/browser acceptance sebelum prasyarat runtime legitimate tersedia.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:

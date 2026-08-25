@@ -457,6 +457,13 @@
 - [x] Add a readable traceability-chain visual to the Instrument Inspector without claiming metrological traceability.
 - [x] Add P18 regression coverage, run static quality gates, document, commit, and push while retaining the authenticated WebGL blocker.
 
+## P19 — MEASUREMENT UNCERTAINTY FOUNDATION
+
+- [x] Map P17/P18 instrument and traceability contracts while preserving CausalFrame and measurement boundaries.
+- [x] Define a source-safe uncertainty-budget contract with unloaded component fields and no numerical uncertainty values.
+- [x] Add a readable uncertainty budget, scientific status, and Instrument → Calibration → Traceability → Uncertainty Budget → Measurement Result relationship to the Instrument Inspector.
+- [x] Add P19 regression coverage, run validation once, document, commit, and push while retaining the authenticated WebGL blocker.
+
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 
 - [x] Diagnose why the deployed Material / Batch selector returns no selectable material records.

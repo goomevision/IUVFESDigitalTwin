@@ -1,6 +1,9 @@
 export type InstrumentStatus = "SIMULATION" | "DERIVED" | "MEASURED" | "UNKNOWN" | "NOT LOADED";
 export type TraceabilityNodeStatus = "VERIFIED" | "NOT LOADED" | "UNKNOWN" | "NOT APPLICABLE";
 export type TraceabilityNodeKind = "INSTRUMENT" | "CALIBRATION_CERTIFICATE" | "REFERENCE_STANDARD" | "CALIBRATION_LABORATORY" | "MEASUREMENT_RESULT" | "EVIDENCE_PROVENANCE";
+export type UncertaintyComponentStatus = "NOT LOADED" | "UNKNOWN" | "NOT APPLICABLE";
+export type UncertaintyComponentKind = "INSTRUMENT" | "CALIBRATION" | "RESOLUTION" | "REPEATABILITY" | "REFERENCE_STANDARD" | "ENVIRONMENTAL" | "OTHER";
+export type UncertaintyAvailability = "NOT AVAILABLE";
 
 export interface InstrumentContractField {
   status: InstrumentStatus;
@@ -34,6 +37,29 @@ export interface MetrologicalTraceabilityNode {
   identifierReference: string;
   source: string;
   provenance: InstrumentStatus;
+  interpretationLimit: string;
+}
+
+export interface MeasurementUncertaintyComponent {
+  id: string;
+  kind: UncertaintyComponentKind;
+  label: string;
+  sourceReference: string;
+  distribution: string;
+  evaluationMethod: string;
+  standardUncertainty: string;
+  sensitivityCoefficient: string;
+  contribution: string;
+  provenance: InstrumentStatus;
+  status: UncertaintyComponentStatus;
+  interpretationLimit: string;
+}
+
+export interface MeasurementUncertaintyBudget {
+  availability: UncertaintyAvailability;
+  status: "NOT LOADED";
+  measurementResultStatus: "NOT APPLICABLE";
+  components: readonly MeasurementUncertaintyComponent[];
   interpretationLimit: string;
 }
 
@@ -181,4 +207,32 @@ export function getMetrologicalTraceabilityChain(entry: InstrumentRegistryEntry)
 
 export function hasVerifiedMetrologicalTraceability(nodes: readonly MetrologicalTraceabilityNode[]) {
   return nodes.length > 0 && nodes.every(node => node.status === "VERIFIED");
+}
+
+export function getMeasurementUncertaintyBudget(entry: InstrumentRegistryEntry): MeasurementUncertaintyBudget {
+  const notLoaded = (id: string, kind: UncertaintyComponentKind, label: string, limit: string): MeasurementUncertaintyComponent => ({
+    id, kind, label, sourceReference: "NOT LOADED", distribution: "NOT LOADED", evaluationMethod: "NOT LOADED", standardUncertainty: "NOT LOADED", sensitivityCoefficient: "NOT LOADED", contribution: "NOT LOADED", provenance: "NOT LOADED", status: "NOT LOADED", interpretationLimit: limit,
+  });
+  const unknown = (id: string, kind: UncertaintyComponentKind, label: string, limit: string): MeasurementUncertaintyComponent => ({
+    id, kind, label, sourceReference: "UNKNOWN", distribution: "UNKNOWN", evaluationMethod: "UNKNOWN", standardUncertainty: "UNKNOWN", sensitivityCoefficient: "UNKNOWN", contribution: "UNKNOWN", provenance: "UNKNOWN", status: "UNKNOWN", interpretationLimit: limit,
+  });
+  return {
+    availability: "NOT AVAILABLE",
+    status: "NOT LOADED",
+    measurementResultStatus: "NOT APPLICABLE",
+    components: [
+      { id: `${entry.id}:INSTRUMENT`, kind: "INSTRUMENT", label: "Instrument contribution", sourceReference: `P17 Instrument Registry / ${entry.id}`, distribution: "NOT APPLICABLE", evaluationMethod: "NOT APPLICABLE", standardUncertainty: "NOT APPLICABLE", sensitivityCoefficient: "NOT APPLICABLE", contribution: "NOT APPLICABLE", provenance: entry.provenance, status: "NOT APPLICABLE", interpretationLimit: "The current channel is simulation provenance, not a physical instrument uncertainty contribution." },
+      notLoaded(`${entry.id}:CALIBRATION`, "CALIBRATION", "Calibration contribution", "No calibration record or calibration uncertainty is loaded."),
+      unknown(`${entry.id}:RESOLUTION`, "RESOLUTION", "Resolution contribution", "Resolution is unavailable in the current source contract; no value is inferred."),
+      notLoaded(`${entry.id}:REPEATABILITY`, "REPEATABILITY", "Repeatability contribution", "No repeatability study or measurement series is loaded."),
+      notLoaded(`${entry.id}:REFERENCE_STANDARD`, "REFERENCE_STANDARD", "Reference standard contribution", "No reference-standard record or uncertainty is loaded."),
+      notLoaded(`${entry.id}:ENVIRONMENTAL`, "ENVIRONMENTAL", "Environmental contribution", "No environmental measurement context or uncertainty is loaded."),
+      unknown(`${entry.id}:OTHER`, "OTHER", "Other contribution", "No other uncertainty source is defined or estimated."),
+    ],
+    interpretationLimit: "No uncertainty budget, combined uncertainty, expanded uncertainty, or measurement result is available from this simulation-only contract.",
+  };
+}
+
+export function hasQuantifiedMeasurementUncertainty(budget: MeasurementUncertaintyBudget) {
+  return budget.components.some(component => /^[-+]?\d/.test(component.standardUncertainty));
 }
