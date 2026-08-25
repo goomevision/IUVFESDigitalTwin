@@ -370,7 +370,7 @@
 - [x] Read the P14 master command, audit compatibility with existing scientific contracts, and define an evidence-safe implementation plan before making changes.
 - [x] Implement a public Knowledge Center route, searchable source-grounded methods/glossary/FAQ, scientific-literacy presentation modes, and a runtime-safe Why-this-value affordance without changing scientific state.
 - [x] Run P14 static, regression, production-build, diff, and browser documentation-ui checks; preserve P10 as AUTH BLOCKED.
-- [ ] Record the CI-verified P14 result in Buku Besar and push the validated P14 commit to feature/control-room-ui.
+- [x] Record the CI-verified P14 result in Buku Besar and push the validated P14 commit to feature/control-room-ui.
 
 ## DEPLOYED INTAKE MATERIAL LIST DEFECT
 

@@ -1340,6 +1340,51 @@ P10 tetap tidak berubah dan `AUTH BLOCKED`. Jangan menjalankan lifecycle/session
 
 ---
 
+## 2026-08-25 — P14 Scientific Knowledge & Method Center
+
+**AI/Worker:** Manus AI
+**Branch:** `feature/control-room-ui`
+**Commit:** `927b167672c06a6886af8f5f97ed96939abdec57` — `feat(control-room): add scientific knowledge and method center`
+**PR:** open; no merge performed
+
+### Temuan
+
+Kontrak ilmiah IUVFES telah tersebar antara Buku Besar, Process Simulator data-flow, intake, recorder, replay/evidence, dan Control Room. Tanpa permukaan pendidikan yang terpusat, pengguna berisiko menyamakan output `SIMULATION`/`DERIVED`, field `UNKNOWN`, AI interpretation, dan laboratory proof. Audit P14 juga tidak menemukan user-facing AI-analysis contract yang dapat menjadi dasar untuk menampilkan hasil atau rekomendasi AI.
+
+### Perubahan
+
+P14 menambahkan route publik `/knowledge` untuk **Scientific Knowledge & Method Center** serta navigation dari P13 auth gate dan header Control Room. Halaman ini menyediakan overview Digital Twin/Virtual Laboratory, scientific status and boundary, method cards dengan WHAT/WHY/INPUT/PROCESS/OUTPUT/LIMITATION/EVIDENCE REQUIREMENT/SOURCE, Digital Twin, CausalFrame, evidence, provenance, AI analysis, material knowledge, experiment guide, glossary, FAQ, scientific-literacy modes, search, dan user guide.
+
+Konten yang tidak dikonfirmasi oleh contract saat ini diberi `NOT AVAILABLE`, `PARTIAL`, atau `FUTURE CAPABILITY`. P14 tidak menampilkan hasil AI, skor confidence, angka uncertainty, material context, dataset laboratory, comparison, calibration, atau next-experiment recommendation yang tidak tersedia. Komponen `WhyThisValue` ditambahkan pada instrument temperature dan pressure existing untuk menerangkan field CausalFrame, classification, frame reference, visual meaning, dan apa yang tidak direpresentasikan oleh nilai tersebut.
+
+### Data flow affected
+
+`audited project documentation → scientificKnowledge content model → /knowledge public documentation route`. Pada Control Room, jalurnya hanya `active CausalFrame sensorAfter.temperatureC / sensorAfter.pressureMbar → WhyThisValue explanatory affordance`. Affordance tersebut tidak menulis ke engine, tidak membuat CausalFrame, tidak mengubah lifecycle, dan tidak mengganti nilai instrument.
+
+### Scientific impact
+
+Tidak ada perubahan pada `ClosedLoopSimulationEngine`, physics, PID, safety, material model, schema database, CausalFrame, intended/effective command, actuator mapping, `timestampSeconds`, replay/evidence, scientific journal, atau session contract. `ProcessMachine3D` tidak diubah untuk P14. P14 menjelaskan bahwa `actuatorLevels` adalah visual intensity, `effectiveCommands` adalah command/interlock authority, dan `timestampSeconds` adalah simulation time tanpa menghasilkan state scientific baru.
+
+### Simulation/Lab boundary impact
+
+Boundary dipertegas tanpa perubahan evidence. `SIMULATION`/`DERIVED` tetap bukan `MEASURED`; laboratory comparison, calibration, uncertainty quantification, model updating, dan runtime AI analysis tidak dinyatakan tersedia. `UNKNOWN` tidak diimputasi. Tidak ada experiment, session, frame, telemetry, material, laboratory result, atau scientific data sintetis yang dibuat.
+
+### Tests / Quality Gate
+
+Validasi lokal: `pnpm check` PASS; `pnpm test` PASS — 30 test files / 79 tests; `pnpm build` PASS; `git diff --check` PASS. Test P14 menegaskan overview chain, availability label untuk AI/uncertainty/laboratory comparison, simulation-versus-laboratory boundary, dan Why-this-value CausalFrame field references. Browser clone-local `/knowledge` menampilkan route, navigation, literacy-mode change, search/filter, explicit availability labels, tanpa error console dan tanpa overflow horizontal pada viewport 1280 px.
+
+GitHub Actions untuk `927b167`: Deploy IUVFES Control Room to GitHub Pages #50 PASS; Control Room Phase 1 Validation #241 PASS; IUVFES Quality Gate #616 PASS. Peringatan ukuran JavaScript bundle lebih dari 500 kB tetap non-blocking.
+
+### Status
+
+🟢 P14 Knowledge Center tersedia sebagai layer pendidikan publik yang source-grounded dan searchable. 🟢 Runtime-safe Why-this-value explanation tersedia untuk instrument existing tanpa menambah state. 🟡 Material context, evidence assessment, hypothesis, dan knowledge-gap guidance menunjukkan availability aktual; laboratorium comparison, uncertainty quantification, model updating, dan AI analysis tetap tidak tersedia. 🟡 P10 tetap `AUTH BLOCKED`; P14 tidak mengubah OAuth atau acceptance P10.
+
+### Next action
+
+Pertahankan P14 sebagai documentation/presentation layer. Sebelum meneruskan P10, selesaikan OAuth callback/backend deployment dependency melalui workflow terpisah dan dapatkan legitimate operator session pada runtime P10 yang benar. Jangan mengubah engine, CausalFrame, ProcessMachine3D, atau physics untuk memperbaiki blocker autentikasi.
+
+---
+
 # 29. TEMPLATE UPDATE BERIKUTNYA
 
 Salin template berikut saat membuat entry baru:
